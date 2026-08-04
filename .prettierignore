@@ -1,0 +1,5 @@
+.env.example
+db/schema.sql
+node_modules
+dist
+coverage
