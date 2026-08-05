@@ -11,10 +11,14 @@
     "lint": "eslint .",
     "format": "prettier --check .",
     "test": "vitest run",
-    "db:push": "tsx src/server/db-push.ts"
+    "db:push": "tsx src/server/db-push.ts",
+    "db:check:supabase": "tsx src/server/check-supabase.ts",
+    "db:migrate:supabase": "tsx src/server/migrate-postgres.ts"
   },
   "dependencies": {
+    "dotenv": "^17.4.2",
     "express": "^4.21.2",
+    "pg": "^8.22.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
@@ -24,6 +28,7 @@
     "@testing-library/react": "^16.1.0",
     "@types/express": "^5.0.0",
     "@types/node": "^22.10.2",
+    "@types/pg": "^8.20.4",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@types/supertest": "^6.0.2",

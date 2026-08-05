@@ -1,5 +1,5 @@
 .env.example
-db/schema.sql
+db/**/*.sql
 node_modules
 dist
 coverage

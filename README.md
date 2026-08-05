@@ -40,6 +40,23 @@ de desenvolvimento, TypeScript, testes e verificacao de codigo.
 - `npm run lint`: verifica padrao de codigo.
 - `npm run build`: verifica tipos e gera build web.
 - `npm run db:push`: cria ou atualiza o banco SQLite de desenvolvimento.
+- `npm run db:check:supabase`: testa a conexao com Supabase Postgres sem aplicar
+  migracoes.
+- `npm run db:migrate:supabase`: aplica migracoes no Supabase Postgres de
+  desenvolvimento/homologacao.
+
+## Supabase
+
+Para preparar um banco Supabase de desenvolvimento ou homologacao:
+
+1. Crie ou edite `.env`.
+2. Defina `APP_ENV=development`.
+3. Defina `SUPABASE_DATABASE_URL` com a connection string do Supabase Postgres.
+4. Rode `npm run db:check:supabase`.
+5. Rode `npm run db:migrate:supabase`.
+
+Nunca coloque a connection string real em `.env.example`, documentacao, prompts
+ou testes.
 
 ## Seguranca
 
