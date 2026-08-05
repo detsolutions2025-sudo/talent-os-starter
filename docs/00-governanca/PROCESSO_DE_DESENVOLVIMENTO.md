@@ -1,6 +1,7 @@
 # Processo de Desenvolvimento do Talent OS
 
 ## Fluxo obrigatório
+
 1. Escolher uma tarefa pequena.
 2. Criar ou atualizar uma especificação.
 3. Revisar a especificação.
@@ -13,6 +14,7 @@
 10. Registrar no Git.
 
 ## Não aprovar um plano quando
+
 - tentar desenvolver módulos futuros;
 - mudar arquitetura sem registrar decisão;
 - não prever testes;
@@ -20,6 +22,7 @@
 - pedir acesso direto à produção.
 
 ## Estados de uma tarefa
+
 - Rascunho
 - Em revisão
 - Aprovada
@@ -29,4 +32,5 @@
 - Bloqueada
 
 ## Regra prática
+
 Não iniciar nova tarefa enquanto a atual não estiver testada, documentada e registrada no Git.

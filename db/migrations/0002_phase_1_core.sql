@@ -1,18 +1,10 @@
-CREATE TABLE IF NOT EXISTS app_settings (
-  id TEXT PRIMARY KEY,
-  key TEXT NOT NULL UNIQUE,
-  value TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   email TEXT NOT NULL UNIQUE,
   status TEXT NOT NULL CHECK (status IN ('active', 'inactive')),
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS organizations (
@@ -23,12 +15,12 @@ CREATE TABLE IF NOT EXISTS organizations (
   legal_name TEXT,
   tax_id TEXT,
   description TEXT,
-  archived_at TEXT,
+  archived_at TIMESTAMPTZ,
   archived_by_user_id TEXT REFERENCES users(id),
-  reactivated_at TEXT,
+  reactivated_at TIMESTAMPTZ,
   reactivated_by_user_id TEXT REFERENCES users(id),
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS memberships (
@@ -37,9 +29,9 @@ CREATE TABLE IF NOT EXISTS memberships (
   user_id TEXT NOT NULL REFERENCES users(id),
   role TEXT NOT NULL CHECK (role IN ('owner', 'admin', 'member')),
   status TEXT NOT NULL CHECK (status IN ('active', 'inactive')),
-  joined_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (organization_id, user_id)
 );
 
@@ -53,8 +45,8 @@ CREATE TABLE IF NOT EXISTS audit_events (
   action TEXT NOT NULL,
   result TEXT NOT NULL CHECK (result IN ('allowed', 'denied')),
   reason TEXT,
-  metadata TEXT NOT NULL DEFAULT '{}',
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_audit_events_organization_id ON audit_events(organization_id);

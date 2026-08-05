@@ -2,14 +2,14 @@
 
 Leia completamente antes de alterar código:
 
-* README.md
-* AGENTS.md
-* SECURITY.md
-* CHECKLIST-REVISAO.md
-* docs/00-visao/roadmap.md
-* docs/03-arquitetura/multi-tenancy.md
-* docs/04-seguranca/constituicao-seguranca.md
-* todas as decisoes existentes em docs/03-arquitetura/decisoes/
+- README.md
+- AGENTS.md
+- SECURITY.md
+- CHECKLIST-REVISAO.md
+- docs/00-visao/roadmap.md
+- docs/03-arquitetura/multi-tenancy.md
+- docs/04-seguranca/constituicao-seguranca.md
+- todas as decisoes existentes em docs/03-arquitetura/decisoes/
 
 Também revise o código atual da Fase 0.
 
@@ -17,28 +17,28 @@ Também revise o código atual da Fase 0.
 
 Executar somente a Fase 1, criando a base de:
 
-* empresas;
-* usuários;
-* vínculo entre usuários e empresas;
-* funções dentro da empresa;
-* seleção da empresa atual;
-* validação de acesso no servidor;
-* auditoria inicial;
-* testes de isolamento entre empresas.
+- empresas;
+- usuários;
+- vínculo entre usuários e empresas;
+- funções dentro da empresa;
+- seleção da empresa atual;
+- validação de acesso no servidor;
+- auditoria inicial;
+- testes de isolamento entre empresas.
 
 Não desenvolver ainda:
 
-* DNA organizacional;
-* estrutura organizacional;
-* cargos;
-* vagas;
-* candidatos;
-* recrutamento;
-* DISC;
-* onboarding;
-* inteligência artificial;
-* cobrança;
-* integrações externas.
+- DNA organizacional;
+- estrutura organizacional;
+- cargos;
+- vagas;
+- candidatos;
+- recrutamento;
+- DISC;
+- onboarding;
+- inteligência artificial;
+- cobrança;
+- integrações externas.
 
 ## Antes de alterar qualquer arquivo
 
@@ -60,23 +60,23 @@ Não implemente antes de apresentar esse plano.
 
 Cada empresa deve possuir, no mínimo:
 
-* identificador;
-* nome;
-* nome simplificado para endereço ou referência;
-* status;
-* data de criação;
-* data de atualização.
+- identificador;
+- nome;
+- nome simplificado para endereço ou referência;
+- status;
+- data de criação;
+- data de atualização.
 
 ### Usuários
 
 Cada usuário deve possuir, no mínimo:
 
-* identificador;
-* nome;
-* e-mail;
-* status;
-* data de criação;
-* data de atualização.
+- identificador;
+- nome;
+- e-mail;
+- status;
+- data de criação;
+- data de atualização.
 
 O e-mail deve ser tratado de forma consistente para evitar duplicidade causada por letras maiúsculas ou espaços.
 
@@ -86,17 +86,17 @@ Um usuário pode participar de mais de uma empresa.
 
 O vínculo deve possuir:
 
-* usuário;
-* empresa;
-* função;
-* status;
-* data de entrada.
+- usuário;
+- empresa;
+- função;
+- status;
+- data de entrada.
 
 Funções iniciais:
 
-* owner;
-* admin;
-* member.
+- owner;
+- admin;
+- member.
 
 Não permita vínculos duplicados entre o mesmo usuário e a mesma empresa.
 
@@ -121,12 +121,12 @@ Como ainda não existe autenticação completa, implemente uma forma temporária
 
 Essa solução:
 
-* deve funcionar apenas no ambiente de desenvolvimento ou teste;
-* não pode ser apresentada como autenticação pronta para produção;
-* deve ser documentada;
-* deve ser fácil de remover na fase de autenticação real;
-* não deve aceitar acesso irrestrito silenciosamente;
-* não deve criar um usuário administrador automaticamente em produção.
+- deve funcionar apenas no ambiente de desenvolvimento ou teste;
+- não pode ser apresentada como autenticação pronta para produção;
+- deve ser documentada;
+- deve ser fácil de remover na fase de autenticação real;
+- não deve aceitar acesso irrestrito silenciosamente;
+- não deve criar um usuário administrador automaticamente em produção.
 
 Registre essa decisão em um novo documento de arquitetura.
 
@@ -134,19 +134,19 @@ Registre essa decisão em um novo documento de arquitetura.
 
 Registre, no mínimo:
 
-* criação de empresa;
-* criação de usuário;
-* criação de vínculo;
-* mudança de função;
-* ativação ou desativação de vínculo;
-* tentativas negadas de acesso entre empresas.
+- criação de empresa;
+- criação de usuário;
+- criação de vínculo;
+- mudança de função;
+- ativação ou desativação de vínculo;
+- tentativas negadas de acesso entre empresas.
 
 Não registre:
 
-* senhas;
-* tokens;
-* segredos;
-* conteúdo pessoal desnecessário.
+- senhas;
+- tokens;
+- segredos;
+- conteúdo pessoal desnecessário.
 
 ## API inicial esperada
 
@@ -154,14 +154,14 @@ Crie apenas os caminhos necessários para a Fase 1.
 
 Exemplos conceituais:
 
-* criar empresa;
-* listar empresas acessíveis ao usuário atual;
-* consultar uma empresa acessível;
-* criar usuário para desenvolvimento;
-* vincular usuário a uma empresa;
-* listar membros da empresa atual;
-* alterar função de um membro;
-* selecionar ou informar o contexto da empresa atual.
+- criar empresa;
+- listar empresas acessíveis ao usuário atual;
+- consultar uma empresa acessível;
+- criar usuário para desenvolvimento;
+- vincular usuário a uma empresa;
+- listar membros da empresa atual;
+- alterar função de um membro;
+- selecionar ou informar o contexto da empresa atual.
 
 Você pode ajustar os caminhos conforme os padrões do projeto, desde que documente a decisão.
 
@@ -169,12 +169,12 @@ Você pode ajustar os caminhos conforme os padrões do projeto, desde que docume
 
 Criar uma interface simples, sem preocupação estética avançada, que permita:
 
-* visualizar o usuário de desenvolvimento atual;
-* visualizar empresas às quais ele pertence;
-* selecionar uma empresa;
-* visualizar informações básicas da empresa selecionada;
-* visualizar seus membros;
-* identificar claramente quando um acesso for negado.
+- visualizar o usuário de desenvolvimento atual;
+- visualizar empresas às quais ele pertence;
+- selecionar uma empresa;
+- visualizar informações básicas da empresa selecionada;
+- visualizar seus membros;
+- identificar claramente quando um acesso for negado.
 
 Não criar um painel completo de administração.
 
@@ -212,20 +212,20 @@ Não alterar manualmente o arquivo `dev.db` como método oficial de desenvolvime
 
 A Fase 1 estará concluída somente quando:
 
-* empresas puderem ser criadas;
-* usuários puderem ser criados no modo de desenvolvimento;
-* usuários puderem ser vinculados às empresas;
-* funções puderem ser definidas;
-* o servidor validar o contexto da empresa;
-* acessos cruzados forem bloqueados;
-* ações importantes forem auditadas;
-* a interface básica funcionar;
-* todos os testes passarem;
-* lint passar;
-* formatação passar;
-* build passar;
-* documentação estiver atualizada;
-* uma nova decisão arquitetural estiver registrada.
+- empresas puderem ser criadas;
+- usuários puderem ser criados no modo de desenvolvimento;
+- usuários puderem ser vinculados às empresas;
+- funções puderem ser definidas;
+- o servidor validar o contexto da empresa;
+- acessos cruzados forem bloqueados;
+- ações importantes forem auditadas;
+- a interface básica funcionar;
+- todos os testes passarem;
+- lint passar;
+- formatação passar;
+- build passar;
+- documentação estiver atualizada;
+- uma nova decisão arquitetural estiver registrada.
 
 ## Entrega final obrigatória
 

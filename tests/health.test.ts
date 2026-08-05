@@ -9,7 +9,7 @@ describe("health endpoint", () => {
     expect(response.body).toEqual({
       status: "ok",
       service: "talent-os",
-      phase: "0"
+      phase: "1"
     });
   });
 });

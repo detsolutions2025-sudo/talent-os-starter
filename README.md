@@ -22,8 +22,8 @@ A IA auxilia. A decisao final e humana.
 
 ## Estado atual
 
-Fase 0 concluida: base tecnica local, tela inicial, servidor basico, banco SQLite
-de desenvolvimento, TypeScript, testes e verificacao de codigo.
+Fase 1 concluida: nucleo multiempresa com Organizations, Users, Memberships,
+roles iniciais, autorizacao centralizada no servidor e auditoria inicial.
 
 ## Como iniciar
 
@@ -67,6 +67,29 @@ Para preparar um banco Supabase de desenvolvimento ou homologacao:
 
 Nunca coloque a connection string real em `.env.example`, documentacao, prompts
 ou testes.
+
+## Fase 1
+
+Identificacao temporaria de desenvolvimento e teste:
+
+- `x-dev-platform-admin: true`
+- `x-dev-user-id: <user-id>`
+
+Esses headers nao sao autenticacao de producao.
+
+Rotas principais:
+
+- `POST /api/dev/users`
+- `GET /api/dev/me`
+- `POST /api/organizations`
+- `GET /api/organizations`
+- `GET /api/organizations/:organizationId`
+- `PATCH /api/organizations/:organizationId`
+- `POST /api/organizations/:organizationId/archive`
+- `POST /api/organizations/:organizationId/reactivate`
+- `GET /api/organizations/:organizationId/memberships`
+- `POST /api/organizations/:organizationId/memberships`
+- `PATCH /api/memberships/:membershipId`
 
 ## Seguranca
 
