@@ -2,6 +2,17 @@
 
 Leia este arquivo antes de alterar qualquer código.
 
+## Leitura obrigatoria
+
+Antes de alterar qualquer arquivo, leia tambem:
+
+- `CONSTITUICAO_DO_PROJETO.md`;
+- todas as decisoes existentes em `docs/03-arquitetura/decisoes/`;
+- a especificacao aprovada da tarefa, quando existir.
+
+Em caso de conflito, siga a ordem de prioridade definida em
+`CONSTITUICAO_DO_PROJETO.md`.
+
 ## Forma de trabalho
 
 1. Trabalhe em uma fase por vez.

@@ -33,6 +33,16 @@ de desenvolvimento, TypeScript, testes e verificacao de codigo.
 4. Inicie a aplicacao com `npm run dev`.
 5. Abra `http://127.0.0.1:5173`.
 
+## Governanca do projeto
+
+Antes de iniciar qualquer alteracao, leia `CONSTITUICAO_DO_PROJETO.md`.
+
+O fluxo obrigatorio de trabalho esta em
+`docs/00-governanca/PROCESSO_DE_DESENVOLVIMENTO.md`.
+
+Novas funcionalidades devem possuir especificacao baseada em
+`docs/02-requisitos/specs/TEMPLATE_SPEC.md`.
+
 ## Comandos uteis
 
 - `npm run dev`: inicia web e API local.
