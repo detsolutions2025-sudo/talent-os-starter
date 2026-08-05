@@ -1,6 +1,6 @@
 # SPEC-005 - DNA Organizacional
 
-**Status:** Aprovada 
+**Status:** Aprovada
 **Versao:** 1.0
 **Fase:** 2  
 **Responsavel de negocio:** Thiago Sousa  

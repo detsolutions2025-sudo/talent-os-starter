@@ -22,9 +22,8 @@ A IA auxilia. A decisao final e humana.
 
 ## Estado atual
 
-Fase 1.1 concluida: nucleo multiempresa com Organizations, Users, Memberships,
-roles iniciais, autorizacao centralizada no servidor, auditoria inicial e
-persistencia PostgreSQL/Supabase no runtime principal.
+Fase 2 concluida: nucleo multiempresa com persistencia PostgreSQL/Supabase e DNA
+Organizacional versionado por Organization.
 
 ## Como iniciar
 
@@ -106,6 +105,23 @@ Rotas principais:
 - `GET /api/organizations/:organizationId/memberships`
 - `POST /api/organizations/:organizationId/memberships`
 - `PATCH /api/memberships/:membershipId`
+
+## Fase 2
+
+DNA Organizacional:
+
+- `GET /api/organizations/:organizationId/dna`
+- `GET /api/organizations/:organizationId/dna/draft`
+- `GET /api/organizations/:organizationId/dna/versions`
+- `GET /api/organizations/:organizationId/dna/versions/:versionId`
+- `POST /api/organizations/:organizationId/dna/drafts`
+- `PATCH /api/organizations/:organizationId/dna/drafts/:versionId`
+- `POST /api/organizations/:organizationId/dna/drafts/:versionId/publish`
+- `POST /api/organizations/:organizationId/dna/drafts/:versionId/discard`
+- `POST /api/platform/organizations/:organizationId/dna/admin-read`
+
+A Fase 2 nao implementa IA, DISC, cargos, vagas, candidatos, matching cultural,
+onboarding, desenvolvimento ou retencao.
 
 ## Seguranca
 

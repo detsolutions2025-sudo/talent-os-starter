@@ -1,9 +1,10 @@
 import express from "express";
 import { AppError } from "./core/errors";
 import type { CoreService } from "./core/service";
+import type { DnaService } from "./dna/service";
 import { createApiRouter } from "./http/routes";
 
-export function createServer(core: CoreService) {
+export function createServer(core: CoreService, dna?: DnaService) {
   const app = express();
 
   app.use(express.json());
@@ -16,7 +17,7 @@ export function createServer(core: CoreService) {
     });
   });
 
-  app.use("/api", createApiRouter(core));
+  app.use("/api", createApiRouter(core, dna));
 
   app.use(
     (

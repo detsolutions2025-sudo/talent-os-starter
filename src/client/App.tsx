@@ -19,6 +19,36 @@ type Membership = {
   } | null;
 };
 
+type DnaValue = {
+  name: string;
+  description: string;
+  practicalMeaning: string;
+  expectedBehaviors: string[];
+  incompatibleBehaviors: string[];
+};
+
+type DnaCompetency = {
+  name: string;
+  description: string;
+  importance: "low" | "medium" | "high" | "critical";
+  examples: string[];
+};
+
+type DnaVersion = {
+  id: string;
+  versionNumber: number | null;
+  status: "draft" | "published" | "archived";
+  mission: string;
+  vision: string;
+  purpose: string;
+  values: DnaValue[];
+  competencies: DnaCompetency[];
+  culture: string;
+  leadershipStyle: string;
+  workEnvironment: string;
+  discardedAt: string | null;
+};
+
 const currentDevUserId = import.meta.env.VITE_DEV_USER_ID ?? "usr_000001";
 const devHeaders = {
   "x-dev-user-id": currentDevUserId
@@ -31,6 +61,9 @@ export function App() {
   const [memberships, setMemberships] = useState<Membership[]>([]);
   const [newMemberUserId, setNewMemberUserId] = useState("");
   const [newMemberRole, setNewMemberRole] = useState<Membership["role"]>("member");
+  const [publishedDna, setPublishedDna] = useState<DnaVersion | null>(null);
+  const [draftDna, setDraftDna] = useState<DnaVersion | null>(null);
+  const [dnaHistory, setDnaHistory] = useState<DnaVersion[]>([]);
   const [message, setMessage] = useState("Nenhuma Organization selecionada.");
   const currentMembership = memberships.find(
     (membership) => membership.userId === currentDevUserId && membership.status === "active"
@@ -38,6 +71,8 @@ export function App() {
   const canManageMemberships =
     currentMembership?.role === "owner" || currentMembership?.role === "admin";
   const canManageOwners = currentMembership?.role === "owner";
+  const canManageDna = currentMembership?.role === "owner" || currentMembership?.role === "admin";
+  const canPublishDna = currentMembership?.role === "owner";
 
   useEffect(() => {
     fetch("/api/organizations", { headers: devHeaders })
@@ -61,6 +96,9 @@ export function App() {
     setSelectedOrganizationId(organizationId);
     setSelectedOrganization(null);
     setMemberships([]);
+    setPublishedDna(null);
+    setDraftDna(null);
+    setDnaHistory([]);
 
     if (!organizationId) {
       setMessage("Nenhuma Organization selecionada.");
@@ -81,13 +119,50 @@ export function App() {
         setSelectedOrganization(organization);
         setMemberships(organizationMemberships);
         setMessage("Organization selecionada com contexto validado no servidor.");
+        void loadDna(organizationId, organizationMemberships);
       })
       .catch((error: Error) => setMessage(error.message));
+  }
+
+  function loadDna(organizationId: string, organizationMemberships = memberships) {
+    const membership = organizationMemberships.find(
+      (candidate) => candidate.userId === currentDevUserId && candidate.status === "active"
+    );
+    const canReadDraft = membership?.role === "owner" || membership?.role === "admin";
+
+    fetch(`/api/organizations/${organizationId}/dna`, { headers: devHeaders })
+      .then(async (response) => {
+        setPublishedDna(response.ok ? ((await response.json()) as DnaVersion) : null);
+      })
+      .catch(() => setPublishedDna(null));
+
+    if (!canReadDraft) {
+      setDraftDna(null);
+      setDnaHistory([]);
+      return;
+    }
+
+    fetch(`/api/organizations/${organizationId}/dna/draft`, { headers: devHeaders })
+      .then(async (response) => {
+        setDraftDna(response.ok ? ((await response.json()) as DnaVersion) : null);
+      })
+      .catch(() => setDraftDna(null));
+    fetch(`/api/organizations/${organizationId}/dna/versions`, { headers: devHeaders })
+      .then(async (response) => {
+        setDnaHistory(response.ok ? ((await response.json()) as DnaVersion[]) : []);
+      })
+      .catch(() => setDnaHistory([]));
   }
 
   function reloadSelectedOrganization() {
     if (selectedOrganizationId) {
       selectOrganization(selectedOrganizationId);
+    }
+  }
+
+  function reloadDna() {
+    if (selectedOrganizationId) {
+      loadDna(selectedOrganizationId);
     }
   }
 
@@ -142,6 +217,138 @@ export function App() {
       .catch((error: Error) => setMessage(error.message));
   }
 
+  function createDnaDraft() {
+    if (!selectedOrganizationId) {
+      setMessage("Selecione uma Organization.");
+      return;
+    }
+
+    fetch(`/api/organizations/${selectedOrganizationId}/dna/drafts`, {
+      method: "POST",
+      headers: {
+        ...devHeaders,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({})
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Acesso negado ou rascunho ativo ja existente.");
+        }
+
+        setDraftDna((await response.json()) as DnaVersion);
+        reloadDna();
+        setMessage("Rascunho de DNA criado.");
+      })
+      .catch((error: Error) => setMessage(error.message));
+  }
+
+  function saveDnaDraft() {
+    if (!selectedOrganizationId || !draftDna) {
+      return;
+    }
+
+    fetch(`/api/organizations/${selectedOrganizationId}/dna/drafts/${draftDna.id}`, {
+      method: "PATCH",
+      headers: {
+        ...devHeaders,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify(draftDna)
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Acesso negado ou dados invalidos para salvar DNA.");
+        }
+
+        setDraftDna((await response.json()) as DnaVersion);
+        reloadDna();
+        setMessage("Rascunho de DNA salvo.");
+      })
+      .catch((error: Error) => setMessage(error.message));
+  }
+
+  function publishDnaDraft() {
+    if (!selectedOrganizationId || !draftDna) {
+      return;
+    }
+
+    fetch(`/api/organizations/${selectedOrganizationId}/dna/drafts/${draftDna.id}/publish`, {
+      method: "POST",
+      headers: devHeaders
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Acesso negado ou DNA incompleto para publicacao.");
+        }
+
+        setPublishedDna((await response.json()) as DnaVersion);
+        setDraftDna(null);
+        reloadDna();
+        setMessage("DNA publicado.");
+      })
+      .catch((error: Error) => setMessage(error.message));
+  }
+
+  function discardDnaDraft() {
+    if (!selectedOrganizationId || !draftDna) {
+      return;
+    }
+
+    fetch(`/api/organizations/${selectedOrganizationId}/dna/drafts/${draftDna.id}/discard`, {
+      method: "POST",
+      headers: devHeaders
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Acesso negado para descartar rascunho.");
+        }
+
+        setDraftDna(null);
+        reloadDna();
+        setMessage("Rascunho de DNA descartado.");
+      })
+      .catch((error: Error) => setMessage(error.message));
+  }
+
+  function updateDraftField(field: keyof DnaVersion, value: string) {
+    if (draftDna) {
+      setDraftDna({ ...draftDna, [field]: value });
+    }
+  }
+
+  function updateFirstValue(field: keyof DnaValue, value: string) {
+    if (!draftDna) {
+      return;
+    }
+
+    const current = draftDna.values[0] ?? {
+      name: "",
+      description: "",
+      practicalMeaning: "",
+      expectedBehaviors: [],
+      incompatibleBehaviors: []
+    };
+    setDraftDna({ ...draftDna, values: [{ ...current, [field]: value }] });
+  }
+
+  function updateFirstCompetency(field: keyof DnaCompetency, value: string) {
+    if (!draftDna) {
+      return;
+    }
+
+    const current = draftDna.competencies[0] ?? {
+      name: "",
+      description: "",
+      importance: "medium",
+      examples: []
+    };
+    setDraftDna({
+      ...draftDna,
+      competencies: [{ ...current, [field]: value } as DnaCompetency]
+    });
+  }
+
   return (
     <main className="app-shell">
       <section className="intro" aria-labelledby="page-title">
@@ -156,7 +363,7 @@ export function App() {
       <section className="workspace" aria-label="Nucleo multiempresa">
         <div className="panel">
           <span>Usuario temporario</span>
-          <strong>usr_000001</strong>
+          <strong>{currentDevUserId}</strong>
           <p>Identificacao exclusiva para desenvolvimento e testes.</p>
         </div>
 
@@ -265,6 +472,130 @@ export function App() {
             </ul>
           )}
         </div>
+
+        {selectedOrganization && (
+          <div className="panel dna-panel">
+            <span>DNA Organizacional</span>
+            {publishedDna ? (
+              <div className="dna-summary">
+                <strong>
+                  Publicado v{publishedDna.versionNumber} - {publishedDna.status}
+                </strong>
+                <p>{publishedDna.mission || "Sem missao informada."}</p>
+              </div>
+            ) : (
+              <p>Nenhuma versao publicada.</p>
+            )}
+
+            {canManageDna && !draftDna && (
+              <button type="button" onClick={createDnaDraft}>
+                Criar rascunho
+              </button>
+            )}
+
+            {canManageDna && draftDna && (
+              <div className="dna-editor">
+                <strong>Rascunho</strong>
+                <input
+                  aria-label="Missao"
+                  placeholder="Missao"
+                  value={draftDna.mission}
+                  onChange={(event) => updateDraftField("mission", event.target.value)}
+                />
+                <input
+                  aria-label="Visao"
+                  placeholder="Visao"
+                  value={draftDna.vision}
+                  onChange={(event) => updateDraftField("vision", event.target.value)}
+                />
+                <input
+                  aria-label="Proposito"
+                  placeholder="Proposito"
+                  value={draftDna.purpose}
+                  onChange={(event) => updateDraftField("purpose", event.target.value)}
+                />
+                <input
+                  aria-label="Valor"
+                  placeholder="Valor"
+                  value={draftDna.values[0]?.name ?? ""}
+                  onChange={(event) => updateFirstValue("name", event.target.value)}
+                />
+                <input
+                  aria-label="Descricao do valor"
+                  placeholder="Descricao do valor"
+                  value={draftDna.values[0]?.description ?? ""}
+                  onChange={(event) => updateFirstValue("description", event.target.value)}
+                />
+                <input
+                  aria-label="Competencia"
+                  placeholder="Competencia"
+                  value={draftDna.competencies[0]?.name ?? ""}
+                  onChange={(event) => updateFirstCompetency("name", event.target.value)}
+                />
+                <input
+                  aria-label="Descricao da competencia"
+                  placeholder="Descricao da competencia"
+                  value={draftDna.competencies[0]?.description ?? ""}
+                  onChange={(event) => updateFirstCompetency("description", event.target.value)}
+                />
+                <select
+                  aria-label="Importancia"
+                  value={draftDna.competencies[0]?.importance ?? "medium"}
+                  onChange={(event) => updateFirstCompetency("importance", event.target.value)}
+                >
+                  <option value="low">low</option>
+                  <option value="medium">medium</option>
+                  <option value="high">high</option>
+                  <option value="critical">critical</option>
+                </select>
+                <input
+                  aria-label="Cultura"
+                  placeholder="Cultura"
+                  value={draftDna.culture}
+                  onChange={(event) => updateDraftField("culture", event.target.value)}
+                />
+                <input
+                  aria-label="Lideranca"
+                  placeholder="Lideranca"
+                  value={draftDna.leadershipStyle}
+                  onChange={(event) => updateDraftField("leadershipStyle", event.target.value)}
+                />
+                <input
+                  aria-label="Ambiente"
+                  placeholder="Ambiente"
+                  value={draftDna.workEnvironment}
+                  onChange={(event) => updateDraftField("workEnvironment", event.target.value)}
+                />
+                <div className="member-actions">
+                  <button type="button" onClick={saveDnaDraft}>
+                    Salvar
+                  </button>
+                  {canPublishDna && (
+                    <button type="button" onClick={publishDnaDraft}>
+                      Publicar
+                    </button>
+                  )}
+                  <button type="button" onClick={discardDnaDraft}>
+                    Descartar
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {canManageDna && dnaHistory.length > 0 && (
+              <ul>
+                {dnaHistory.map((version) => (
+                  <li key={version.id}>
+                    <strong>{version.status}</strong>
+                    <small>
+                      v{version.versionNumber ?? "-"} {version.discardedAt ? "- descartado" : ""}
+                    </small>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </section>
     </main>
   );

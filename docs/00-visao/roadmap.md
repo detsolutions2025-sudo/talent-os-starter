@@ -32,7 +32,7 @@ Critério de conclusão:
 - troca de empresa;
 - testes de acesso.
 
-## Fase 2 — DNA organizacional
+## Fase 2 — DNA Organizacional ✅
 
 - missão;
 - visão;

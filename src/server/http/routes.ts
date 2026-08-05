@@ -4,8 +4,9 @@ import { Router as createRouter } from "express";
 import { getActor } from "./dev-auth";
 import { forbidden } from "../core/errors";
 import type { CoreService } from "../core/service";
+import type { DnaService } from "../dna/service";
 
-export function createApiRouter(core: CoreService): Router {
+export function createApiRouter(core: CoreService, dna?: DnaService): Router {
   const router = createRouter();
 
   router.get(
@@ -132,6 +133,113 @@ export function createApiRouter(core: CoreService): Router {
       response.json(membership);
     })
   );
+
+  if (dna) {
+    router.get(
+      "/organizations/:organizationId/dna",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await dna.getPublished(getActor(request), routeParam(request.params.organizationId))
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/dna/draft",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await dna.getActiveDraft(getActor(request), routeParam(request.params.organizationId))
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/dna/versions",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await dna.listVersions(getActor(request), routeParam(request.params.organizationId))
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/dna/versions/:versionId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await dna.getVersion(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.versionId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/dna/drafts",
+      asyncHandler(async (request, response) => {
+        const draft = await dna.createDraft(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          request.body
+        );
+        response.status(201).json(draft);
+      })
+    );
+
+    router.patch(
+      "/organizations/:organizationId/dna/drafts/:versionId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await dna.updateDraft(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.versionId),
+            request.body
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/dna/drafts/:versionId/publish",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await dna.publishDraft(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.versionId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/dna/drafts/:versionId/discard",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await dna.discardDraft(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.versionId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/platform/organizations/:organizationId/dna/admin-read",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await dna.adminRead(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            request.body
+          )
+        );
+      })
+    );
+  }
 
   return router;
 }

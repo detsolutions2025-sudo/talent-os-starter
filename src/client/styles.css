@@ -98,7 +98,9 @@ h1 {
 
 .field select,
 .member-form input,
-.member-form select {
+.member-form select,
+.dna-editor input,
+.dna-editor select {
   width: 100%;
   min-height: 44px;
   margin-top: 16px;
@@ -141,6 +143,22 @@ h1 {
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 16px;
+}
+
+.dna-panel {
+  grid-column: 1 / -1;
+}
+
+.dna-summary,
+.dna-editor {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.dna-editor input,
+.dna-editor select {
+  margin-top: 0;
 }
 
 .member-form input,
