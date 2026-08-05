@@ -1,7 +1,7 @@
 # SPEC-006 - Estrutura Organizacional
 
 **Status:** Aprovada
-**Versao:** 1.0 
+**Versao:** 1.0
 **Fase:** 3  
 **Responsavel de negocio:** Thiago Sousa  
 **Ultima atualizacao:** 2026-08-05
@@ -158,24 +158,24 @@ usados na API devem ser os valores canonicos acima.
 
 ## 8. Dados necessarios
 
-| Campo                | Obrigatorio | Observacao                                                       |
-| -------------------- | ----------: | ---------------------------------------------------------------- |
-| `id`                 |         Sim | Identificador unico gerado pelo sistema.                         |
-| `organization_id`    |         Sim | Organization proprietaria da unidade.                            |
-| `code`               |         Sim | Codigo unico por Organization, normalizado.                      |
-| `name`               |         Sim | Nome exibido da unidade.                                         |
-| `type`               |         Sim | Valor canonico fixo desta fase.                                  |
-| `parent_id`          |         Nao | Unidade pai da mesma Organization.                               |
-| `manager_name`       |         Nao | Nome do gestor informado, sem vinculo com User nesta fase.        |
-| `manager_email`      |         Nao | E-mail do gestor informado, validado quando presente.             |
-| `description`        |         Nao | Descricao operacional da unidade.                                |
+| Campo                | Obrigatorio | Observacao                                                         |
+| -------------------- | ----------: | ------------------------------------------------------------------ |
+| `id`                 |         Sim | Identificador unico gerado pelo sistema.                           |
+| `organization_id`    |         Sim | Organization proprietaria da unidade.                              |
+| `code`               |         Sim | Codigo unico por Organization, normalizado.                        |
+| `name`               |         Sim | Nome exibido da unidade.                                           |
+| `type`               |         Sim | Valor canonico fixo desta fase.                                    |
+| `parent_id`          |         Nao | Unidade pai da mesma Organization.                                 |
+| `manager_name`       |         Nao | Nome do gestor informado, sem vinculo com User nesta fase.         |
+| `manager_email`      |         Nao | E-mail do gestor informado, validado quando presente.              |
+| `description`        |         Nao | Descricao operacional da unidade.                                  |
 | `display_order`      |         Sim | Inteiro maior ou igual a zero para ordenacao entre unidades irmas. |
-| `status`             |         Sim | `active` ou `inactive`.                                          |
-| `created_by_user_id` |         Sim | Usuario responsavel pela criacao.                                |
-| `updated_by_user_id` |         Sim | Usuario responsavel pela ultima alteracao.                       |
-| `created_at`         |         Sim | Data/hora de criacao.                                            |
-| `updated_at`         |         Sim | Data/hora da ultima alteracao.                                   |
-| `inactivated_at`     |         Nao | Data/hora da inativacao, quando ocorrer.                         |
+| `status`             |         Sim | `active` ou `inactive`.                                            |
+| `created_by_user_id` |         Sim | Usuario responsavel pela criacao.                                  |
+| `updated_by_user_id` |         Sim | Usuario responsavel pela ultima alteracao.                         |
+| `created_at`         |         Sim | Data/hora de criacao.                                              |
+| `updated_at`         |         Sim | Data/hora da ultima alteracao.                                     |
+| `inactivated_at`     |         Nao | Data/hora da inativacao, quando ocorrer.                           |
 
 ### 8.1 Regras de codigo
 
@@ -340,24 +340,24 @@ Tabela conceitual esperada: `organizational_units`.
 
 Campos minimos:
 
-| Campo                | Restricao esperada                                      |
-| -------------------- | ------------------------------------------------------- |
-| `id`                 | Chave primaria.                                         |
-| `organization_id`    | Obrigatorio, FK para `organizations(id)`.               |
-| `code`               | Obrigatorio.                                            |
-| `name`               | Obrigatorio.                                            |
-| `type`               | Obrigatorio, restrito aos tipos canonicos.              |
-| `parent_id`          | Opcional, FK autorreferente.                            |
-| `manager_name`       | Opcional.                                               |
-| `manager_email`      | Opcional.                                               |
-| `description`        | Opcional.                                               |
-| `display_order`      | Obrigatorio, inteiro maior ou igual a zero.             |
-| `status`             | Obrigatorio, restrito a `active` e `inactive`.          |
-| `created_by_user_id` | Obrigatorio, FK para `users(id)`.                       |
-| `updated_by_user_id` | Obrigatorio, FK para `users(id)`.                       |
-| `created_at`         | Obrigatorio.                                            |
-| `updated_at`         | Obrigatorio.                                            |
-| `inactivated_at`     | Opcional.                                               |
+| Campo                | Restricao esperada                             |
+| -------------------- | ---------------------------------------------- |
+| `id`                 | Chave primaria.                                |
+| `organization_id`    | Obrigatorio, FK para `organizations(id)`.      |
+| `code`               | Obrigatorio.                                   |
+| `name`               | Obrigatorio.                                   |
+| `type`               | Obrigatorio, restrito aos tipos canonicos.     |
+| `parent_id`          | Opcional, FK autorreferente.                   |
+| `manager_name`       | Opcional.                                      |
+| `manager_email`      | Opcional.                                      |
+| `description`        | Opcional.                                      |
+| `display_order`      | Obrigatorio, inteiro maior ou igual a zero.    |
+| `status`             | Obrigatorio, restrito a `active` e `inactive`. |
+| `created_by_user_id` | Obrigatorio, FK para `users(id)`.              |
+| `updated_by_user_id` | Obrigatorio, FK para `users(id)`.              |
+| `created_at`         | Obrigatorio.                                   |
+| `updated_at`         | Obrigatorio.                                   |
+| `inactivated_at`     | Opcional.                                      |
 
 Restricoes e indices esperados:
 

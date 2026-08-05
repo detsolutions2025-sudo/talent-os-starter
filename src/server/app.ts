@@ -3,8 +3,13 @@ import { AppError } from "./core/errors";
 import type { CoreService } from "./core/service";
 import type { DnaService } from "./dna/service";
 import { createApiRouter } from "./http/routes";
+import type { OrganizationalUnitService } from "./organizational-units/service";
 
-export function createServer(core: CoreService, dna?: DnaService) {
+export function createServer(
+  core: CoreService,
+  dna?: DnaService,
+  organizationalUnits?: OrganizationalUnitService
+) {
   const app = express();
 
   app.use(express.json());
@@ -17,7 +22,7 @@ export function createServer(core: CoreService, dna?: DnaService) {
     });
   });
 
-  app.use("/api", createApiRouter(core, dna));
+  app.use("/api", createApiRouter(core, dna, organizationalUnits));
 
   app.use(
     (

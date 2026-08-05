@@ -22,8 +22,9 @@ A IA auxilia. A decisao final e humana.
 
 ## Estado atual
 
-Fase 2 concluida: nucleo multiempresa com persistencia PostgreSQL/Supabase e DNA
-Organizacional versionado por Organization.
+Fase 3 concluida: nucleo multiempresa com persistencia PostgreSQL/Supabase, DNA
+Organizacional versionado por Organization e Estrutura Organizacional por
+Organizational Units.
 
 ## Como iniciar
 
@@ -122,6 +123,25 @@ DNA Organizacional:
 
 A Fase 2 nao implementa IA, DISC, cargos, vagas, candidatos, matching cultural,
 onboarding, desenvolvimento ou retencao.
+
+## Fase 3
+
+Estrutura Organizacional:
+
+- `POST /api/organizations/:organizationId/organizational-units`
+- `GET /api/organizations/:organizationId/organizational-units/tree`
+- `GET /api/organizations/:organizationId/organizational-units`
+- `GET /api/organizations/:organizationId/organizational-units/history`
+- `GET /api/organizations/:organizationId/organizational-units/:unitId`
+- `PATCH /api/organizations/:organizationId/organizational-units/:unitId`
+- `POST /api/organizations/:organizationId/organizational-units/:unitId/move`
+- `POST /api/organizations/:organizationId/organizational-units/:unitId/inactivate`
+- `POST /api/organizations/:organizationId/organizational-units/:unitId/reactivate`
+- `POST /api/platform/organizations/:organizationId/organizational-units/admin-read`
+
+A Fase 3 nao implementa cargos, vagas, colaboradores, organograma de pessoas,
+workflows, centros de custo, tipos personalizados, drag-and-drop, importacao em
+massa ou exclusao fisica.
 
 ## Seguranca
 

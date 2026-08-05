@@ -49,6 +49,52 @@ type DnaVersion = {
   discardedAt: string | null;
 };
 
+type OrganizationalUnit = {
+  id: string;
+  code: string;
+  name: string;
+  type:
+    | "board"
+    | "directorate"
+    | "department"
+    | "division"
+    | "branch"
+    | "office"
+    | "team"
+    | "squad"
+    | "unit"
+    | "other";
+  parentId: string | null;
+  managerName: string | null;
+  managerEmail: string | null;
+  description: string | null;
+  displayOrder: number;
+  status: "active" | "inactive";
+  children?: OrganizationalUnit[];
+};
+
+type OrganizationalUnitDraft = {
+  code: string;
+  name: string;
+  type: OrganizationalUnit["type"];
+  parentId: string;
+  managerName: string;
+  managerEmail: string;
+  description: string;
+  displayOrder: number;
+};
+
+const emptyUnitDraft: OrganizationalUnitDraft = {
+  code: "",
+  name: "",
+  type: "department",
+  parentId: "",
+  managerName: "",
+  managerEmail: "",
+  description: "",
+  displayOrder: 0
+};
+
 const currentDevUserId = import.meta.env.VITE_DEV_USER_ID ?? "usr_000001";
 const devHeaders = {
   "x-dev-user-id": currentDevUserId
@@ -64,6 +110,11 @@ export function App() {
   const [publishedDna, setPublishedDna] = useState<DnaVersion | null>(null);
   const [draftDna, setDraftDna] = useState<DnaVersion | null>(null);
   const [dnaHistory, setDnaHistory] = useState<DnaVersion[]>([]);
+  const [unitTree, setUnitTree] = useState<OrganizationalUnit[]>([]);
+  const [activeUnits, setActiveUnits] = useState<OrganizationalUnit[]>([]);
+  const [selectedUnitId, setSelectedUnitId] = useState("");
+  const [unitDraft, setUnitDraft] = useState<OrganizationalUnitDraft>(emptyUnitDraft);
+  const [showInactiveUnits, setShowInactiveUnits] = useState(false);
   const [message, setMessage] = useState("Nenhuma Organization selecionada.");
   const currentMembership = memberships.find(
     (membership) => membership.userId === currentDevUserId && membership.status === "active"
@@ -73,6 +124,8 @@ export function App() {
   const canManageOwners = currentMembership?.role === "owner";
   const canManageDna = currentMembership?.role === "owner" || currentMembership?.role === "admin";
   const canPublishDna = currentMembership?.role === "owner";
+  const canManageUnits = currentMembership?.role === "owner" || currentMembership?.role === "admin";
+  const canChangeUnitCode = currentMembership?.role === "owner";
 
   useEffect(() => {
     fetch("/api/organizations", { headers: devHeaders })
@@ -99,6 +152,10 @@ export function App() {
     setPublishedDna(null);
     setDraftDna(null);
     setDnaHistory([]);
+    setUnitTree([]);
+    setActiveUnits([]);
+    setSelectedUnitId("");
+    setUnitDraft(emptyUnitDraft);
 
     if (!organizationId) {
       setMessage("Nenhuma Organization selecionada.");
@@ -120,6 +177,7 @@ export function App() {
         setMemberships(organizationMemberships);
         setMessage("Organization selecionada com contexto validado no servidor.");
         void loadDna(organizationId, organizationMemberships);
+        void loadUnits(organizationId);
       })
       .catch((error: Error) => setMessage(error.message));
   }
@@ -154,6 +212,19 @@ export function App() {
       .catch(() => setDnaHistory([]));
   }
 
+  function loadUnits(organizationId: string) {
+    fetch(`/api/organizations/${organizationId}/organizational-units/tree`, { headers: devHeaders })
+      .then(async (response) => {
+        setUnitTree(response.ok ? ((await response.json()) as OrganizationalUnit[]) : []);
+      })
+      .catch(() => setUnitTree([]));
+    fetch(`/api/organizations/${organizationId}/organizational-units`, { headers: devHeaders })
+      .then(async (response) => {
+        setActiveUnits(response.ok ? ((await response.json()) as OrganizationalUnit[]) : []);
+      })
+      .catch(() => setActiveUnits([]));
+  }
+
   function reloadSelectedOrganization() {
     if (selectedOrganizationId) {
       selectOrganization(selectedOrganizationId);
@@ -163,6 +234,12 @@ export function App() {
   function reloadDna() {
     if (selectedOrganizationId) {
       loadDna(selectedOrganizationId);
+    }
+  }
+
+  function reloadUnits() {
+    if (selectedOrganizationId) {
+      loadUnits(selectedOrganizationId);
     }
   }
 
@@ -349,13 +426,146 @@ export function App() {
     });
   }
 
+  function resetUnitDraft(parentId = "") {
+    setSelectedUnitId("");
+    setUnitDraft({ ...emptyUnitDraft, parentId });
+  }
+
+  function selectUnit(unit: OrganizationalUnit) {
+    setSelectedUnitId(unit.id);
+    setUnitDraft({
+      code: unit.code,
+      name: unit.name,
+      type: unit.type,
+      parentId: unit.parentId ?? "",
+      managerName: unit.managerName ?? "",
+      managerEmail: unit.managerEmail ?? "",
+      description: unit.description ?? "",
+      displayOrder: unit.displayOrder
+    });
+  }
+
+  function saveUnit() {
+    if (!selectedOrganizationId) {
+      setMessage("Selecione uma Organization.");
+      return;
+    }
+
+    const body = {
+      ...unitDraft,
+      parentId: unitDraft.parentId || null
+    };
+    const url = selectedUnitId
+      ? `/api/organizations/${selectedOrganizationId}/organizational-units/${selectedUnitId}`
+      : `/api/organizations/${selectedOrganizationId}/organizational-units`;
+
+    fetch(url, {
+      method: selectedUnitId ? "PATCH" : "POST",
+      headers: {
+        ...devHeaders,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify(body)
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Acesso negado ou dados invalidos para salvar unidade.");
+        }
+
+        const saved = (await response.json()) as OrganizationalUnit;
+        setSelectedUnitId(saved.id);
+        reloadUnits();
+        setMessage("Unidade organizacional salva.");
+      })
+      .catch((error: Error) => setMessage(error.message));
+  }
+
+  function moveUnit() {
+    if (!selectedOrganizationId || !selectedUnitId) {
+      return;
+    }
+
+    fetch(
+      `/api/organizations/${selectedOrganizationId}/organizational-units/${selectedUnitId}/move`,
+      {
+        method: "POST",
+        headers: {
+          ...devHeaders,
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          parentId: unitDraft.parentId || null,
+          displayOrder: unitDraft.displayOrder
+        })
+      }
+    )
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Movimentacao negada ou hierarquia invalida.");
+        }
+
+        reloadUnits();
+        setMessage("Unidade movimentada.");
+      })
+      .catch((error: Error) => setMessage(error.message));
+  }
+
+  function changeUnitStatus(action: "inactivate" | "reactivate") {
+    if (!selectedOrganizationId || !selectedUnitId) {
+      return;
+    }
+
+    fetch(
+      `/api/organizations/${selectedOrganizationId}/organizational-units/${selectedUnitId}/${action}`,
+      {
+        method: "POST",
+        headers: devHeaders
+      }
+    )
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Alteracao de status negada para a unidade.");
+        }
+
+        const updated = (await response.json()) as OrganizationalUnit;
+        selectUnit(updated);
+        reloadUnits();
+        setMessage(action === "inactivate" ? "Unidade inativada." : "Unidade reativada.");
+      })
+      .catch((error: Error) => setMessage(error.message));
+  }
+
+  function renderUnitNodes(units: OrganizationalUnit[]) {
+    if (!units.length) {
+      return <p>Nenhuma unidade carregada.</p>;
+    }
+
+    return (
+      <ul className="unit-tree">
+        {units
+          .filter((unit) => showInactiveUnits || unit.status === "active")
+          .map((unit) => (
+            <li key={unit.id}>
+              <button type="button" className="unit-row" onClick={() => selectUnit(unit)}>
+                <strong>{unit.name}</strong>
+                <small>
+                  {unit.code} - {unit.type} - {unit.status}
+                </small>
+              </button>
+              {unit.children && unit.children.length > 0 && renderUnitNodes(unit.children)}
+            </li>
+          ))}
+      </ul>
+    );
+  }
+
   return (
     <main className="app-shell">
       <section className="intro" aria-labelledby="page-title">
-        <p className="eyebrow">Fase 1</p>
+        <p className="eyebrow">Fase 3</p>
         <h1 id="page-title">Talent OS</h1>
         <p className="lead">
-          Nucleo multiempresa com Organizations, Users, Memberships, roles e autorizacao no
+          Nucleo multiempresa, DNA Organizacional e Estrutura Organizacional com autorizacao no
           servidor.
         </p>
       </section>
@@ -594,6 +804,153 @@ export function App() {
                 ))}
               </ul>
             )}
+          </div>
+        )}
+
+        {selectedOrganization && (
+          <div className="panel org-units-panel">
+            <span>Estrutura Organizacional</span>
+            <div className="unit-toolbar">
+              {canManageUnits && (
+                <>
+                  <button type="button" onClick={() => resetUnitDraft("")}>
+                    Nova raiz
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => resetUnitDraft(selectedUnitId)}
+                    disabled={!selectedUnitId}
+                  >
+                    Nova filha
+                  </button>
+                </>
+              )}
+              <label>
+                <input
+                  type="checkbox"
+                  checked={showInactiveUnits}
+                  onChange={(event) => setShowInactiveUnits(event.target.checked)}
+                />
+                Inativas
+              </label>
+            </div>
+
+            <div className="org-units-layout">
+              <div>{renderUnitNodes(unitTree)}</div>
+
+              {canManageUnits ? (
+                <div className="unit-editor">
+                  <strong>{selectedUnitId ? "Editar unidade" : "Criar unidade"}</strong>
+                  <input
+                    aria-label="Codigo da unidade"
+                    placeholder="Codigo"
+                    value={unitDraft.code}
+                    disabled={Boolean(selectedUnitId) && !canChangeUnitCode}
+                    onChange={(event) => setUnitDraft({ ...unitDraft, code: event.target.value })}
+                  />
+                  <input
+                    aria-label="Nome da unidade"
+                    placeholder="Nome"
+                    value={unitDraft.name}
+                    onChange={(event) => setUnitDraft({ ...unitDraft, name: event.target.value })}
+                  />
+                  <select
+                    aria-label="Tipo da unidade"
+                    value={unitDraft.type}
+                    onChange={(event) =>
+                      setUnitDraft({
+                        ...unitDraft,
+                        type: event.target.value as OrganizationalUnit["type"]
+                      })
+                    }
+                  >
+                    <option value="board">board</option>
+                    <option value="directorate">directorate</option>
+                    <option value="department">department</option>
+                    <option value="division">division</option>
+                    <option value="branch">branch</option>
+                    <option value="office">office</option>
+                    <option value="team">team</option>
+                    <option value="squad">squad</option>
+                    <option value="unit">unit</option>
+                    <option value="other">other</option>
+                  </select>
+                  <select
+                    aria-label="Unidade pai"
+                    value={unitDraft.parentId}
+                    onChange={(event) =>
+                      setUnitDraft({ ...unitDraft, parentId: event.target.value })
+                    }
+                  >
+                    <option value="">Raiz</option>
+                    {activeUnits
+                      .filter((unit) => unit.id !== selectedUnitId)
+                      .map((unit) => (
+                        <option key={unit.id} value={unit.id}>
+                          {unit.code} - {unit.name}
+                        </option>
+                      ))}
+                  </select>
+                  <input
+                    aria-label="Gestor"
+                    placeholder="Gestor"
+                    value={unitDraft.managerName}
+                    onChange={(event) =>
+                      setUnitDraft({ ...unitDraft, managerName: event.target.value })
+                    }
+                  />
+                  <input
+                    aria-label="Email do gestor"
+                    placeholder="Email do gestor"
+                    value={unitDraft.managerEmail}
+                    onChange={(event) =>
+                      setUnitDraft({ ...unitDraft, managerEmail: event.target.value })
+                    }
+                  />
+                  <input
+                    aria-label="Descricao da unidade"
+                    placeholder="Descricao"
+                    value={unitDraft.description}
+                    onChange={(event) =>
+                      setUnitDraft({ ...unitDraft, description: event.target.value })
+                    }
+                  />
+                  <input
+                    aria-label="Ordem"
+                    type="number"
+                    min="0"
+                    value={unitDraft.displayOrder}
+                    onChange={(event) =>
+                      setUnitDraft({ ...unitDraft, displayOrder: Number(event.target.value) })
+                    }
+                  />
+                  <div className="member-actions">
+                    <button type="button" onClick={saveUnit}>
+                      Salvar
+                    </button>
+                    <button type="button" onClick={moveUnit} disabled={!selectedUnitId}>
+                      Mover
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => changeUnitStatus("inactivate")}
+                      disabled={!selectedUnitId}
+                    >
+                      Inativar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => changeUnitStatus("reactivate")}
+                      disabled={!selectedUnitId}
+                    >
+                      Reativar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <p>Visualizacao limitada a unidades ativas.</p>
+              )}
+            </div>
           </div>
         )}
       </section>

@@ -5,8 +5,13 @@ import { getActor } from "./dev-auth";
 import { forbidden } from "../core/errors";
 import type { CoreService } from "../core/service";
 import type { DnaService } from "../dna/service";
+import type { OrganizationalUnitService } from "../organizational-units/service";
 
-export function createApiRouter(core: CoreService, dna?: DnaService): Router {
+export function createApiRouter(
+  core: CoreService,
+  dna?: DnaService,
+  organizationalUnits?: OrganizationalUnitService
+): Router {
   const router = createRouter();
 
   router.get(
@@ -232,6 +237,136 @@ export function createApiRouter(core: CoreService, dna?: DnaService): Router {
       asyncHandler(async (request, response) => {
         response.json(
           await dna.adminRead(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            request.body
+          )
+        );
+      })
+    );
+  }
+
+  if (organizationalUnits) {
+    router.post(
+      "/organizations/:organizationId/organizational-units",
+      asyncHandler(async (request, response) => {
+        const unit = await organizationalUnits.createUnit(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          request.body
+        );
+        response.status(201).json(unit);
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/organizational-units/tree",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await organizationalUnits.listTree(
+            getActor(request),
+            routeParam(request.params.organizationId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/organizational-units",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await organizationalUnits.listActive(
+            getActor(request),
+            routeParam(request.params.organizationId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/organizational-units/history",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await organizationalUnits.listHistory(
+            getActor(request),
+            routeParam(request.params.organizationId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/organizational-units/:unitId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await organizationalUnits.getUnit(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.unitId)
+          )
+        );
+      })
+    );
+
+    router.patch(
+      "/organizations/:organizationId/organizational-units/:unitId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await organizationalUnits.updateUnit(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.unitId),
+            request.body
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/organizational-units/:unitId/move",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await organizationalUnits.moveUnit(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.unitId),
+            request.body
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/organizational-units/:unitId/inactivate",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await organizationalUnits.inactivateUnit(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.unitId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/organizational-units/:unitId/reactivate",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await organizationalUnits.reactivateUnit(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.unitId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/platform/organizations/:organizationId/organizational-units/admin-read",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await organizationalUnits.adminRead(
             getActor(request),
             routeParam(request.params.organizationId),
             request.body
