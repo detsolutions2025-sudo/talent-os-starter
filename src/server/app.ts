@@ -1,9 +1,9 @@
 import express from "express";
 import { AppError } from "./core/errors";
-import { createCoreService, type CoreService } from "./core/service";
+import type { CoreService } from "./core/service";
 import { createApiRouter } from "./http/routes";
 
-export function createServer(core: CoreService = createCoreService()) {
+export function createServer(core: CoreService) {
   const app = express();
 
   app.use(express.json());

@@ -22,16 +22,21 @@ A IA auxilia. A decisao final e humana.
 
 ## Estado atual
 
-Fase 1 concluida: nucleo multiempresa com Organizations, Users, Memberships,
-roles iniciais, autorizacao centralizada no servidor e auditoria inicial.
+Fase 1.1 concluida: nucleo multiempresa com Organizations, Users, Memberships,
+roles iniciais, autorizacao centralizada no servidor, auditoria inicial e
+persistencia PostgreSQL/Supabase no runtime principal.
 
 ## Como iniciar
 
 1. Copie `.env.example` para `.env`.
 2. Instale dependencias com `npm install`.
-3. Prepare o banco local com `npm run db:push`.
-4. Inicie a aplicacao com `npm run dev`.
-5. Abra `http://127.0.0.1:5173`.
+3. Defina `SUPABASE_DATABASE_URL` com uma connection string PostgreSQL/Supabase
+   de desenvolvimento.
+4. Aplique as migrations com `npm run db:migrate:supabase`.
+5. Para usar a interface local, defina `VITE_DEV_USER_ID` com o ID de um User
+   ativo que possua Membership ativo em uma Organization.
+6. Inicie a aplicacao com `npm run dev`.
+7. Abra `http://127.0.0.1:5173`.
 
 ## Governanca do projeto
 
@@ -67,6 +72,17 @@ Para preparar um banco Supabase de desenvolvimento ou homologacao:
 
 Nunca coloque a connection string real em `.env.example`, documentacao, prompts
 ou testes.
+
+## Persistencia da Fase 1.1
+
+O runtime principal da API usa PostgreSQL/Supabase por meio de
+`SUPABASE_DATABASE_URL`. Se a variavel estiver ausente ou invalida, a API falha
+ao iniciar de forma visivel. O armazenamento em memoria existe apenas para testes
+rapidos explicitos e nao e usado como fallback automatico.
+
+Os testes de persistencia usam `TEST_DATABASE_URL`, quando definida, ou
+`SUPABASE_DATABASE_URL`. Cada execucao cria um schema temporario, aplica as
+migrations nesse schema e remove tudo ao final.
 
 ## Fase 1
 

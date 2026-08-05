@@ -10,6 +10,7 @@ type Organization = {
 
 type Membership = {
   id: string;
+  userId: string;
   role: "owner" | "admin" | "member";
   status: "active" | "inactive";
   user: {
@@ -18,8 +19,9 @@ type Membership = {
   } | null;
 };
 
+const currentDevUserId = import.meta.env.VITE_DEV_USER_ID ?? "usr_000001";
 const devHeaders = {
-  "x-dev-user-id": "usr_000001"
+  "x-dev-user-id": currentDevUserId
 };
 
 export function App() {
@@ -30,6 +32,12 @@ export function App() {
   const [newMemberUserId, setNewMemberUserId] = useState("");
   const [newMemberRole, setNewMemberRole] = useState<Membership["role"]>("member");
   const [message, setMessage] = useState("Nenhuma Organization selecionada.");
+  const currentMembership = memberships.find(
+    (membership) => membership.userId === currentDevUserId && membership.status === "active"
+  );
+  const canManageMemberships =
+    currentMembership?.role === "owner" || currentMembership?.role === "admin";
+  const canManageOwners = currentMembership?.role === "owner";
 
   useEffect(() => {
     fetch("/api/organizations", { headers: devHeaders })
@@ -183,26 +191,28 @@ export function App() {
 
         <div className="panel members">
           <span>Memberships</span>
-          <div className="member-form">
-            <input
-              aria-label="User ID"
-              placeholder="User ID"
-              value={newMemberUserId}
-              onChange={(event) => setNewMemberUserId(event.target.value)}
-            />
-            <select
-              aria-label="Role"
-              value={newMemberRole}
-              onChange={(event) => setNewMemberRole(event.target.value as Membership["role"])}
-            >
-              <option value="member">member</option>
-              <option value="admin">admin</option>
-              <option value="owner">owner</option>
-            </select>
-            <button type="button" onClick={addMember}>
-              Adicionar
-            </button>
-          </div>
+          {canManageMemberships && (
+            <div className="member-form">
+              <input
+                aria-label="User ID"
+                placeholder="User ID"
+                value={newMemberUserId}
+                onChange={(event) => setNewMemberUserId(event.target.value)}
+              />
+              <select
+                aria-label="Role"
+                value={newMemberRole}
+                onChange={(event) => setNewMemberRole(event.target.value as Membership["role"])}
+              >
+                <option value="member">member</option>
+                {canManageOwners && <option value="admin">admin</option>}
+                {canManageOwners && <option value="owner">owner</option>}
+              </select>
+              <button type="button" onClick={addMember}>
+                Adicionar
+              </button>
+            </div>
+          )}
           {memberships.length === 0 ? (
             <p>Nenhum membro carregado.</p>
           ) : (
@@ -213,36 +223,43 @@ export function App() {
                   <small>
                     {membership.role} - {membership.status}
                   </small>
-                  <div className="member-actions">
-                    <button
-                      type="button"
-                      onClick={() => updateMembership(membership.id, { role: "member" })}
-                    >
-                      member
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateMembership(membership.id, { role: "admin" })}
-                    >
-                      admin
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateMembership(membership.id, { role: "owner" })}
-                    >
-                      owner
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        updateMembership(membership.id, {
-                          status: membership.status === "active" ? "inactive" : "active"
-                        })
-                      }
-                    >
-                      {membership.status === "active" ? "desativar" : "ativar"}
-                    </button>
-                  </div>
+                  {(canManageOwners ||
+                    (currentMembership?.role === "admin" && membership.role === "member")) && (
+                    <div className="member-actions">
+                      {canManageOwners && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => updateMembership(membership.id, { role: "member" })}
+                          >
+                            member
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => updateMembership(membership.id, { role: "admin" })}
+                          >
+                            admin
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => updateMembership(membership.id, { role: "owner" })}
+                          >
+                            owner
+                          </button>
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateMembership(membership.id, {
+                            status: membership.status === "active" ? "inactive" : "active"
+                          })
+                        }
+                      >
+                        {membership.status === "active" ? "desativar" : "ativar"}
+                      </button>
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>

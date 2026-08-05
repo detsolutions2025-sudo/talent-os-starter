@@ -1,7 +1,8 @@
 import { authorize } from "./authorization";
 import { badRequest, conflict, forbidden, notFound } from "./errors";
+import { MemoryCoreRepository } from "./memory-repository";
 import { normalizeEmail, normalizeSlug } from "./normalization";
-import { CoreStore } from "./store";
+import type { CoreRepository } from "./repository";
 import type {
   Actor,
   AuditEvent,
@@ -45,15 +46,15 @@ type UpdateMembershipInput = {
 };
 
 export class CoreService {
-  constructor(private readonly store = new CoreStore()) {}
+  constructor(private readonly repository: CoreRepository) {}
 
-  getStore() {
-    return this.store;
+  getRepository() {
+    return this.repository;
   }
 
   async createUser(actor: Actor, input: CreateUserInput) {
-    return this.withDeniedAudit(actor, null, "user.create_denied", () => {
-      authorize(this.store, { actor, permission: "platform.user.create" });
+    return this.withDeniedAudit(actor, null, "user.create_denied", async () => {
+      await authorize(this.repository, { actor, permission: "platform.user.create" });
 
       const email = normalizeEmail(input.email);
 
@@ -69,13 +70,13 @@ export class CoreService {
         throw badRequest("user_status_invalid", "User status is invalid.");
       }
 
-      if (this.store.users().some((user) => user.email === email)) {
+      if (await this.repository.findUserByEmail(email)) {
         throw conflict("user_email_duplicate", "Email already exists.");
       }
 
-      const now = this.store.now();
+      const now = this.repository.now();
       const user: User = {
-        id: this.store.nextId("usr"),
+        id: this.repository.nextId("usr"),
         name: input.name.trim(),
         email,
         status: input.status ?? "active",
@@ -83,26 +84,26 @@ export class CoreService {
         updatedAt: now
       };
 
-      this.store.addUser(user);
-      this.audit(actor, null, "user.created", "allowed", null, { userId: user.id });
+      await this.repository.addUser(user);
+      await this.audit(actor, null, "user.created", "allowed", null, { userId: user.id });
 
       return user;
     });
   }
 
-  listUsers(actor: Actor) {
-    return this.withDeniedAudit(actor, null, "user.list_denied", () => {
-      authorize(this.store, { actor, permission: "platform.user.create" });
-      return this.store.users();
+  async listUsers(actor: Actor) {
+    return this.withDeniedAudit(actor, null, "user.list_denied", async () => {
+      await authorize(this.repository, { actor, permission: "platform.user.create" });
+      return this.repository.listUsers();
     });
   }
 
-  getCurrentUser(actor: Actor) {
+  async getCurrentUser(actor: Actor) {
     if (actor.kind === "platform") {
       return { kind: "platform", userId: actor.userId };
     }
 
-    const user = this.store.users().find((candidate) => candidate.id === actor.userId);
+    const user = await this.repository.findUserById(actor.userId);
 
     if (!user) {
       throw notFound("user_not_found", "User not found.");
@@ -112,15 +113,15 @@ export class CoreService {
   }
 
   async createOrganization(actor: Actor, input: CreateOrganizationInput) {
-    return this.store.transaction(async (store) => {
-      const scopedService = new CoreService(store);
+    return this.repository.transaction(async (repository) => {
+      const scopedService = new CoreService(repository);
 
-      return scopedService.withDeniedAudit(actor, null, "organization.create_denied", () => {
-        authorize(store, { actor, permission: "platform.organization.create" });
+      return scopedService.withDeniedAudit(actor, null, "organization.create_denied", async () => {
+        await authorize(repository, { actor, permission: "platform.organization.create" });
 
         const name = input.name.trim();
         const slug = normalizeSlug(input.slug);
-        const owner = store.users().find((user) => user.id === input.initialOwnerUserId);
+        const owner = await repository.findUserById(input.initialOwnerUserId);
 
         if (!name) {
           throw badRequest("organization_name_required", "Organization name is required.");
@@ -130,7 +131,7 @@ export class CoreService {
           throw badRequest("organization_slug_required", "Organization slug is required.");
         }
 
-        if (store.organizations().some((organization) => organization.slug === slug)) {
+        if (await repository.findOrganizationBySlug(slug)) {
           throw conflict("organization_slug_duplicate", "Organization slug already exists.");
         }
 
@@ -142,9 +143,9 @@ export class CoreService {
           throw badRequest("initial_owner_inactive", "Initial owner user must be active.");
         }
 
-        const now = store.now();
+        const now = repository.now();
         const organization: Organization = {
-          id: store.nextId("org"),
+          id: repository.nextId("org"),
           name,
           slug,
           status: "active",
@@ -159,7 +160,7 @@ export class CoreService {
           updatedAt: now
         };
         const membership: Membership = {
-          id: store.nextId("mem"),
+          id: repository.nextId("mem"),
           organizationId: organization.id,
           userId: owner.id,
           role: "owner",
@@ -169,26 +170,19 @@ export class CoreService {
           updatedAt: now
         };
 
-        store.addOrganization(organization);
-        store.addMembership(membership);
+        await repository.addOrganization(organization);
+        await repository.addMembership(membership);
 
-        const ownerCount = store
-          .memberships()
-          .filter(
-            (candidate) =>
-              candidate.organizationId === organization.id &&
-              candidate.role === "owner" &&
-              candidate.status === "active"
-          ).length;
+        const ownerCount = await repository.countActiveOwners(organization.id);
 
         if (ownerCount !== 1) {
           throw conflict("initial_owner_count_invalid", "Organization must start with one owner.");
         }
 
-        scopedService.audit(actor, organization.id, "organization.created", "allowed", null, {
+        await scopedService.audit(actor, organization.id, "organization.created", "allowed", null, {
           organizationId: organization.id
         });
-        scopedService.audit(
+        await scopedService.audit(
           actor,
           organization.id,
           "membership.created_initial_owner",
@@ -205,41 +199,31 @@ export class CoreService {
     });
   }
 
-  listOrganizations(actor: Actor) {
+  async listOrganizations(actor: Actor) {
     if (actor.kind === "platform") {
-      return this.store.organizations();
+      return this.repository.listOrganizations();
     }
 
-    const user = this.ensureActiveUser(actor.userId);
-    const organizations = this.store
-      .memberships()
-      .filter((membership) => membership.userId === user.id && membership.status === "active")
-      .map((membership) =>
-        this.store
-          .organizations()
-          .find((organization) => organization.id === membership.organizationId)
-      )
-      .filter((organization): organization is Organization => organization !== undefined);
-
-    return organizations.filter((organization) => organization.status === "active");
+    const user = await this.ensureActiveUser(actor.userId);
+    return this.repository.listOrganizationsForUser(user.id);
   }
 
-  getOrganization(actor: Actor, organizationId: string) {
-    return this.withDeniedAudit(actor, organizationId, "organization.access_denied", () => {
-      authorize(this.store, { actor, organizationId, permission: "organization.read" });
+  async getOrganization(actor: Actor, organizationId: string) {
+    return this.withDeniedAudit(actor, organizationId, "organization.access_denied", async () => {
+      await authorize(this.repository, { actor, organizationId, permission: "organization.read" });
       return this.findOrganization(organizationId);
     });
   }
 
-  updateOrganization(actor: Actor, organizationId: string, input: UpdateOrganizationInput) {
-    return this.withDeniedAudit(actor, organizationId, "organization.update_denied", () => {
-      authorize(this.store, {
+  async updateOrganization(actor: Actor, organizationId: string, input: UpdateOrganizationInput) {
+    return this.withDeniedAudit(actor, organizationId, "organization.update_denied", async () => {
+      await authorize(this.repository, {
         actor,
         organizationId,
         permission: "organization.update_operational_fields"
       });
 
-      const organization = this.findOrganization(organizationId);
+      const organization = await this.findOrganization(organizationId);
       const nextSlug = input.slug === undefined ? organization.slug : normalizeSlug(input.slug);
 
       if (input.name !== undefined && !input.name.trim()) {
@@ -250,96 +234,122 @@ export class CoreService {
         throw badRequest("organization_slug_required", "Organization slug is required.");
       }
 
-      if (
-        nextSlug !== organization.slug &&
-        this.store.organizations().some((candidate) => candidate.slug === nextSlug)
-      ) {
+      const existingSlugOwner = await this.repository.findOrganizationBySlug(nextSlug);
+
+      if (existingSlugOwner && existingSlugOwner.id !== organization.id) {
         throw conflict("organization_slug_duplicate", "Organization slug already exists.");
       }
 
-      organization.name = input.name?.trim() ?? organization.name;
-      organization.slug = nextSlug;
-      organization.legalName =
-        input.legalName === undefined ? organization.legalName : input.legalName;
-      organization.taxId = input.taxId === undefined ? organization.taxId : input.taxId;
-      organization.description =
-        input.description === undefined ? organization.description : input.description;
-      organization.updatedAt = this.store.now();
+      const updated: Organization = {
+        ...organization,
+        name: input.name?.trim() ?? organization.name,
+        slug: nextSlug,
+        legalName: input.legalName === undefined ? organization.legalName : input.legalName,
+        taxId: input.taxId === undefined ? organization.taxId : input.taxId,
+        description: input.description === undefined ? organization.description : input.description,
+        updatedAt: this.repository.now()
+      };
 
-      this.audit(actor, organization.id, "organization.updated", "allowed", null, {
+      await this.repository.updateOrganization(updated);
+      await this.audit(actor, updated.id, "organization.updated", "allowed", null, {
         organizationId
       });
 
-      return organization;
+      return updated;
     });
   }
 
-  archiveOrganization(actor: Actor, organizationId: string) {
-    return this.withDeniedAudit(actor, organizationId, "organization.archive_denied", () => {
-      authorize(this.store, { actor, permission: "platform.organization.archive" });
-      const organization = this.findOrganization(organizationId);
-      const now = this.store.now();
+  async archiveOrganization(actor: Actor, organizationId: string) {
+    return this.repository.transaction(async (repository) => {
+      const scopedService = new CoreService(repository);
 
-      organization.status = "archived";
-      organization.archivedAt = now;
-      organization.archivedByUserId = actor.userId;
-      organization.updatedAt = now;
+      return scopedService.withDeniedAudit(
+        actor,
+        organizationId,
+        "organization.archive_denied",
+        async () => {
+          await authorize(repository, { actor, permission: "platform.organization.archive" });
+          const organization = await scopedService.findOrganization(organizationId);
+          const now = repository.now();
+          const archived: Organization = {
+            ...organization,
+            status: "archived",
+            archivedAt: now,
+            archivedByUserId: actor.userId,
+            updatedAt: now
+          };
 
-      this.audit(actor, organization.id, "organization.archived", "allowed", null, {
-        organizationId
-      });
+          await repository.updateOrganization(archived);
+          await scopedService.audit(actor, archived.id, "organization.archived", "allowed", null, {
+            organizationId
+          });
 
-      return organization;
+          return archived;
+        }
+      );
     });
   }
 
-  reactivateOrganization(actor: Actor, organizationId: string) {
-    return this.withDeniedAudit(actor, organizationId, "organization.reactivate_denied", () => {
-      authorize(this.store, { actor, permission: "platform.organization.reactivate" });
-      const organization = this.findOrganization(organizationId);
-      const now = this.store.now();
+  async reactivateOrganization(actor: Actor, organizationId: string) {
+    return this.repository.transaction(async (repository) => {
+      const scopedService = new CoreService(repository);
 
-      organization.status = "active";
-      organization.reactivatedAt = now;
-      organization.reactivatedByUserId = actor.userId;
-      organization.updatedAt = now;
+      return scopedService.withDeniedAudit(
+        actor,
+        organizationId,
+        "organization.reactivate_denied",
+        async () => {
+          await authorize(repository, { actor, permission: "platform.organization.reactivate" });
+          const organization = await scopedService.findOrganization(organizationId);
+          const now = repository.now();
+          const reactivated: Organization = {
+            ...organization,
+            status: "active",
+            reactivatedAt: now,
+            reactivatedByUserId: actor.userId,
+            updatedAt: now
+          };
 
-      this.audit(actor, organization.id, "organization.reactivated", "allowed", null, {
-        organizationId
-      });
+          await repository.updateOrganization(reactivated);
+          await scopedService.audit(
+            actor,
+            reactivated.id,
+            "organization.reactivated",
+            "allowed",
+            null,
+            {
+              organizationId
+            }
+          );
 
-      return organization;
+          return reactivated;
+        }
+      );
     });
   }
 
-  listMemberships(actor: Actor, organizationId: string) {
-    return this.withDeniedAudit(actor, organizationId, "membership.read_denied", () => {
-      authorize(this.store, { actor, organizationId, permission: "membership.read" });
-      return this.store
-        .memberships()
-        .filter((membership) => membership.organizationId === organizationId)
-        .map((membership) => ({
-          ...membership,
-          user: this.store.users().find((user) => user.id === membership.userId) ?? null
-        }));
+  async listMemberships(actor: Actor, organizationId: string) {
+    return this.withDeniedAudit(actor, organizationId, "membership.read_denied", async () => {
+      await authorize(this.repository, { actor, organizationId, permission: "membership.read" });
+      return this.repository.listMembershipsWithUsersByOrganization(organizationId);
     });
   }
 
-  createMembership(actor: Actor, input: CreateMembershipInput) {
-    return this.store.transaction(async (store) => {
-      const scopedService = new CoreService(store);
+  async createMembership(actor: Actor, input: CreateMembershipInput) {
+    return this.repository.transaction(async (repository) => {
+      const scopedService = new CoreService(repository);
 
       return scopedService.withDeniedAudit(
         actor,
         input.organizationId,
         "membership.create_denied",
-        () => {
-          const authorization = authorize(store, {
+        async () => {
+          const authorization = await authorize(repository, {
             actor,
             organizationId: input.organizationId,
             permission: input.role === "owner" ? "membership.manage_owner" : "membership.create"
           });
-          const user = store.users().find((candidate) => candidate.id === input.userId);
+          const user = await repository.findUserById(input.userId);
 
           if (!user) {
             throw badRequest("membership_user_missing", "User does not exist.");
@@ -358,20 +368,14 @@ export class CoreService {
           }
 
           if (
-            store
-              .memberships()
-              .some(
-                (membership) =>
-                  membership.organizationId === input.organizationId &&
-                  membership.userId === input.userId
-              )
+            await repository.findMembershipByOrganizationAndUser(input.organizationId, input.userId)
           ) {
             throw conflict("membership_duplicate", "Membership already exists.");
           }
 
-          const now = store.now();
+          const now = repository.now();
           const membership: Membership = {
-            id: store.nextId("mem"),
+            id: repository.nextId("mem"),
             organizationId: input.organizationId,
             userId: input.userId,
             role: input.role,
@@ -381,11 +385,18 @@ export class CoreService {
             updatedAt: now
           };
 
-          store.addMembership(membership);
-          scopedService.audit(actor, input.organizationId, "membership.created", "allowed", null, {
-            membershipId: membership.id,
-            userId: input.userId
-          });
+          await repository.addMembership(membership);
+          await scopedService.audit(
+            actor,
+            input.organizationId,
+            "membership.created",
+            "allowed",
+            null,
+            {
+              membershipId: membership.id,
+              userId: input.userId
+            }
+          );
 
           return membership;
         }
@@ -393,10 +404,10 @@ export class CoreService {
     });
   }
 
-  updateMembership(actor: Actor, membershipId: string, input: UpdateMembershipInput) {
-    return this.store.transaction(async (store) => {
-      const scopedService = new CoreService(store);
-      const membership = store.memberships().find((candidate) => candidate.id === membershipId);
+  async updateMembership(actor: Actor, membershipId: string, input: UpdateMembershipInput) {
+    return this.repository.transaction(async (repository) => {
+      const scopedService = new CoreService(repository);
+      const membership = await repository.findMembershipById(membershipId);
 
       if (!membership) {
         throw notFound("membership_not_found", "Membership not found.");
@@ -406,13 +417,13 @@ export class CoreService {
         actor,
         membership.organizationId,
         "membership.update_denied",
-        () => {
+        async () => {
           const targetRole = input.role ?? membership.role;
           const permission: Permission =
             membership.role === "owner" || targetRole === "owner"
               ? "membership.manage_owner"
               : "membership.update";
-          const authorization = authorize(store, {
+          const authorization = await authorize(repository, {
             actor,
             organizationId: membership.organizationId,
             permission
@@ -434,6 +445,7 @@ export class CoreService {
             throw forbidden("permission_denied", "Admin can only keep members as members.");
           }
 
+          await repository.lockMembershipsByOrganization(membership.organizationId);
           const wouldChangeLastOwner =
             membership.role === "owner" &&
             membership.status === "active" &&
@@ -441,9 +453,9 @@ export class CoreService {
 
           if (
             wouldChangeLastOwner &&
-            this.countActiveOwners(store, membership.organizationId) === 1
+            (await repository.countActiveOwners(membership.organizationId)) === 1
           ) {
-            scopedService.audit(
+            await scopedService.audit(
               actor,
               membership.organizationId,
               "membership.last_owner_change_denied",
@@ -454,11 +466,15 @@ export class CoreService {
             throw conflict("last_owner_required", "Last active owner cannot be changed.");
           }
 
-          membership.role = input.role ?? membership.role;
-          membership.status = input.status ?? membership.status;
-          membership.updatedAt = store.now();
+          const updated: Membership = {
+            ...membership,
+            role: input.role ?? membership.role,
+            status: input.status ?? membership.status,
+            updatedAt: repository.now()
+          };
 
-          scopedService.audit(
+          await repository.updateMembership(updated);
+          await scopedService.audit(
             actor,
             membership.organizationId,
             "membership.role_changed",
@@ -470,7 +486,7 @@ export class CoreService {
           );
 
           if (input.status === "active") {
-            scopedService.audit(
+            await scopedService.audit(
               actor,
               membership.organizationId,
               "membership.activated",
@@ -483,7 +499,7 @@ export class CoreService {
           }
 
           if (input.status === "inactive") {
-            scopedService.audit(
+            await scopedService.audit(
               actor,
               membership.organizationId,
               "membership.deactivated",
@@ -495,18 +511,18 @@ export class CoreService {
             );
           }
 
-          return membership;
+          return updated;
         }
       );
     });
   }
 
-  auditEvents() {
-    return this.store.auditEvents();
+  async auditEvents() {
+    return this.repository.listAuditEvents();
   }
 
-  private ensureActiveUser(userId: string) {
-    const user = this.store.users().find((candidate) => candidate.id === userId);
+  private async ensureActiveUser(userId: string) {
+    const user = await this.repository.findUserById(userId);
 
     if (!user || user.status !== "active") {
       throw forbidden("user_inactive_or_missing", "Active user is required.");
@@ -515,10 +531,8 @@ export class CoreService {
     return user;
   }
 
-  private findOrganization(organizationId: string) {
-    const organization = this.store
-      .organizations()
-      .find((candidate) => candidate.id === organizationId);
+  private async findOrganization(organizationId: string) {
+    const organization = await this.repository.findOrganizationById(organizationId);
 
     if (!organization) {
       throw notFound("organization_not_found", "Organization not found.");
@@ -527,18 +541,7 @@ export class CoreService {
     return organization;
   }
 
-  private countActiveOwners(store: CoreStore, organizationId: string) {
-    return store
-      .memberships()
-      .filter(
-        (membership) =>
-          membership.organizationId === organizationId &&
-          membership.role === "owner" &&
-          membership.status === "active"
-      ).length;
-  }
-
-  private audit(
+  private async audit(
     actor: Actor,
     organizationId: string | null,
     action: string,
@@ -546,28 +549,28 @@ export class CoreService {
     reason: string | null,
     metadata: AuditEvent["metadata"] = {}
   ) {
-    this.store.addAuditEvent({
-      id: this.store.nextId("aud"),
+    await this.repository.addAuditEvent({
+      id: this.repository.nextId("aud"),
       organizationId,
       actorUserId: actor.userId,
       action,
       result,
       reason,
       metadata,
-      createdAt: this.store.now()
+      createdAt: this.repository.now()
     });
   }
 
-  private withDeniedAudit<T>(
+  private async withDeniedAudit<T>(
     actor: Actor,
     organizationId: string | null,
     deniedAction: string,
-    callback: () => T
+    callback: () => Promise<T>
   ) {
     try {
-      return callback();
+      return await callback();
     } catch (error) {
-      this.audit(
+      await this.audit(
         actor,
         organizationId,
         deniedAction,
@@ -579,6 +582,10 @@ export class CoreService {
   }
 }
 
-export function createCoreService() {
-  return new CoreService();
+export function createCoreService(repository: CoreRepository) {
+  return new CoreService(repository);
+}
+
+export function createMemoryCoreService() {
+  return new CoreService(new MemoryCoreRepository());
 }

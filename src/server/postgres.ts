@@ -1,10 +1,10 @@
 import pg from "pg";
 
-const { Client } = pg;
+const { Client, Pool } = pg;
 
 export function requirePostgresDatabaseUrl(value = process.env.SUPABASE_DATABASE_URL) {
   if (!value) {
-    throw new Error("SUPABASE_DATABASE_URL is required to run Supabase migrations.");
+    throw new Error("SUPABASE_DATABASE_URL is required for PostgreSQL operations.");
   }
 
   let parsed: URL;
@@ -40,8 +40,23 @@ export function redactDatabaseUrl(value: string) {
 export function createPostgresClient(connectionString: string) {
   return new Client({
     connectionString,
-    ssl: {
-      rejectUnauthorized: false
-    }
+    ssl: shouldUseSsl(connectionString) ? { rejectUnauthorized: false } : false
   });
+}
+
+export function createPostgresPool(connectionString: string) {
+  return new Pool({
+    connectionString,
+    ssl: shouldUseSsl(connectionString) ? { rejectUnauthorized: false } : false
+  });
+}
+
+function shouldUseSsl(connectionString: string) {
+  const parsed = new URL(connectionString);
+
+  if (parsed.searchParams.get("sslmode") === "disable") {
+    return false;
+  }
+
+  return parsed.hostname !== "localhost" && parsed.hostname !== "127.0.0.1";
 }

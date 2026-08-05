@@ -1,6 +1,7 @@
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createServer } from "../../src/server/app";
+import { MemoryCoreRepository } from "../../src/server/core/memory-repository";
 import { createCoreService, type CoreService } from "../../src/server/core/service";
 
 const platformHeaders = { "x-dev-platform-admin": "true" };
@@ -38,11 +39,13 @@ async function createOrganization(
 
 describe("phase 1 multi-company API", () => {
   let service: CoreService;
+  let repository: MemoryCoreRepository;
   let app: ReturnType<typeof createServer>;
 
   beforeEach(() => {
     process.env.APP_ENV = "test";
-    service = createCoreService();
+    repository = new MemoryCoreRepository();
+    service = createCoreService(repository);
     app = createServer(service);
   });
 
@@ -53,7 +56,7 @@ describe("phase 1 multi-company API", () => {
     expect(result.organization.status).toBe("active");
     expect(result.membership.role).toBe("owner");
     expect(result.membership.status).toBe("active");
-    expect(service.getStore().snapshot().memberships).toHaveLength(1);
+    expect(repository.snapshot().memberships).toHaveLength(1);
   });
 
   it("rolls back when Organization creation fails", async () => {
@@ -66,8 +69,8 @@ describe("phase 1 multi-company API", () => {
       .send({ name: "Duplicate", slug: "duplicate", initialOwnerUserId: owner.id })
       .expect(409);
 
-    expect(service.getStore().snapshot().organizations).toHaveLength(1);
-    expect(service.getStore().snapshot().memberships).toHaveLength(1);
+    expect(repository.snapshot().organizations).toHaveLength(1);
+    expect(repository.snapshot().memberships).toHaveLength(1);
   });
 
   it("rejects a missing initial owner without creating Organization", async () => {
@@ -77,12 +80,12 @@ describe("phase 1 multi-company API", () => {
       .send({ name: "No Owner", slug: "no-owner", initialOwnerUserId: "usr_missing" })
       .expect(400);
 
-    expect(service.getStore().snapshot().organizations).toHaveLength(0);
+    expect(repository.snapshot().organizations).toHaveLength(0);
   });
 
   it("rejects an inactive initial owner without creating Organization", async () => {
     const owner = await createUser(app, "inactive@example.com");
-    service.getStore().snapshot().users[0].status = "inactive";
+    repository.snapshot().users[0].status = "inactive";
 
     await request(app)
       .post("/api/organizations")
@@ -90,14 +93,13 @@ describe("phase 1 multi-company API", () => {
       .send({ name: "Inactive Owner", slug: "inactive-owner", initialOwnerUserId: owner.id })
       .expect(400);
 
-    expect(service.getStore().snapshot().organizations).toHaveLength(0);
+    expect(repository.snapshot().organizations).toHaveLength(0);
   });
 
   it("creates exactly one first active owner", async () => {
     const owner = await createUser(app, "owner@example.com");
     const result = await createOrganization(app, owner.id);
-    const owners = service
-      .getStore()
+    const owners = repository
       .snapshot()
       .memberships.filter(
         (membership) =>
@@ -124,7 +126,7 @@ describe("phase 1 multi-company API", () => {
   it("blocks inactive User", async () => {
     const owner = await createUser(app, "owner@example.com");
     const result = await createOrganization(app, owner.id);
-    service.getStore().snapshot().users[0].status = "inactive";
+    repository.snapshot().users[0].status = "inactive";
 
     await request(app)
       .get(`/api/organizations/${result.organization.id}`)
@@ -135,7 +137,7 @@ describe("phase 1 multi-company API", () => {
   it("blocks inactive Membership", async () => {
     const owner = await createUser(app, "owner@example.com");
     const result = await createOrganization(app, owner.id);
-    service.getStore().snapshot().memberships[0].status = "inactive";
+    repository.snapshot().memberships[0].status = "inactive";
 
     await request(app)
       .get(`/api/organizations/${result.organization.id}`)
@@ -317,7 +319,9 @@ describe("phase 1 multi-company API", () => {
       .set({ "x-dev-user-id": ownerA.id })
       .expect(403);
 
-    expect(service.auditEvents().some((event) => event.result === "denied")).toBe(true);
+    await expect(service.auditEvents()).resolves.toEqual(
+      expect.arrayContaining([expect.objectContaining({ result: "denied" })])
+    );
   });
 
   it("does not mix data from different Organizations in responses", async () => {

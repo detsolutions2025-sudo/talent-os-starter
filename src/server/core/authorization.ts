@@ -1,6 +1,6 @@
 import { forbidden, notFound } from "./errors";
 import type { Actor, Membership, MembershipRole, Permission } from "./types";
-import type { CoreStore } from "./store";
+import type { CoreRepository } from "./repository";
 
 export type AuthorizationContext = {
   actor: Actor;
@@ -28,7 +28,10 @@ const platformPermissions = new Set<Permission>([
   "membership.manage_owner"
 ]);
 
-export function authorize(store: CoreStore, context: AuthorizationContext): AuthorizedMembership {
+export async function authorize(
+  repository: CoreRepository,
+  context: AuthorizationContext
+): Promise<AuthorizedMembership> {
   if (context.actor.kind === "platform") {
     if (!platformPermissions.has(context.permission)) {
       throw forbidden("permission_denied", "Permission denied.");
@@ -37,7 +40,7 @@ export function authorize(store: CoreStore, context: AuthorizationContext): Auth
     return { membership: null, role: "platform" };
   }
 
-  const user = store.users().find((candidate) => candidate.id === context.actor.userId);
+  const user = await repository.findUserById(context.actor.userId);
 
   if (!user || user.status !== "active") {
     throw forbidden("user_inactive_or_missing", "Active user is required.");
@@ -47,9 +50,7 @@ export function authorize(store: CoreStore, context: AuthorizationContext): Auth
     throw forbidden("organization_context_required", "Organization context is required.");
   }
 
-  const organization = store
-    .organizations()
-    .find((candidate) => candidate.id === context.organizationId);
+  const organization = await repository.findOrganizationById(context.organizationId);
 
   if (!organization) {
     throw notFound("organization_not_found", "Organization not found.");
@@ -59,11 +60,7 @@ export function authorize(store: CoreStore, context: AuthorizationContext): Auth
     throw forbidden("organization_archived", "Archived organization cannot be used as context.");
   }
 
-  const membership = store
-    .memberships()
-    .find(
-      (candidate) => candidate.organizationId === organization.id && candidate.userId === user.id
-    );
+  const membership = await repository.findMembershipByOrganizationAndUser(organization.id, user.id);
 
   if (!membership || membership.status !== "active") {
     throw forbidden("membership_required", "Active membership is required.");
