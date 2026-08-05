@@ -1,6 +1,8 @@
 import { createServer } from "./app";
+import { createPostgresCompetencyService } from "./competencies/service";
 import { createCoreService } from "./core/service";
 import { createPostgresDnaService } from "./dna/service";
+import { createPostgresJobProfileService } from "./job-profiles/service";
 import { createPostgresOrganizationalUnitService } from "./organizational-units/service";
 import { PostgresCoreRepository } from "./persistence/postgres-core-repository";
 import { createPostgresPool, requirePostgresDatabaseUrl } from "./postgres";
@@ -11,7 +13,9 @@ const pool = createPostgresPool(connectionString);
 const app = createServer(
   createCoreService(new PostgresCoreRepository(pool)),
   createPostgresDnaService(pool),
-  createPostgresOrganizationalUnitService(pool)
+  createPostgresOrganizationalUnitService(pool),
+  createPostgresCompetencyService(pool),
+  createPostgresJobProfileService(pool)
 );
 
 app.listen(port, () => {

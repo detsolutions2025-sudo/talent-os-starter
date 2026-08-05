@@ -102,7 +102,13 @@ h1 {
 .dna-editor input,
 .dna-editor select,
 .unit-editor input,
-.unit-editor select {
+.unit-editor select,
+.competency-form input,
+.competency-form select,
+.competency-form textarea,
+.job-profile-form input,
+.job-profile-form select,
+.job-profile-form textarea {
   width: 100%;
   min-height: 44px;
   margin-top: 16px;
@@ -148,13 +154,17 @@ h1 {
 }
 
 .dna-panel,
-.org-units-panel {
+.org-units-panel,
+.competencies-panel,
+.job-profiles-panel {
   grid-column: 1 / -1;
 }
 
 .dna-summary,
 .dna-editor,
-.unit-editor {
+.unit-editor,
+.competency-form,
+.job-profile-form {
   display: grid;
   gap: 8px;
   margin-top: 16px;
@@ -163,8 +173,21 @@ h1 {
 .dna-editor input,
 .dna-editor select,
 .unit-editor input,
-.unit-editor select {
+.unit-editor select,
+.competency-form input,
+.competency-form select,
+.competency-form textarea,
+.job-profile-form input,
+.job-profile-form select,
+.job-profile-form textarea {
   margin-top: 0;
+}
+
+.job-profile-form textarea,
+.competency-form textarea {
+  min-height: 96px;
+  padding: 10px 12px;
+  resize: vertical;
 }
 
 .member-form input,
@@ -213,6 +236,47 @@ input:disabled {
   margin-top: 16px;
 }
 
+.competency-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.8fr) minmax(280px, 1fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.job-profile-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.8fr) minmax(280px, 1fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.job-profile-editor {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+}
+
+.competency-list {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.competency-list li {
+  display: grid;
+  gap: 6px;
+  border-top: 1px solid #eef0ea;
+  padding-top: 10px;
+}
+
+.competency-list small,
+.competency-list code {
+  color: #667078;
+  overflow-wrap: anywhere;
+}
+
 .unit-tree {
   display: grid;
   gap: 8px;
@@ -252,7 +316,9 @@ input:disabled {
     grid-template-columns: 1fr;
   }
 
-  .org-units-layout {
+  .org-units-layout,
+  .competency-layout,
+  .job-profile-layout {
     grid-template-columns: 1fr;
   }
 }

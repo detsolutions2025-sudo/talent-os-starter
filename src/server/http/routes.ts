@@ -1,16 +1,20 @@
 import type { Router } from "express";
 import type { Request, Response, NextFunction } from "express";
 import { Router as createRouter } from "express";
+import type { CompetencyService } from "../competencies/service";
 import { getActor } from "./dev-auth";
 import { forbidden } from "../core/errors";
 import type { CoreService } from "../core/service";
 import type { DnaService } from "../dna/service";
+import type { JobProfileService } from "../job-profiles/service";
 import type { OrganizationalUnitService } from "../organizational-units/service";
 
 export function createApiRouter(
   core: CoreService,
   dna?: DnaService,
-  organizationalUnits?: OrganizationalUnitService
+  organizationalUnits?: OrganizationalUnitService,
+  competencies?: CompetencyService,
+  jobProfiles?: JobProfileService
 ): Router {
   const router = createRouter();
 
@@ -367,6 +371,487 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await organizationalUnits.adminRead(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            request.body
+          )
+        );
+      })
+    );
+  }
+
+  if (competencies) {
+    router.post(
+      "/platform/competencies/global",
+      asyncHandler(async (request, response) => {
+        const competency = await competencies.createGlobal(getActor(request), request.body);
+        response.status(201).json(competency);
+      })
+    );
+
+    router.get(
+      "/platform/competencies/global",
+      asyncHandler(async (request, response) => {
+        response.json(await competencies.listGlobals(getActor(request)));
+      })
+    );
+
+    router.get(
+      "/platform/competencies/global/history",
+      asyncHandler(async (request, response) => {
+        response.json(await competencies.globalHistory(getActor(request)));
+      })
+    );
+
+    router.get(
+      "/platform/competencies/global/:globalCompetencyId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await competencies.getGlobal(
+            getActor(request),
+            routeParam(request.params.globalCompetencyId)
+          )
+        );
+      })
+    );
+
+    router.patch(
+      "/platform/competencies/global/:globalCompetencyId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await competencies.updateGlobal(
+            getActor(request),
+            routeParam(request.params.globalCompetencyId),
+            request.body
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/platform/competencies/global/:globalCompetencyId/activate",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await competencies.setGlobalStatus(
+            getActor(request),
+            routeParam(request.params.globalCompetencyId),
+            "active"
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/platform/competencies/global/:globalCompetencyId/inactivate",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await competencies.setGlobalStatus(
+            getActor(request),
+            routeParam(request.params.globalCompetencyId),
+            "inactive"
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/platform/competencies/global/:globalCompetencyId/deprecate",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await competencies.setGlobalStatus(
+            getActor(request),
+            routeParam(request.params.globalCompetencyId),
+            "deprecated"
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/competencies",
+      asyncHandler(async (request, response) => {
+        const competency = await competencies.createOrganizationCompetency(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          request.body
+        );
+        response.status(201).json(competency);
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/competencies",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await competencies.listOrganizationCompetencies(
+            getActor(request),
+            routeParam(request.params.organizationId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/competencies/catalog",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await competencies.listUnifiedCatalog(
+            getActor(request),
+            routeParam(request.params.organizationId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/competencies/available-globals",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await competencies.listAvailableGlobals(
+            getActor(request),
+            routeParam(request.params.organizationId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/competencies/history",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await competencies.listHistory(
+            getActor(request),
+            routeParam(request.params.organizationId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/competencies/catalog/:catalogItemId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await competencies.getCatalogItem(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.catalogItemId)
+          )
+        );
+      })
+    );
+
+    router.patch(
+      "/organizations/:organizationId/competencies/:competencyId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await competencies.updateOrganizationCompetency(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.competencyId),
+            request.body
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/competencies/:competencyId/activate",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await competencies.setOrganizationCompetencyStatus(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.competencyId),
+            "active"
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/competencies/:competencyId/inactivate",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await competencies.setOrganizationCompetencyStatus(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.competencyId),
+            "inactive"
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/competencies/adoptions",
+      asyncHandler(async (request, response) => {
+        const adoption = await competencies.adoptGlobal(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          request.body
+        );
+        response.status(201).json(adoption);
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/competencies/adoptions/:adoptionId/activate",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await competencies.setAdoptionStatus(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.adoptionId),
+            "active"
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/competencies/adoptions/:adoptionId/inactivate",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await competencies.setAdoptionStatus(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.adoptionId),
+            "inactive"
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/platform/organizations/:organizationId/competencies/admin-read",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await competencies.adminRead(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            request.body
+          )
+        );
+      })
+    );
+  }
+
+  if (jobProfiles) {
+    router.post(
+      "/organizations/:organizationId/job-profiles",
+      asyncHandler(async (request, response) => {
+        const profile = await jobProfiles.createJobProfile(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          request.body
+        );
+        response.status(201).json(profile);
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/job-profiles",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await jobProfiles.listActive(getActor(request), routeParam(request.params.organizationId))
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/job-profiles/inactive",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await jobProfiles.listInactive(
+            getActor(request),
+            routeParam(request.params.organizationId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/job-profiles/:jobProfileId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await jobProfiles.getJobProfile(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.jobProfileId)
+          )
+        );
+      })
+    );
+
+    router.patch(
+      "/organizations/:organizationId/job-profiles/:jobProfileId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await jobProfiles.updateJobProfile(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.jobProfileId),
+            request.body
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/job-profiles/:jobProfileId/activate",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await jobProfiles.setJobProfileStatus(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.jobProfileId),
+            "active"
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/job-profiles/:jobProfileId/inactivate",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await jobProfiles.setJobProfileStatus(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.jobProfileId),
+            "inactive"
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/job-profiles/:jobProfileId/drafts",
+      asyncHandler(async (request, response) => {
+        const draft = await jobProfiles.createDraft(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          routeParam(request.params.jobProfileId),
+          request.body
+        );
+        response.status(201).json(draft);
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/job-profiles/:jobProfileId/draft",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await jobProfiles.getActiveDraft(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.jobProfileId)
+          )
+        );
+      })
+    );
+
+    router.patch(
+      "/organizations/:organizationId/job-profiles/:jobProfileId/drafts/:versionId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await jobProfiles.updateDraft(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.jobProfileId),
+            routeParam(request.params.versionId),
+            request.body
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/job-profiles/:jobProfileId/drafts/:versionId/publish",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await jobProfiles.publishDraft(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.jobProfileId),
+            routeParam(request.params.versionId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/job-profiles/:jobProfileId/drafts/:versionId/discard",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await jobProfiles.discardDraft(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.jobProfileId),
+            routeParam(request.params.versionId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/job-profiles/:jobProfileId/published",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await jobProfiles.getPublished(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.jobProfileId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/job-profiles/:jobProfileId/versions",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await jobProfiles.listVersions(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.jobProfileId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/job-profiles/:jobProfileId/versions/:versionId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await jobProfiles.getVersion(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.jobProfileId),
+            routeParam(request.params.versionId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/job-profiles/:jobProfileId/history",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await jobProfiles.history(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.jobProfileId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/platform/organizations/:organizationId/job-profiles/admin-read",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await jobProfiles.adminRead(
             getActor(request),
             routeParam(request.params.organizationId),
             request.body

@@ -281,22 +281,22 @@ vinculos ja existentes.
 
 ### 9.1 Campos comuns de competencia
 
-| Campo                 | Obrigatorio | Observacao                                           |
-| --------------------- | ----------: | ---------------------------------------------------- |
-| `id`                  |         Sim | Identificador interno gerado pelo sistema.           |
-| `code`                |         Sim | Codigo tecnico normalizado e unico no escopo.        |
-| `name`                |         Sim | Nome exibido da competencia.                         |
-| `category`            |         Sim | Valor canonico definido nesta SPEC.                  |
-| `definition`          | Condicional | Obrigatorio para competencia ativa.                  |
-| `positive_evidences`  |         Sim | Lista estruturada, pode ser vazia quando permitido.  |
-| `negative_evidences`  |         Sim | Lista estruturada, pode ser vazia quando permitido.  |
-| `practical_examples`  |         Nao | Lista estruturada opcional.                          |
-| `proficiency_levels`  |         Sim | Cinco niveis obrigatorios para ativacao.             |
-| `status`              |         Sim | Status canonico conforme o tipo da competencia.      |
-| `created_by_user_id`  |         Sim | Autor da criacao, quando houver usuario aplicavel.   |
-| `updated_by_user_id`  |         Nao | Ultimo usuario que alterou, quando aplicavel.        |
-| `created_at`          |         Sim | Data/hora de criacao.                                |
-| `updated_at`          |         Sim | Data/hora da ultima alteracao.                       |
+| Campo                | Obrigatorio | Observacao                                          |
+| -------------------- | ----------: | --------------------------------------------------- |
+| `id`                 |         Sim | Identificador interno gerado pelo sistema.          |
+| `code`               |         Sim | Codigo tecnico normalizado e unico no escopo.       |
+| `name`               |         Sim | Nome exibido da competencia.                        |
+| `category`           |         Sim | Valor canonico definido nesta SPEC.                 |
+| `definition`         | Condicional | Obrigatorio para competencia ativa.                 |
+| `positive_evidences` |         Sim | Lista estruturada, pode ser vazia quando permitido. |
+| `negative_evidences` |         Sim | Lista estruturada, pode ser vazia quando permitido. |
+| `practical_examples` |         Nao | Lista estruturada opcional.                         |
+| `proficiency_levels` |         Sim | Cinco niveis obrigatorios para ativacao.            |
+| `status`             |         Sim | Status canonico conforme o tipo da competencia.     |
+| `created_by_user_id` |         Sim | Autor da criacao, quando houver usuario aplicavel.  |
+| `updated_by_user_id` |         Nao | Ultimo usuario que alterou, quando aplicavel.       |
+| `created_at`         |         Sim | Data/hora de criacao.                               |
+| `updated_at`         |         Sim | Data/hora da ultima alteracao.                      |
 
 Organization Competency tambem deve possuir `organization_id` obrigatorio.
 
@@ -400,16 +400,16 @@ Regras:
 
 Cada `competency_catalog_item` deve possuir:
 
-| Campo                            | Obrigatorio | Observacao                                      |
-| -------------------------------- | ----------: | ----------------------------------------------- |
-| `id`                             |         Sim | Identificador proprio e globalmente unico.      |
-| `organization_id`                |         Sim | Organization dona do item de catalogo.          |
-| `origin`                         |         Sim | `global` ou `organization`.                     |
-| `global_competency_id`           | Condicional | Obrigatorio quando `origin = global`.           |
-| `organization_competency_id`     | Condicional | Obrigatorio quando `origin = organization`.     |
-| `status`                         |         Sim | Status operacional do item no catalogo.         |
-| `created_at`                     |         Sim | Data/hora de criacao.                           |
-| `updated_at`                     |         Sim | Data/hora da ultima alteracao.                  |
+| Campo                        | Obrigatorio | Observacao                                  |
+| ---------------------------- | ----------: | ------------------------------------------- |
+| `id`                         |         Sim | Identificador proprio e globalmente unico.  |
+| `organization_id`            |         Sim | Organization dona do item de catalogo.      |
+| `origin`                     |         Sim | `global` ou `organization`.                 |
+| `global_competency_id`       | Condicional | Obrigatorio quando `origin = global`.       |
+| `organization_competency_id` | Condicional | Obrigatorio quando `origin = organization`. |
+| `status`                     |         Sim | Status operacional do item no catalogo.     |
+| `created_at`                 |         Sim | Data/hora de criacao.                       |
+| `updated_at`                 |         Sim | Data/hora da ultima alteracao.              |
 
 Regras:
 
@@ -425,23 +425,23 @@ Regras:
 
 ## 10. Permissoes
 
-| Acao                                                        | Platform Admin | owner | admin | member |
-| ----------------------------------------------------------- | :------------: | :---: | :---: | :----: |
-| Criar Global Competency                                    |      Sim       |  Nao  |  Nao  |  Nao   |
-| Editar Global Competency                                   |      Sim       |  Nao  |  Nao  |  Nao   |
-| Alterar codigo global                                      |      Sim       |  Nao  |  Nao  |  Nao   |
-| Ativar, inativar ou depreciar Global Competency            |      Sim       |  Nao  |  Nao  |  Nao   |
-| Consultar historico global                                 |      Sim       |  Nao  |  Nao  |  Nao   |
-| Visualizar catalogo global disponivel                      |      Sim       |  Sim  |  Sim  |  Nao   |
-| Criar Organization Competency                              |      Nao       |  Sim  |  Sim  |  Nao   |
-| Editar Organization Competency                             |      Nao       |  Sim  |  Sim  |  Nao   |
-| Alterar codigo de Organization Competency apos criacao     |      Nao       |  Sim  |  Nao  |  Nao   |
-| Ativar ou inativar Organization Competency                 |      Nao       |  Sim  |  Sim  |  Nao   |
-| Adotar Global Competency                                   |      Nao       |  Sim  |  Sim  |  Nao   |
-| Ativar ou inativar adocao                                  |      Nao       |  Sim  |  Sim  |  Nao   |
-| Visualizar competencias ativas disponiveis para uso        |      Nao       |  Sim  |  Sim  |  Sim   |
-| Consultar historico da Organization                        |      Nao       |  Sim  |  Sim  |  Nao   |
-| Consulta administrativa auditada de dados de Organization  |      Sim       |  Nao  |  Nao  |  Nao   |
+| Acao                                                      | Platform Admin | owner | admin | member |
+| --------------------------------------------------------- | :------------: | :---: | :---: | :----: |
+| Criar Global Competency                                   |      Sim       |  Nao  |  Nao  |  Nao   |
+| Editar Global Competency                                  |      Sim       |  Nao  |  Nao  |  Nao   |
+| Alterar codigo global                                     |      Sim       |  Nao  |  Nao  |  Nao   |
+| Ativar, inativar ou depreciar Global Competency           |      Sim       |  Nao  |  Nao  |  Nao   |
+| Consultar historico global                                |      Sim       |  Nao  |  Nao  |  Nao   |
+| Visualizar catalogo global disponivel                     |      Sim       |  Sim  |  Sim  |  Nao   |
+| Criar Organization Competency                             |      Nao       |  Sim  |  Sim  |  Nao   |
+| Editar Organization Competency                            |      Nao       |  Sim  |  Sim  |  Nao   |
+| Alterar codigo de Organization Competency apos criacao    |      Nao       |  Sim  |  Nao  |  Nao   |
+| Ativar ou inativar Organization Competency                |      Nao       |  Sim  |  Sim  |  Nao   |
+| Adotar Global Competency                                  |      Nao       |  Sim  |  Sim  |  Nao   |
+| Ativar ou inativar adocao                                 |      Nao       |  Sim  |  Sim  |  Nao   |
+| Visualizar competencias ativas disponiveis para uso       |      Nao       |  Sim  |  Sim  |  Sim   |
+| Consultar historico da Organization                       |      Nao       |  Sim  |  Sim  |  Nao   |
+| Consulta administrativa auditada de dados de Organization |      Sim       |  Nao  |  Nao  |  Nao   |
 
 Todas as permissoes dependem de User ativo, Membership ativo quando aplicavel,
 Organization ativa quando aplicavel e autorizacao validada no servidor.
@@ -450,32 +450,32 @@ Organization ativa quando aplicavel e autorizacao validada no servidor.
 
 ### 11.1 Plataforma
 
-| Operacao                      | Finalidade                                      |
-| ----------------------------- | ----------------------------------------------- |
-| Criar competencia global      | Cadastrar competencia oficial da plataforma.    |
-| Listar catalogo global        | Consultar biblioteca global.                    |
-| Consultar competencia global  | Ver detalhes de uma competencia global.         |
-| Atualizar competencia global  | Alterar conteudo ou metadados permitidos.       |
-| Ativar competencia global     | Liberar uso operacional e novas adocoes.        |
-| Inativar competencia global   | Bloquear novas adocoes e uso operacional novo.  |
-| Depreciar competencia global  | Preservar historico e bloquear novas adocoes.   |
-| Consultar historico global    | Ver eventos de auditoria da biblioteca global.  |
+| Operacao                     | Finalidade                                     |
+| ---------------------------- | ---------------------------------------------- |
+| Criar competencia global     | Cadastrar competencia oficial da plataforma.   |
+| Listar catalogo global       | Consultar biblioteca global.                   |
+| Consultar competencia global | Ver detalhes de uma competencia global.        |
+| Atualizar competencia global | Alterar conteudo ou metadados permitidos.      |
+| Ativar competencia global    | Liberar uso operacional e novas adocoes.       |
+| Inativar competencia global  | Bloquear novas adocoes e uso operacional novo. |
+| Depreciar competencia global | Preservar historico e bloquear novas adocoes.  |
+| Consultar historico global   | Ver eventos de auditoria da biblioteca global. |
 
 ### 11.2 Organization
 
-| Operacao                              | Finalidade                                      |
-| ------------------------------------- | ----------------------------------------------- |
-| Criar competencia propria             | Cadastrar competencia da Organization atual.    |
-| Listar catalogo unificado             | Ver competencias proprias e adotadas ativas.    |
-| Consultar competencia                 | Ver detalhes permitidos da competencia.         |
-| Atualizar competencia propria         | Alterar dados autorizados.                      |
-| Ativar ou inativar competencia propria| Controlar uso futuro da competencia propria.    |
-| Listar globais disponiveis            | Ver competencias globais adotaveis.             |
-| Adotar competencia global             | Criar associacao com uma Global Competency.     |
-| Ativar ou inativar adocao             | Controlar uso futuro da competencia adotada.    |
-| Consultar catalog item                | Validar item operacional unificado permitido.   |
-| Consultar historico                   | Ver eventos da Organization.                    |
-| Consulta administrativa auditada      | Permitir consulta excepcional por Platform Admin.|
+| Operacao                               | Finalidade                                        |
+| -------------------------------------- | ------------------------------------------------- |
+| Criar competencia propria              | Cadastrar competencia da Organization atual.      |
+| Listar catalogo unificado              | Ver competencias proprias e adotadas ativas.      |
+| Consultar competencia                  | Ver detalhes permitidos da competencia.           |
+| Atualizar competencia propria          | Alterar dados autorizados.                        |
+| Ativar ou inativar competencia propria | Controlar uso futuro da competencia propria.      |
+| Listar globais disponiveis             | Ver competencias globais adotaveis.               |
+| Adotar competencia global              | Criar associacao com uma Global Competency.       |
+| Ativar ou inativar adocao              | Controlar uso futuro da competencia adotada.      |
+| Consultar catalog item                 | Validar item operacional unificado permitido.     |
+| Consultar historico                    | Ver eventos da Organization.                      |
+| Consulta administrativa auditada       | Permitir consulta excepcional por Platform Admin. |
 
 ## 12. Catalogo unificado da Organization
 

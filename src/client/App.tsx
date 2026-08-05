@@ -84,6 +84,89 @@ type OrganizationalUnitDraft = {
   displayOrder: number;
 };
 
+type CompetencyCategory =
+  | "technical"
+  | "behavioral"
+  | "leadership"
+  | "management"
+  | "tools"
+  | "languages"
+  | "compliance"
+  | "safety"
+  | "other";
+
+type GlobalCompetency = {
+  id: string;
+  code: string;
+  name: string;
+  category: CompetencyCategory;
+  definition: string;
+  status: "active" | "inactive" | "deprecated";
+};
+
+type OrganizationCompetency = {
+  id: string;
+  code: string;
+  name: string;
+  category: CompetencyCategory;
+  definition: string;
+  status: "active" | "inactive";
+};
+
+type UnifiedCatalogItem = {
+  competencyCatalogItemId: string;
+  origin: "global" | "organization";
+  code: string;
+  name: string;
+  category: CompetencyCategory;
+  status: "active" | "inactive";
+  sourceStatus: string;
+  globalStatus: "active" | "inactive" | "deprecated" | null;
+  editable: boolean;
+  deprecated: boolean;
+};
+
+type CompetencyDraft = {
+  code: string;
+  name: string;
+  category: CompetencyCategory;
+  definition: string;
+};
+
+type JobProfile = {
+  id: string;
+  code: string;
+  name: string;
+  status: "active" | "inactive";
+};
+
+type JobProfileDraft = {
+  code: string;
+  name: string;
+};
+
+type JobProfileVersion = {
+  id: string;
+  versionNumber: number | null;
+  status: "draft" | "published" | "archived";
+  title: string;
+  mission: string;
+  summary: string;
+  responsibilities: { text: string; displayOrder: number }[];
+  requirements: { text: string; type: string; required: boolean; displayOrder: number }[];
+  workModel: "onsite" | "hybrid" | "remote" | "flexible";
+  workSchedule: { weeklyHours: number; description: string; shift: string };
+  travelRequirement: "none" | "occasional" | "frequent";
+  salaryRange: { min: number; max: number; currency: string; periodicity: string } | null;
+  competencies: {
+    competencyCatalogItemId: string;
+    expectedLevel: number;
+    required: boolean;
+    displayOrder: number;
+  }[];
+  discardedAt: string | null;
+};
+
 const emptyUnitDraft: OrganizationalUnitDraft = {
   code: "",
   name: "",
@@ -93,6 +176,34 @@ const emptyUnitDraft: OrganizationalUnitDraft = {
   managerEmail: "",
   description: "",
   displayOrder: 0
+};
+
+const emptyCompetencyDraft: CompetencyDraft = {
+  code: "",
+  name: "",
+  category: "technical",
+  definition: ""
+};
+
+const emptyJobProfileDraft: JobProfileDraft = {
+  code: "",
+  name: ""
+};
+
+const competencyCategories: CompetencyCategory[] = [
+  "technical",
+  "behavioral",
+  "leadership",
+  "management",
+  "tools",
+  "languages",
+  "compliance",
+  "safety",
+  "other"
+];
+
+const platformHeaders = {
+  "x-dev-platform-admin": "true"
 };
 
 const currentDevUserId = import.meta.env.VITE_DEV_USER_ID ?? "usr_000001";
@@ -115,6 +226,28 @@ export function App() {
   const [selectedUnitId, setSelectedUnitId] = useState("");
   const [unitDraft, setUnitDraft] = useState<OrganizationalUnitDraft>(emptyUnitDraft);
   const [showInactiveUnits, setShowInactiveUnits] = useState(false);
+  const [competencyTab, setCompetencyTab] = useState<"global" | "organization" | "catalog">(
+    "catalog"
+  );
+  const [globalCompetencies, setGlobalCompetencies] = useState<GlobalCompetency[]>([]);
+  const [availableGlobalCompetencies, setAvailableGlobalCompetencies] = useState<
+    GlobalCompetency[]
+  >([]);
+  const [organizationCompetencies, setOrganizationCompetencies] = useState<
+    OrganizationCompetency[]
+  >([]);
+  const [catalogItems, setCatalogItems] = useState<UnifiedCatalogItem[]>([]);
+  const [jobProfiles, setJobProfiles] = useState<JobProfile[]>([]);
+  const [inactiveJobProfiles, setInactiveJobProfiles] = useState<JobProfile[]>([]);
+  const [selectedJobProfileId, setSelectedJobProfileId] = useState("");
+  const [jobProfileDraft, setJobProfileDraft] = useState<JobProfileDraft>(emptyJobProfileDraft);
+  const [jobDraftVersion, setJobDraftVersion] = useState<JobProfileVersion | null>(null);
+  const [publishedJobVersion, setPublishedJobVersion] = useState<JobProfileVersion | null>(null);
+  const [jobProfileHistory, setJobProfileHistory] = useState<JobProfileVersion[]>([]);
+  const [globalCompetencyDraft, setGlobalCompetencyDraft] =
+    useState<CompetencyDraft>(emptyCompetencyDraft);
+  const [organizationCompetencyDraft, setOrganizationCompetencyDraft] =
+    useState<CompetencyDraft>(emptyCompetencyDraft);
   const [message, setMessage] = useState("Nenhuma Organization selecionada.");
   const currentMembership = memberships.find(
     (membership) => membership.userId === currentDevUserId && membership.status === "active"
@@ -126,6 +259,10 @@ export function App() {
   const canPublishDna = currentMembership?.role === "owner";
   const canManageUnits = currentMembership?.role === "owner" || currentMembership?.role === "admin";
   const canChangeUnitCode = currentMembership?.role === "owner";
+  const canManageCompetencies =
+    currentMembership?.role === "owner" || currentMembership?.role === "admin";
+  const canManageJobs = currentMembership?.role === "owner" || currentMembership?.role === "admin";
+  const canPublishJobs = currentMembership?.role === "owner";
 
   useEffect(() => {
     fetch("/api/organizations", { headers: devHeaders })
@@ -143,7 +280,16 @@ export function App() {
         );
       })
       .catch((error: Error) => setMessage(error.message));
+    loadPlatformGlobals();
   }, []);
+
+  function loadPlatformGlobals() {
+    fetch("/api/platform/competencies/global", { headers: platformHeaders })
+      .then(async (response) => {
+        setGlobalCompetencies(response.ok ? ((await response.json()) as GlobalCompetency[]) : []);
+      })
+      .catch(() => setGlobalCompetencies([]));
+  }
 
   function selectOrganization(organizationId: string) {
     setSelectedOrganizationId(organizationId);
@@ -156,6 +302,16 @@ export function App() {
     setActiveUnits([]);
     setSelectedUnitId("");
     setUnitDraft(emptyUnitDraft);
+    setOrganizationCompetencies([]);
+    setAvailableGlobalCompetencies([]);
+    setCatalogItems([]);
+    setJobProfiles([]);
+    setInactiveJobProfiles([]);
+    setSelectedJobProfileId("");
+    setJobProfileDraft(emptyJobProfileDraft);
+    setJobDraftVersion(null);
+    setPublishedJobVersion(null);
+    setJobProfileHistory([]);
 
     if (!organizationId) {
       setMessage("Nenhuma Organization selecionada.");
@@ -178,6 +334,8 @@ export function App() {
         setMessage("Organization selecionada com contexto validado no servidor.");
         void loadDna(organizationId, organizationMemberships);
         void loadUnits(organizationId);
+        void loadCompetencies(organizationId, organizationMemberships);
+        void loadJobProfiles(organizationId, organizationMemberships);
       })
       .catch((error: Error) => setMessage(error.message));
   }
@@ -225,6 +383,66 @@ export function App() {
       .catch(() => setActiveUnits([]));
   }
 
+  function loadCompetencies(organizationId: string, organizationMemberships = memberships) {
+    const membership = organizationMemberships.find(
+      (candidate) => candidate.userId === currentDevUserId && candidate.status === "active"
+    );
+    const canManage = membership?.role === "owner" || membership?.role === "admin";
+
+    fetch(`/api/organizations/${organizationId}/competencies/catalog`, { headers: devHeaders })
+      .then(async (response) => {
+        setCatalogItems(response.ok ? ((await response.json()) as UnifiedCatalogItem[]) : []);
+      })
+      .catch(() => setCatalogItems([]));
+
+    if (!canManage) {
+      setOrganizationCompetencies([]);
+      setAvailableGlobalCompetencies([]);
+      return;
+    }
+
+    fetch(`/api/organizations/${organizationId}/competencies`, { headers: devHeaders })
+      .then(async (response) => {
+        setOrganizationCompetencies(
+          response.ok ? ((await response.json()) as OrganizationCompetency[]) : []
+        );
+      })
+      .catch(() => setOrganizationCompetencies([]));
+    fetch(`/api/organizations/${organizationId}/competencies/available-globals`, {
+      headers: devHeaders
+    })
+      .then(async (response) => {
+        setAvailableGlobalCompetencies(
+          response.ok ? ((await response.json()) as GlobalCompetency[]) : []
+        );
+      })
+      .catch(() => setAvailableGlobalCompetencies([]));
+  }
+
+  function loadJobProfiles(organizationId: string, organizationMemberships = memberships) {
+    const membership = organizationMemberships.find(
+      (candidate) => candidate.userId === currentDevUserId && candidate.status === "active"
+    );
+    const canManage = membership?.role === "owner" || membership?.role === "admin";
+
+    fetch(`/api/organizations/${organizationId}/job-profiles`, { headers: devHeaders })
+      .then(async (response) => {
+        setJobProfiles(response.ok ? ((await response.json()) as JobProfile[]) : []);
+      })
+      .catch(() => setJobProfiles([]));
+
+    if (!canManage) {
+      setInactiveJobProfiles([]);
+      return;
+    }
+
+    fetch(`/api/organizations/${organizationId}/job-profiles/inactive`, { headers: devHeaders })
+      .then(async (response) => {
+        setInactiveJobProfiles(response.ok ? ((await response.json()) as JobProfile[]) : []);
+      })
+      .catch(() => setInactiveJobProfiles([]));
+  }
+
   function reloadSelectedOrganization() {
     if (selectedOrganizationId) {
       selectOrganization(selectedOrganizationId);
@@ -240,6 +458,21 @@ export function App() {
   function reloadUnits() {
     if (selectedOrganizationId) {
       loadUnits(selectedOrganizationId);
+    }
+  }
+
+  function reloadCompetencies() {
+    if (selectedOrganizationId) {
+      loadCompetencies(selectedOrganizationId);
+    }
+  }
+
+  function reloadJobProfiles() {
+    if (selectedOrganizationId) {
+      loadJobProfiles(selectedOrganizationId);
+      if (selectedJobProfileId) {
+        loadSelectedJobProfile(selectedJobProfileId);
+      }
     }
   }
 
@@ -292,6 +525,359 @@ export function App() {
         reloadSelectedOrganization();
       })
       .catch((error: Error) => setMessage(error.message));
+  }
+
+  function competencyPayload(draft: CompetencyDraft) {
+    return {
+      ...draft,
+      status: "active",
+      positiveEvidences: [{ text: "Evidencia observavel", displayOrder: 0 }],
+      negativeEvidences: [{ text: "Ausencia de evidencia observavel", displayOrder: 0 }],
+      practicalExamples: [{ text: "Aplicacao pratica", displayOrder: 0 }],
+      proficiencyLevels: [
+        {
+          number: 1,
+          code: "basic",
+          displayName: "Basico",
+          description: "Reconhece conceitos essenciais.",
+          observableEvidences: []
+        },
+        {
+          number: 2,
+          code: "intermediate",
+          displayName: "Intermediario",
+          description: "Aplica com apoio em cenarios conhecidos.",
+          observableEvidences: []
+        },
+        {
+          number: 3,
+          code: "proficient",
+          displayName: "Proficiente",
+          description: "Aplica com autonomia em cenarios recorrentes.",
+          observableEvidences: []
+        },
+        {
+          number: 4,
+          code: "advanced",
+          displayName: "Avancado",
+          description: "Resolve casos complexos e orienta outras pessoas.",
+          observableEvidences: []
+        },
+        {
+          number: 5,
+          code: "reference",
+          displayName: "Referencia",
+          description: "Define praticas e referencia tecnica para a Organization.",
+          observableEvidences: []
+        }
+      ]
+    };
+  }
+
+  function createGlobalCompetency() {
+    fetch("/api/platform/competencies/global", {
+      method: "POST",
+      headers: {
+        ...platformHeaders,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify(competencyPayload(globalCompetencyDraft))
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Acesso negado ou dados invalidos para criar global.");
+        }
+
+        setGlobalCompetencyDraft(emptyCompetencyDraft);
+        loadPlatformGlobals();
+        if (selectedOrganizationId) {
+          reloadCompetencies();
+        }
+        setMessage("Competencia global criada.");
+      })
+      .catch((error: Error) => setMessage(error.message));
+  }
+
+  function createOrganizationCompetency() {
+    if (!selectedOrganizationId) {
+      setMessage("Selecione uma Organization.");
+      return;
+    }
+
+    fetch(`/api/organizations/${selectedOrganizationId}/competencies`, {
+      method: "POST",
+      headers: {
+        ...devHeaders,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify(competencyPayload(organizationCompetencyDraft))
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Acesso negado ou dados invalidos para criar competencia.");
+        }
+
+        setOrganizationCompetencyDraft(emptyCompetencyDraft);
+        reloadCompetencies();
+        setMessage("Competencia propria criada e adicionada ao catalogo.");
+      })
+      .catch((error: Error) => setMessage(error.message));
+  }
+
+  function adoptGlobalCompetency(globalCompetencyId: string) {
+    if (!selectedOrganizationId) {
+      return;
+    }
+
+    fetch(`/api/organizations/${selectedOrganizationId}/competencies/adoptions`, {
+      method: "POST",
+      headers: {
+        ...devHeaders,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({ globalCompetencyId })
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Acesso negado ou global indisponivel para adocao.");
+        }
+
+        reloadCompetencies();
+        setMessage("Competencia global adotada.");
+      })
+      .catch((error: Error) => setMessage(error.message));
+  }
+
+  function changeOrganizationCompetencyStatus(
+    competencyId: string,
+    action: "activate" | "inactivate"
+  ) {
+    if (!selectedOrganizationId) {
+      return;
+    }
+
+    fetch(`/api/organizations/${selectedOrganizationId}/competencies/${competencyId}/${action}`, {
+      method: "POST",
+      headers: devHeaders
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Alteracao de status negada para competencia.");
+        }
+
+        reloadCompetencies();
+        setMessage(action === "activate" ? "Competencia ativada." : "Competencia inativada.");
+      })
+      .catch((error: Error) => setMessage(error.message));
+  }
+
+  function createJobProfile() {
+    if (!selectedOrganizationId) {
+      setMessage("Selecione uma Organization.");
+      return;
+    }
+
+    fetch(`/api/organizations/${selectedOrganizationId}/job-profiles`, {
+      method: "POST",
+      headers: {
+        ...devHeaders,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify(jobProfileDraft)
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Acesso negado ou dados invalidos para criar cargo.");
+        }
+
+        const profile = (await response.json()) as JobProfile;
+        setJobProfileDraft(emptyJobProfileDraft);
+        setSelectedJobProfileId(profile.id);
+        reloadJobProfiles();
+        loadSelectedJobProfile(profile.id);
+        setMessage("Cargo criado.");
+      })
+      .catch((error: Error) => setMessage(error.message));
+  }
+
+  function loadSelectedJobProfile(jobProfileId: string) {
+    if (!selectedOrganizationId || !jobProfileId) {
+      setJobDraftVersion(null);
+      setPublishedJobVersion(null);
+      setJobProfileHistory([]);
+      return;
+    }
+
+    fetch(`/api/organizations/${selectedOrganizationId}/job-profiles/${jobProfileId}/published`, {
+      headers: devHeaders
+    })
+      .then(async (response) => {
+        setPublishedJobVersion(response.ok ? ((await response.json()) as JobProfileVersion) : null);
+      })
+      .catch(() => setPublishedJobVersion(null));
+
+    if (!canManageJobs) {
+      setJobDraftVersion(null);
+      setJobProfileHistory([]);
+      return;
+    }
+
+    fetch(`/api/organizations/${selectedOrganizationId}/job-profiles/${jobProfileId}/draft`, {
+      headers: devHeaders
+    })
+      .then(async (response) => {
+        setJobDraftVersion(response.ok ? ((await response.json()) as JobProfileVersion) : null);
+      })
+      .catch(() => setJobDraftVersion(null));
+    fetch(`/api/organizations/${selectedOrganizationId}/job-profiles/${jobProfileId}/versions`, {
+      headers: devHeaders
+    })
+      .then(async (response) => {
+        setJobProfileHistory(response.ok ? ((await response.json()) as JobProfileVersion[]) : []);
+      })
+      .catch(() => setJobProfileHistory([]));
+  }
+
+  function createJobDraft() {
+    if (!selectedOrganizationId || !selectedJobProfileId) {
+      setMessage("Selecione um cargo.");
+      return;
+    }
+
+    fetch(
+      `/api/organizations/${selectedOrganizationId}/job-profiles/${selectedJobProfileId}/drafts`,
+      {
+        method: "POST",
+        headers: {
+          ...devHeaders,
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({})
+      }
+    )
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Acesso negado ou rascunho ativo ja existente.");
+        }
+
+        setJobDraftVersion((await response.json()) as JobProfileVersion);
+        loadSelectedJobProfile(selectedJobProfileId);
+        setMessage("Rascunho de cargo criado.");
+      })
+      .catch((error: Error) => setMessage(error.message));
+  }
+
+  function saveJobDraft() {
+    if (!selectedOrganizationId || !selectedJobProfileId || !jobDraftVersion) {
+      return;
+    }
+
+    fetch(
+      `/api/organizations/${selectedOrganizationId}/job-profiles/${selectedJobProfileId}/drafts/${jobDraftVersion.id}`,
+      {
+        method: "PATCH",
+        headers: {
+          ...devHeaders,
+          "content-type": "application/json"
+        },
+        body: JSON.stringify(jobDraftPayload(jobDraftVersion))
+      }
+    )
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Acesso negado ou dados invalidos para salvar cargo.");
+        }
+
+        setJobDraftVersion((await response.json()) as JobProfileVersion);
+        loadSelectedJobProfile(selectedJobProfileId);
+        setMessage("Rascunho de cargo salvo.");
+      })
+      .catch((error: Error) => setMessage(error.message));
+  }
+
+  function publishJobDraft() {
+    if (!selectedOrganizationId || !selectedJobProfileId || !jobDraftVersion) {
+      return;
+    }
+
+    fetch(
+      `/api/organizations/${selectedOrganizationId}/job-profiles/${selectedJobProfileId}/drafts/${jobDraftVersion.id}/publish`,
+      { method: "POST", headers: devHeaders }
+    )
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Publicacao negada ou rascunho incompleto.");
+        }
+
+        setPublishedJobVersion((await response.json()) as JobProfileVersion);
+        setJobDraftVersion(null);
+        reloadJobProfiles();
+        setMessage("Cargo publicado.");
+      })
+      .catch((error: Error) => setMessage(error.message));
+  }
+
+  function discardJobDraft() {
+    if (!selectedOrganizationId || !selectedJobProfileId || !jobDraftVersion) {
+      return;
+    }
+
+    fetch(
+      `/api/organizations/${selectedOrganizationId}/job-profiles/${selectedJobProfileId}/drafts/${jobDraftVersion.id}/discard`,
+      { method: "POST", headers: devHeaders }
+    )
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Acesso negado para descartar rascunho.");
+        }
+
+        setJobDraftVersion(null);
+        loadSelectedJobProfile(selectedJobProfileId);
+        setMessage("Rascunho de cargo descartado.");
+      })
+      .catch((error: Error) => setMessage(error.message));
+  }
+
+  function updateJobDraftField<K extends keyof JobProfileVersion>(
+    field: K,
+    value: JobProfileVersion[K]
+  ) {
+    if (jobDraftVersion) {
+      setJobDraftVersion({ ...jobDraftVersion, [field]: value });
+    }
+  }
+
+  function jobDraftPayload(version: JobProfileVersion) {
+    const selectedCatalogItem = catalogItems.find((item) => item.status === "active");
+
+    return {
+      title: version.title,
+      mission: version.mission,
+      summary: version.summary,
+      responsibilities: version.responsibilities.length
+        ? version.responsibilities
+        : [{ text: "Responsabilidade principal", displayOrder: 0 }],
+      requirements: version.requirements,
+      education: { level: "not_required", area: "", required: false, note: "" },
+      certifications: [],
+      languages: [],
+      tools: [],
+      workModel: version.workModel,
+      workSchedule: version.workSchedule,
+      travelRequirement: version.travelRequirement,
+      salaryRange: version.salaryRange,
+      notes: "",
+      competencies: selectedCatalogItem
+        ? [
+            {
+              competencyCatalogItemId: selectedCatalogItem.competencyCatalogItemId,
+              expectedLevel: 3,
+              required: true,
+              displayOrder: 0
+            }
+          ]
+        : []
+    };
   }
 
   function createDnaDraft() {
@@ -951,6 +1537,408 @@ export function App() {
                 <p>Visualizacao limitada a unidades ativas.</p>
               )}
             </div>
+          </div>
+        )}
+
+        {selectedOrganization && (
+          <div className="panel job-profiles-panel">
+            <span>Cargos</span>
+            <div className="job-profile-layout">
+              <div>
+                {canManageJobs && (
+                  <div className="job-profile-form">
+                    <input
+                      aria-label="Codigo do cargo"
+                      placeholder="Codigo"
+                      value={jobProfileDraft.code}
+                      onChange={(event) =>
+                        setJobProfileDraft({ ...jobProfileDraft, code: event.target.value })
+                      }
+                    />
+                    <input
+                      aria-label="Nome do cargo"
+                      placeholder="Nome"
+                      value={jobProfileDraft.name}
+                      onChange={(event) =>
+                        setJobProfileDraft({ ...jobProfileDraft, name: event.target.value })
+                      }
+                    />
+                    <button type="button" onClick={createJobProfile}>
+                      Criar cargo
+                    </button>
+                  </div>
+                )}
+
+                <ul className="competency-list">
+                  {[...jobProfiles, ...inactiveJobProfiles].map((profile) => (
+                    <li key={profile.id}>
+                      <button
+                        type="button"
+                        className="unit-row"
+                        onClick={() => {
+                          setSelectedJobProfileId(profile.id);
+                          loadSelectedJobProfile(profile.id);
+                        }}
+                      >
+                        <strong>{profile.name}</strong>
+                        <small>
+                          {profile.code} - {profile.status}
+                        </small>
+                      </button>
+                    </li>
+                  ))}
+                  {jobProfiles.length + inactiveJobProfiles.length === 0 && (
+                    <li>Nenhum cargo cadastrado.</li>
+                  )}
+                </ul>
+              </div>
+
+              <div className="job-profile-editor">
+                {publishedJobVersion ? (
+                  <div className="dna-summary">
+                    <strong>
+                      Publicado v{publishedJobVersion.versionNumber ?? "-"} -{" "}
+                      {publishedJobVersion.status}
+                    </strong>
+                    <p>{publishedJobVersion.summary || "Sem resumo informado."}</p>
+                    {publishedJobVersion.salaryRange && (
+                      <small>
+                        {publishedJobVersion.salaryRange.currency}{" "}
+                        {publishedJobVersion.salaryRange.min} -{" "}
+                        {publishedJobVersion.salaryRange.max}
+                      </small>
+                    )}
+                  </div>
+                ) : (
+                  <p>Nenhuma versao publicada.</p>
+                )}
+
+                {canManageJobs && selectedJobProfileId && !jobDraftVersion && (
+                  <button type="button" onClick={createJobDraft}>
+                    Criar rascunho
+                  </button>
+                )}
+
+                {canManageJobs && jobDraftVersion && (
+                  <div className="job-profile-form">
+                    <strong>Rascunho</strong>
+                    <input
+                      aria-label="Titulo do cargo"
+                      placeholder="Titulo"
+                      value={jobDraftVersion.title}
+                      onChange={(event) => updateJobDraftField("title", event.target.value)}
+                    />
+                    <textarea
+                      aria-label="Missao do cargo"
+                      placeholder="Missao"
+                      value={jobDraftVersion.mission}
+                      onChange={(event) => updateJobDraftField("mission", event.target.value)}
+                    />
+                    <textarea
+                      aria-label="Resumo do cargo"
+                      placeholder="Resumo"
+                      value={jobDraftVersion.summary}
+                      onChange={(event) => updateJobDraftField("summary", event.target.value)}
+                    />
+                    <input
+                      aria-label="Responsabilidade principal"
+                      placeholder="Responsabilidade principal"
+                      value={jobDraftVersion.responsibilities[0]?.text ?? ""}
+                      onChange={(event) =>
+                        updateJobDraftField("responsibilities", [
+                          { text: event.target.value, displayOrder: 0 }
+                        ])
+                      }
+                    />
+                    <select
+                      aria-label="Modelo de trabalho"
+                      value={jobDraftVersion.workModel}
+                      onChange={(event) =>
+                        updateJobDraftField(
+                          "workModel",
+                          event.target.value as JobProfileVersion["workModel"]
+                        )
+                      }
+                    >
+                      <option value="onsite">onsite</option>
+                      <option value="hybrid">hybrid</option>
+                      <option value="remote">remote</option>
+                      <option value="flexible">flexible</option>
+                    </select>
+                    <div className="member-form">
+                      <input
+                        aria-label="Salario minimo"
+                        type="number"
+                        min="0"
+                        placeholder="Min"
+                        value={jobDraftVersion.salaryRange?.min ?? 0}
+                        onChange={(event) =>
+                          updateJobDraftField("salaryRange", {
+                            min: Number(event.target.value),
+                            max: jobDraftVersion.salaryRange?.max ?? 0,
+                            currency: jobDraftVersion.salaryRange?.currency ?? "BRL",
+                            periodicity: jobDraftVersion.salaryRange?.periodicity ?? "monthly"
+                          })
+                        }
+                      />
+                      <input
+                        aria-label="Salario maximo"
+                        type="number"
+                        min="0"
+                        placeholder="Max"
+                        value={jobDraftVersion.salaryRange?.max ?? 0}
+                        onChange={(event) =>
+                          updateJobDraftField("salaryRange", {
+                            min: jobDraftVersion.salaryRange?.min ?? 0,
+                            max: Number(event.target.value),
+                            currency: jobDraftVersion.salaryRange?.currency ?? "BRL",
+                            periodicity: jobDraftVersion.salaryRange?.periodicity ?? "monthly"
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="member-actions">
+                      <button type="button" onClick={saveJobDraft}>
+                        Salvar
+                      </button>
+                      {canPublishJobs && (
+                        <button type="button" onClick={publishJobDraft}>
+                          Publicar
+                        </button>
+                      )}
+                      <button type="button" onClick={discardJobDraft}>
+                        Descartar
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {canManageJobs && jobProfileHistory.length > 0 && (
+                  <ul className="competency-list">
+                    {jobProfileHistory.map((version) => (
+                      <li key={version.id}>
+                        <strong>{version.status}</strong>
+                        <small>
+                          v{version.versionNumber ?? "-"}{" "}
+                          {version.discardedAt ? "- descartado" : ""}
+                        </small>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {selectedOrganization && (
+          <div className="panel competencies-panel">
+            <span>Catalogo de Competencias</span>
+            <div className="unit-toolbar">
+              <button type="button" onClick={() => setCompetencyTab("catalog")}>
+                Catalogo Utilizado
+              </button>
+              <button type="button" onClick={() => setCompetencyTab("organization")}>
+                Competencias da Empresa
+              </button>
+              <button type="button" onClick={() => setCompetencyTab("global")}>
+                Biblioteca Global
+              </button>
+            </div>
+
+            {competencyTab === "catalog" && (
+              <ul className="competency-list">
+                {catalogItems.map((item) => (
+                  <li key={item.competencyCatalogItemId}>
+                    <strong>{item.name}</strong>
+                    <small>
+                      {item.code} - {item.category} - {item.origin}
+                      {item.deprecated ? " - deprecated" : ""}
+                    </small>
+                    <code>{item.competencyCatalogItemId}</code>
+                  </li>
+                ))}
+                {catalogItems.length === 0 && <li>Nenhuma competencia disponivel.</li>}
+              </ul>
+            )}
+
+            {competencyTab === "organization" && (
+              <div className="competency-layout">
+                {canManageCompetencies ? (
+                  <div className="competency-form">
+                    <input
+                      aria-label="Codigo da competencia"
+                      placeholder="Codigo"
+                      value={organizationCompetencyDraft.code}
+                      onChange={(event) =>
+                        setOrganizationCompetencyDraft({
+                          ...organizationCompetencyDraft,
+                          code: event.target.value
+                        })
+                      }
+                    />
+                    <input
+                      aria-label="Nome da competencia"
+                      placeholder="Nome"
+                      value={organizationCompetencyDraft.name}
+                      onChange={(event) =>
+                        setOrganizationCompetencyDraft({
+                          ...organizationCompetencyDraft,
+                          name: event.target.value
+                        })
+                      }
+                    />
+                    <select
+                      aria-label="Categoria da competencia"
+                      value={organizationCompetencyDraft.category}
+                      onChange={(event) =>
+                        setOrganizationCompetencyDraft({
+                          ...organizationCompetencyDraft,
+                          category: event.target.value as CompetencyCategory
+                        })
+                      }
+                    >
+                      {competencyCategories.map((category) => (
+                        <option key={category} value={category}>
+                          {category}
+                        </option>
+                      ))}
+                    </select>
+                    <textarea
+                      aria-label="Definicao da competencia"
+                      placeholder="Definicao"
+                      value={organizationCompetencyDraft.definition}
+                      onChange={(event) =>
+                        setOrganizationCompetencyDraft({
+                          ...organizationCompetencyDraft,
+                          definition: event.target.value
+                        })
+                      }
+                    />
+                    <button type="button" onClick={createOrganizationCompetency}>
+                      Criar competencia
+                    </button>
+                  </div>
+                ) : (
+                  <p>Visualizacao limitada ao catalogo utilizado.</p>
+                )}
+
+                <ul className="competency-list">
+                  {organizationCompetencies.map((competency) => (
+                    <li key={competency.id}>
+                      <strong>{competency.name}</strong>
+                      <small>
+                        {competency.code} - {competency.category} - {competency.status}
+                      </small>
+                      {canManageCompetencies && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            changeOrganizationCompetencyStatus(
+                              competency.id,
+                              competency.status === "active" ? "inactivate" : "activate"
+                            )
+                          }
+                        >
+                          {competency.status === "active" ? "Inativar" : "Ativar"}
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                  {organizationCompetencies.length === 0 && <li>Nenhuma competencia propria.</li>}
+                </ul>
+              </div>
+            )}
+
+            {competencyTab === "global" && (
+              <div className="competency-layout">
+                <div className="competency-form">
+                  <input
+                    aria-label="Codigo global"
+                    placeholder="Codigo global"
+                    value={globalCompetencyDraft.code}
+                    onChange={(event) =>
+                      setGlobalCompetencyDraft({
+                        ...globalCompetencyDraft,
+                        code: event.target.value
+                      })
+                    }
+                  />
+                  <input
+                    aria-label="Nome global"
+                    placeholder="Nome global"
+                    value={globalCompetencyDraft.name}
+                    onChange={(event) =>
+                      setGlobalCompetencyDraft({
+                        ...globalCompetencyDraft,
+                        name: event.target.value
+                      })
+                    }
+                  />
+                  <select
+                    aria-label="Categoria global"
+                    value={globalCompetencyDraft.category}
+                    onChange={(event) =>
+                      setGlobalCompetencyDraft({
+                        ...globalCompetencyDraft,
+                        category: event.target.value as CompetencyCategory
+                      })
+                    }
+                  >
+                    {competencyCategories.map((category) => (
+                      <option key={category} value={category}>
+                        {category}
+                      </option>
+                    ))}
+                  </select>
+                  <textarea
+                    aria-label="Definicao global"
+                    placeholder="Definicao"
+                    value={globalCompetencyDraft.definition}
+                    onChange={(event) =>
+                      setGlobalCompetencyDraft({
+                        ...globalCompetencyDraft,
+                        definition: event.target.value
+                      })
+                    }
+                  />
+                  <button type="button" onClick={createGlobalCompetency}>
+                    Criar global
+                  </button>
+                </div>
+
+                <ul className="competency-list">
+                  {globalCompetencies.map((competency) => (
+                    <li key={competency.id}>
+                      <strong>{competency.name}</strong>
+                      <small>
+                        {competency.code} - {competency.category} - {competency.status}
+                      </small>
+                    </li>
+                  ))}
+                  {globalCompetencies.length === 0 && <li>Nenhuma global carregada.</li>}
+                </ul>
+
+                {canManageCompetencies && (
+                  <ul className="competency-list">
+                    {availableGlobalCompetencies.map((competency) => (
+                      <li key={competency.id}>
+                        <strong>{competency.name}</strong>
+                        <small>
+                          {competency.code} - {competency.category}
+                        </small>
+                        <button type="button" onClick={() => adoptGlobalCompetency(competency.id)}>
+                          Adotar
+                        </button>
+                      </li>
+                    ))}
+                    {availableGlobalCompetencies.length === 0 && (
+                      <li>Nenhuma global disponivel para adocao.</li>
+                    )}
+                  </ul>
+                )}
+              </div>
+            )}
           </div>
         )}
       </section>

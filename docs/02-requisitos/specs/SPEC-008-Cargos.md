@@ -250,18 +250,18 @@ publicado e nao cria novo status canonico.
 
 ### 8.1 Job Profile
 
-| Campo                | Obrigatorio | Observacao                                           |
-| -------------------- | ----------: | ---------------------------------------------------- |
-| `id`                 |         Sim | Identificador interno gerado pelo sistema.           |
-| `organization_id`    |         Sim | Organization proprietaria do cargo.                  |
-| `code`               |         Sim | Codigo tecnico unico por Organization.               |
-| `name`               |         Sim | Nome exibido do cargo.                               |
-| `status`             |         Sim | `active` ou `inactive`.                              |
-| `created_by_user_id` |         Sim | Usuario responsavel pela criacao.                    |
-| `updated_by_user_id` |         Nao | Usuario responsavel pela ultima alteracao.           |
-| `created_at`         |         Sim | Data/hora de criacao.                                |
-| `updated_at`         |         Sim | Data/hora da ultima alteracao.                       |
-| `inactivated_at`     |         Nao | Data/hora de inativacao, quando ocorrer.             |
+| Campo                | Obrigatorio | Observacao                                 |
+| -------------------- | ----------: | ------------------------------------------ |
+| `id`                 |         Sim | Identificador interno gerado pelo sistema. |
+| `organization_id`    |         Sim | Organization proprietaria do cargo.        |
+| `code`               |         Sim | Codigo tecnico unico por Organization.     |
+| `name`               |         Sim | Nome exibido do cargo.                     |
+| `status`             |         Sim | `active` ou `inactive`.                    |
+| `created_by_user_id` |         Sim | Usuario responsavel pela criacao.          |
+| `updated_by_user_id` |         Nao | Usuario responsavel pela ultima alteracao. |
+| `created_at`         |         Sim | Data/hora de criacao.                      |
+| `updated_at`         |         Sim | Data/hora da ultima alteracao.             |
+| `inactivated_at`     |         Nao | Data/hora de inativacao, quando ocorrer.   |
 
 ### 8.2 Codigo do cargo
 
@@ -302,35 +302,35 @@ O nome deve:
 
 Cada versao deve possuir:
 
-| Campo                 | Obrigatorio | Observacao                                           |
-| --------------------- | ----------: | ---------------------------------------------------- |
-| `id`                  |         Sim | Identificador interno da versao.                     |
-| `job_profile_id`      |         Sim | Job Profile dono da versao.                          |
-| `organization_id`     |         Sim | Organization proprietaria, igual a do Job Profile.   |
-| `version_number`      | Condicional | Obrigatorio para `published` e `archived`.           |
-| `status`              |         Sim | `draft`, `published` ou `archived`.                  |
-| `title`               |         Sim | Titulo exibido na versao.                            |
-| `mission`             | Condicional | Obrigatoria para publicacao.                         |
-| `summary`             | Condicional | Obrigatorio para publicacao.                         |
-| `responsibilities`    |         Sim | Lista estruturada de responsabilidades.              |
-| `requirements`        |         Sim | Lista estruturada de requisitos.                     |
-| `education`           |         Sim | Estrutura simples de escolaridade.                   |
-| `certifications`      |         Nao | Lista estruturada opcional.                          |
-| `languages`           |         Nao | Lista estruturada opcional.                          |
-| `tools`               |         Nao | Lista estruturada opcional.                          |
-| `work_model`          |         Sim | Valor canonico.                                      |
-| `work_schedule`       |         Sim | Estrutura simples de jornada.                        |
-| `travel_requirement`  |         Sim | Valor canonico.                                      |
-| `salary_range`        |         Nao | Faixa salarial opcional e protegida.                 |
-| `notes`               |         Nao | Observacoes opcionais.                               |
-| `created_by_user_id`  |         Sim | Usuario que criou a versao.                          |
-| `updated_by_user_id`  |         Nao | Usuario que atualizou o rascunho.                    |
-| `published_by_user_id`|         Nao | Usuario que publicou, quando houver.                 |
-| `discarded_by_user_id`|         Nao | Usuario que descartou, quando houver.                |
-| `created_at`          |         Sim | Data/hora de criacao.                                |
-| `updated_at`          |         Sim | Data/hora da ultima alteracao.                       |
-| `published_at`        |         Nao | Data/hora de publicacao.                             |
-| `discarded_at`        |         Nao | Data/hora de descarte do rascunho.                   |
+| Campo                  | Obrigatorio | Observacao                                         |
+| ---------------------- | ----------: | -------------------------------------------------- |
+| `id`                   |         Sim | Identificador interno da versao.                   |
+| `job_profile_id`       |         Sim | Job Profile dono da versao.                        |
+| `organization_id`      |         Sim | Organization proprietaria, igual a do Job Profile. |
+| `version_number`       | Condicional | Obrigatorio para `published` e `archived`.         |
+| `status`               |         Sim | `draft`, `published` ou `archived`.                |
+| `title`                |         Sim | Titulo exibido na versao.                          |
+| `mission`              | Condicional | Obrigatoria para publicacao.                       |
+| `summary`              | Condicional | Obrigatorio para publicacao.                       |
+| `responsibilities`     |         Sim | Lista estruturada de responsabilidades.            |
+| `requirements`         |         Sim | Lista estruturada de requisitos.                   |
+| `education`            |         Sim | Estrutura simples de escolaridade.                 |
+| `certifications`       |         Nao | Lista estruturada opcional.                        |
+| `languages`            |         Nao | Lista estruturada opcional.                        |
+| `tools`                |         Nao | Lista estruturada opcional.                        |
+| `work_model`           |         Sim | Valor canonico.                                    |
+| `work_schedule`        |         Sim | Estrutura simples de jornada.                      |
+| `travel_requirement`   |         Sim | Valor canonico.                                    |
+| `salary_range`         |         Nao | Faixa salarial opcional e protegida.               |
+| `notes`                |         Nao | Observacoes opcionais.                             |
+| `created_by_user_id`   |         Sim | Usuario que criou a versao.                        |
+| `updated_by_user_id`   |         Nao | Usuario que atualizou o rascunho.                  |
+| `published_by_user_id` |         Nao | Usuario que publicou, quando houver.               |
+| `discarded_by_user_id` |         Nao | Usuario que descartou, quando houver.              |
+| `created_at`           |         Sim | Data/hora de criacao.                              |
+| `updated_at`           |         Sim | Data/hora da ultima alteracao.                     |
+| `published_at`         |         Nao | Data/hora de publicacao.                           |
+| `discarded_at`         |         Nao | Data/hora de descarte do rascunho.                 |
 
 ## 9. Conteudo da versao
 
@@ -560,21 +560,21 @@ Rascunho descartado:
 Todas as permissoes devem ser validadas no servidor, com User ativo, Membership
 ativo quando aplicavel e Organization ativa para operacoes normais.
 
-| Acao                                      | Platform Admin | owner | admin | member |
-| ----------------------------------------- | :------------: | :---: | :---: | :----: |
-| Criar Job Profile                         |      Nao       |  Sim  |  Sim  |  Nao   |
-| Atualizar dados estaveis                  |      Nao       |  Sim  |  Sim  |  Nao   |
-| Alterar codigo apos criacao               |      Nao       |  Sim  |  Nao  |  Nao   |
-| Criar rascunho                            |      Nao       |  Sim  |  Sim  |  Nao   |
-| Editar rascunho                           |      Nao       |  Sim  |  Sim  |  Nao   |
-| Descartar rascunho                        |      Nao       |  Sim  |  Sim  |  Nao   |
-| Publicar rascunho                         |      Nao       |  Sim  |  Nao  |  Nao   |
-| Ativar ou inativar Job Profile            |      Nao       |  Sim  |  Sim  |  Nao   |
-| Consultar versao publicada                |      Nao       |  Sim  |  Sim  |  Sim   |
-| Consultar rascunho                        |      Nao       |  Sim  |  Sim  |  Nao   |
-| Consultar historico                       |      Nao       |  Sim  |  Sim  |  Nao   |
-| Visualizar faixa salarial                 |      Nao       |  Sim  |  Sim  |  Nao   |
-| Consulta administrativa auditada          |      Sim       |  Nao  |  Nao  |  Nao   |
+| Acao                             | Platform Admin | owner | admin | member |
+| -------------------------------- | :------------: | :---: | :---: | :----: |
+| Criar Job Profile                |      Nao       |  Sim  |  Sim  |  Nao   |
+| Atualizar dados estaveis         |      Nao       |  Sim  |  Sim  |  Nao   |
+| Alterar codigo apos criacao      |      Nao       |  Sim  |  Nao  |  Nao   |
+| Criar rascunho                   |      Nao       |  Sim  |  Sim  |  Nao   |
+| Editar rascunho                  |      Nao       |  Sim  |  Sim  |  Nao   |
+| Descartar rascunho               |      Nao       |  Sim  |  Sim  |  Nao   |
+| Publicar rascunho                |      Nao       |  Sim  |  Nao  |  Nao   |
+| Ativar ou inativar Job Profile   |      Nao       |  Sim  |  Sim  |  Nao   |
+| Consultar versao publicada       |      Nao       |  Sim  |  Sim  |  Sim   |
+| Consultar rascunho               |      Nao       |  Sim  |  Sim  |  Nao   |
+| Consultar historico              |      Nao       |  Sim  |  Sim  |  Nao   |
+| Visualizar faixa salarial        |      Nao       |  Sim  |  Sim  |  Nao   |
+| Consulta administrativa auditada |      Sim       |  Nao  |  Nao  |  Nao   |
 
 ### 11.1 Owner
 
@@ -627,24 +627,24 @@ Quando a Organization estiver `archived`:
 
 ## 14. API conceitual
 
-| Operacao                         | Finalidade                                                  |
-| -------------------------------- | ----------------------------------------------------------- |
-| Criar Job Profile                | Criar cargo em Organization ativa.                          |
-| Listar cargos ativos             | Consultar cargos ativos permitidos.                         |
-| Listar cargos inativos           | Consultar Job Profiles inativos para owner/admin.           |
-| Consultar cargo                  | Consultar Job Profile permitido.                            |
-| Atualizar dados estaveis         | Alterar nome ou metadados estaveis permitidos.              |
-| Criar rascunho                   | Criar rascunho inicial ou baseado na versao publicada.      |
-| Consultar rascunho               | Obter rascunho permitido para owner/admin.                  |
-| Editar rascunho                  | Alterar conteudo da versao `draft`.                         |
-| Descartar rascunho               | Marcar rascunho como descartado.                            |
-| Publicar                         | Publicar rascunho em transacao.                             |
-| Consultar versao publicada       | Obter versao publicada atual permitida.                     |
-| Listar historico                 | Listar versoes e eventos permitidos.                        |
-| Consultar versao especifica      | Obter versao permitida por ID.                              |
-| Ativar Job Profile               | Reativar cargo quando permitido.                            |
-| Inativar Job Profile             | Inativar cargo sem excluir historico.                       |
-| Consulta administrativa auditada | Consulta excepcional por Platform Admin.                    |
+| Operacao                         | Finalidade                                             |
+| -------------------------------- | ------------------------------------------------------ |
+| Criar Job Profile                | Criar cargo em Organization ativa.                     |
+| Listar cargos ativos             | Consultar cargos ativos permitidos.                    |
+| Listar cargos inativos           | Consultar Job Profiles inativos para owner/admin.      |
+| Consultar cargo                  | Consultar Job Profile permitido.                       |
+| Atualizar dados estaveis         | Alterar nome ou metadados estaveis permitidos.         |
+| Criar rascunho                   | Criar rascunho inicial ou baseado na versao publicada. |
+| Consultar rascunho               | Obter rascunho permitido para owner/admin.             |
+| Editar rascunho                  | Alterar conteudo da versao `draft`.                    |
+| Descartar rascunho               | Marcar rascunho como descartado.                       |
+| Publicar                         | Publicar rascunho em transacao.                        |
+| Consultar versao publicada       | Obter versao publicada atual permitida.                |
+| Listar historico                 | Listar versoes e eventos permitidos.                   |
+| Consultar versao especifica      | Obter versao permitida por ID.                         |
+| Ativar Job Profile               | Reativar cargo quando permitido.                       |
+| Inativar Job Profile             | Inativar cargo sem excluir historico.                  |
+| Consulta administrativa auditada | Consulta excepcional por Platform Admin.               |
 
 Todas as operacoes devem validar `organizationId`, `jobProfileId`, `versionId`
 e `competencyCatalogItemId` no servidor quando aplicavel.
