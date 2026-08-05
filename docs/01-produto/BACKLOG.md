@@ -12,29 +12,30 @@
 
 ## Núcleo da plataforma
 
-| ID       | Funcionalidade      | Fase | Status                | Dependências       |
-| -------- | ------------------- | ---: | --------------------- | ------------------ |
-| SPEC-001 | Organization        |    1 | Aprovada              | Nenhuma            |
-| SPEC-002 | User                |    1 | Aprovada para revisão | Organization       |
-| SPEC-003 | Membership          |    1 | Aprovada para revisão | Organization, User |
-| SPEC-004 | Roles & Permissions |    1 | Aprovada para revisão | Membership         |
+| ID       | Funcionalidade      | Fase | Versão | Status    | Dependências       |
+| -------- | ------------------- | ---: | ------ | --------- | ------------------ |
+| SPEC-001 | Organization        |    1 | v0.1.0 | Concluída | Nenhuma            |
+| SPEC-002 | User                |    1 | v0.1.0 | Concluída | Organization       |
+| SPEC-003 | Membership          |    1 | v0.1.0 | Concluída | Organization, User |
+| SPEC-004 | Roles & Permissions |    1 | v0.1.0 | Concluída | Membership         |
 
-## Próximas especificações
+## Especificações
 
-| ID       | Funcionalidade             | Fase | Status                      |
-| -------- | -------------------------- | ---: | --------------------------- |
-| SPEC-005 | DNA Organizacional         |    2 | Concluída                   |
-| SPEC-006 | Estrutura Organizacional   |    2 | Concluída |
-| SPEC-007 | Departamentos              |    2 | Aprovada para implementação                    |
-| SPEC-008 | Cargos                     |    3 | Aprovada para implementação                    |
-| SPEC-009 | Vagas                      |    4 | Pendente                    |
-| SPEC-010 | Candidatos                 |    4 | Pendente                    |
-| SPEC-011 | Processo Seletivo          |    5 | Pendente                    |
-| SPEC-012 | Avaliação Assistida por IA |    6 | Pendente                    |
-| SPEC-013 | Entrevistas                |    6 | Pendente                    |
-| SPEC-014 | Propostas                  |    7 | Pendente                    |
-| SPEC-015 | Onboarding                 |    8 | Pendente                    |
-| SPEC-016 | Desenvolvimento e Retenção |    9 | Pendente                    |
+| ID       | Funcionalidade             | Fase | Versão | Status    |
+| -------- | -------------------------- | ---: | ------ | --------- |
+| SPEC-005 | DNA Organizacional         |    2 | v0.2.0 | Concluída |
+| SPEC-006 | Estrutura Organizacional   |    3 | v0.3.0 | Concluída |
+| SPEC-007 | Catálogo de Competências   |    4 | v0.4.0 | Concluída |
+| SPEC-008 | Cargos                     |    5 | v0.5.0 | Concluída |
+| SPEC-009 | Banco de Perguntas         |    6 | —      | Rascunho  |
+| SPEC-010 | Vagas                      |    7 | —      | Rascunho  |
+| SPEC-011 | Candidatos                 |    8 | —      | Rascunho  |
+| SPEC-012 | Processo Seletivo          |    9 | —      | Rascunho  |
+| SPEC-013 | Entrevistas                |   10 | —      | Rascunho  |
+| SPEC-014 | Avaliação Assistida por IA |   11 | —      | Rascunho  |
+| SPEC-015 | Propostas                  |   12 | —      | Rascunho  |
+| SPEC-016 | Onboarding                 |   13 | —      | Rascunho  |
+| SPEC-017 | Desenvolvimento e Retenção |   14 | —      | Rascunho  |
 
 ## Regra de atualização
 
