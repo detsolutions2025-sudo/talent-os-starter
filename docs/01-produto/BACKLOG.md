@@ -24,7 +24,7 @@
 | ID       | Funcionalidade             | Fase | Status   |
 | -------- | -------------------------- | ---: | -------- |
 | SPEC-005 | DNA Organizacional         |    2 | Concluída |
-| SPEC-006 | Estrutura Organizacional   |    2 | Pendente |
+| SPEC-006 | Estrutura Organizacional   |    2 | Aprovada para implementação |
 | SPEC-007 | Departamentos              |    2 | Pendente |
 | SPEC-008 | Cargos                     |    3 | Pendente |
 | SPEC-009 | Vagas                      |    4 | Pendente |
