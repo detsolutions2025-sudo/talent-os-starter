@@ -6,13 +6,15 @@ import type { DnaService } from "./dna/service";
 import { createApiRouter } from "./http/routes";
 import type { JobProfileService } from "./job-profiles/service";
 import type { OrganizationalUnitService } from "./organizational-units/service";
+import type { QuestionService } from "./questions/service";
 
 export function createServer(
   core: CoreService,
   dna?: DnaService,
   organizationalUnits?: OrganizationalUnitService,
   competencies?: CompetencyService,
-  jobProfiles?: JobProfileService
+  jobProfiles?: JobProfileService,
+  questions?: QuestionService
 ) {
   const app = express();
 
@@ -26,7 +28,10 @@ export function createServer(
     });
   });
 
-  app.use("/api", createApiRouter(core, dna, organizationalUnits, competencies, jobProfiles));
+  app.use(
+    "/api",
+    createApiRouter(core, dna, organizationalUnits, competencies, jobProfiles, questions)
+  );
 
   app.use(
     (

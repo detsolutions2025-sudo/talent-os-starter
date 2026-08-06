@@ -8,13 +8,15 @@ import type { CoreService } from "../core/service";
 import type { DnaService } from "../dna/service";
 import type { JobProfileService } from "../job-profiles/service";
 import type { OrganizationalUnitService } from "../organizational-units/service";
+import type { QuestionService } from "../questions/service";
 
 export function createApiRouter(
   core: CoreService,
   dna?: DnaService,
   organizationalUnits?: OrganizationalUnitService,
   competencies?: CompetencyService,
-  jobProfiles?: JobProfileService
+  jobProfiles?: JobProfileService,
+  questions?: QuestionService
 ): Router {
   const router = createRouter();
 
@@ -852,6 +854,256 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await jobProfiles.adminRead(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            request.body
+          )
+        );
+      })
+    );
+  }
+
+  if (questions) {
+    router.post(
+      "/platform/questions/global",
+      asyncHandler(async (request, response) => {
+        const question = await questions.createGlobal(getActor(request), request.body);
+        response.status(201).json(question);
+      })
+    );
+
+    router.get(
+      "/platform/questions/global",
+      asyncHandler(async (request, response) => {
+        response.json(await questions.listGlobals(getActor(request)));
+      })
+    );
+
+    router.get(
+      "/platform/questions/global/history",
+      asyncHandler(async (request, response) => {
+        response.json(await questions.globalHistory(getActor(request)));
+      })
+    );
+
+    router.get(
+      "/platform/questions/global/:globalQuestionId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await questions.getGlobal(getActor(request), routeParam(request.params.globalQuestionId))
+        );
+      })
+    );
+
+    router.patch(
+      "/platform/questions/global/:globalQuestionId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await questions.updateGlobal(
+            getActor(request),
+            routeParam(request.params.globalQuestionId),
+            request.body
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/platform/questions/global/:globalQuestionId/activate",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await questions.setGlobalStatus(
+            getActor(request),
+            routeParam(request.params.globalQuestionId),
+            "active"
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/platform/questions/global/:globalQuestionId/inactivate",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await questions.setGlobalStatus(
+            getActor(request),
+            routeParam(request.params.globalQuestionId),
+            "inactive"
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/platform/questions/global/:globalQuestionId/deprecate",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await questions.setGlobalStatus(
+            getActor(request),
+            routeParam(request.params.globalQuestionId),
+            "deprecated"
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/questions",
+      asyncHandler(async (request, response) => {
+        const question = await questions.createOrganizationQuestion(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          request.body
+        );
+        response.status(201).json(question);
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/questions",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await questions.listOrganizationQuestions(
+            getActor(request),
+            routeParam(request.params.organizationId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/questions/catalog",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await questions.listUnifiedCatalog(
+            getActor(request),
+            routeParam(request.params.organizationId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/questions/available-globals",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await questions.listAvailableGlobals(
+            getActor(request),
+            routeParam(request.params.organizationId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/questions/history",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await questions.listHistory(getActor(request), routeParam(request.params.organizationId))
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/questions/catalog/:catalogItemId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await questions.getCatalogItem(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.catalogItemId)
+          )
+        );
+      })
+    );
+
+    router.patch(
+      "/organizations/:organizationId/questions/:questionId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await questions.updateOrganizationQuestion(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.questionId),
+            request.body
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/questions/:questionId/activate",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await questions.setOrganizationQuestionStatus(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.questionId),
+            "active"
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/questions/:questionId/inactivate",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await questions.setOrganizationQuestionStatus(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.questionId),
+            "inactive"
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/questions/adoptions",
+      asyncHandler(async (request, response) => {
+        const adoption = await questions.adoptGlobal(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          request.body
+        );
+        response.status(201).json(adoption);
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/questions/adoptions/:adoptionId/activate",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await questions.setAdoptionStatus(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.adoptionId),
+            "active"
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/questions/adoptions/:adoptionId/inactivate",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await questions.setAdoptionStatus(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.adoptionId),
+            "inactive"
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/platform/organizations/:organizationId/questions/admin-read",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await questions.adminRead(
             getActor(request),
             routeParam(request.params.organizationId),
             request.body

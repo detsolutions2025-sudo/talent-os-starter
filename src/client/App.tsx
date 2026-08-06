@@ -126,6 +126,77 @@ type UnifiedCatalogItem = {
   deprecated: boolean;
 };
 
+type QuestionCategory =
+  | "general"
+  | "technical"
+  | "behavioral"
+  | "situational"
+  | "culture"
+  | "leadership"
+  | "management"
+  | "compliance"
+  | "safety"
+  | "screening"
+  | "other";
+
+type QuestionType =
+  | "open_text"
+  | "long_text"
+  | "single_choice"
+  | "multiple_choice"
+  | "yes_no"
+  | "numeric"
+  | "scale"
+  | "date"
+  | "situational"
+  | "behavioral"
+  | "technical";
+
+type GlobalQuestion = {
+  id: string;
+  code: string;
+  title: string;
+  questionText: string;
+  type: QuestionType;
+  category: QuestionCategory;
+  status: "active" | "inactive" | "deprecated";
+};
+
+type OrganizationQuestion = {
+  id: string;
+  code: string;
+  title: string;
+  questionText: string;
+  type: QuestionType;
+  category: QuestionCategory;
+  competencyCatalogItemId: string | null;
+  status: "active" | "inactive";
+};
+
+type UnifiedQuestionCatalogItem = {
+  questionCatalogItemId: string;
+  origin: "global" | "organization";
+  code: string;
+  title: string;
+  type: QuestionType;
+  category: QuestionCategory;
+  status: "active" | "inactive";
+  sourceStatus: string;
+  globalStatus: "active" | "inactive" | "deprecated" | null;
+  editable: boolean;
+  deprecated: boolean;
+  competencyCatalogItemId: string | null;
+};
+
+type QuestionDraft = {
+  code: string;
+  title: string;
+  questionText: string;
+  type: QuestionType;
+  category: QuestionCategory;
+  competencyCatalogItemId: string;
+};
+
 type CompetencyDraft = {
   code: string;
   name: string;
@@ -185,6 +256,15 @@ const emptyCompetencyDraft: CompetencyDraft = {
   definition: ""
 };
 
+const emptyQuestionDraft: QuestionDraft = {
+  code: "",
+  title: "",
+  questionText: "",
+  type: "open_text",
+  category: "general",
+  competencyCatalogItemId: ""
+};
+
 const emptyJobProfileDraft: JobProfileDraft = {
   code: "",
   name: ""
@@ -200,6 +280,34 @@ const competencyCategories: CompetencyCategory[] = [
   "compliance",
   "safety",
   "other"
+];
+
+const questionCategories: QuestionCategory[] = [
+  "general",
+  "technical",
+  "behavioral",
+  "situational",
+  "culture",
+  "leadership",
+  "management",
+  "compliance",
+  "safety",
+  "screening",
+  "other"
+];
+
+const questionTypes: QuestionType[] = [
+  "open_text",
+  "long_text",
+  "single_choice",
+  "multiple_choice",
+  "yes_no",
+  "numeric",
+  "scale",
+  "date",
+  "situational",
+  "behavioral",
+  "technical"
 ];
 
 const platformHeaders = {
@@ -237,6 +345,13 @@ export function App() {
     OrganizationCompetency[]
   >([]);
   const [catalogItems, setCatalogItems] = useState<UnifiedCatalogItem[]>([]);
+  const [questionTab, setQuestionTab] = useState<"catalog" | "organization" | "global">("catalog");
+  const [globalQuestions, setGlobalQuestions] = useState<GlobalQuestion[]>([]);
+  const [availableGlobalQuestions, setAvailableGlobalQuestions] = useState<GlobalQuestion[]>([]);
+  const [organizationQuestions, setOrganizationQuestions] = useState<OrganizationQuestion[]>([]);
+  const [questionCatalogItems, setQuestionCatalogItems] = useState<UnifiedQuestionCatalogItem[]>(
+    []
+  );
   const [jobProfiles, setJobProfiles] = useState<JobProfile[]>([]);
   const [inactiveJobProfiles, setInactiveJobProfiles] = useState<JobProfile[]>([]);
   const [selectedJobProfileId, setSelectedJobProfileId] = useState("");
@@ -248,6 +363,8 @@ export function App() {
     useState<CompetencyDraft>(emptyCompetencyDraft);
   const [organizationCompetencyDraft, setOrganizationCompetencyDraft] =
     useState<CompetencyDraft>(emptyCompetencyDraft);
+  const [organizationQuestionDraft, setOrganizationQuestionDraft] =
+    useState<QuestionDraft>(emptyQuestionDraft);
   const [message, setMessage] = useState("Nenhuma Organization selecionada.");
   const currentMembership = memberships.find(
     (membership) => membership.userId === currentDevUserId && membership.status === "active"
@@ -260,6 +377,8 @@ export function App() {
   const canManageUnits = currentMembership?.role === "owner" || currentMembership?.role === "admin";
   const canChangeUnitCode = currentMembership?.role === "owner";
   const canManageCompetencies =
+    currentMembership?.role === "owner" || currentMembership?.role === "admin";
+  const canManageQuestions =
     currentMembership?.role === "owner" || currentMembership?.role === "admin";
   const canManageJobs = currentMembership?.role === "owner" || currentMembership?.role === "admin";
   const canPublishJobs = currentMembership?.role === "owner";
@@ -281,6 +400,7 @@ export function App() {
       })
       .catch((error: Error) => setMessage(error.message));
     loadPlatformGlobals();
+    loadPlatformQuestions();
   }, []);
 
   function loadPlatformGlobals() {
@@ -289,6 +409,14 @@ export function App() {
         setGlobalCompetencies(response.ok ? ((await response.json()) as GlobalCompetency[]) : []);
       })
       .catch(() => setGlobalCompetencies([]));
+  }
+
+  function loadPlatformQuestions() {
+    fetch("/api/platform/questions/global", { headers: platformHeaders })
+      .then(async (response) => {
+        setGlobalQuestions(response.ok ? ((await response.json()) as GlobalQuestion[]) : []);
+      })
+      .catch(() => setGlobalQuestions([]));
   }
 
   function selectOrganization(organizationId: string) {
@@ -305,6 +433,10 @@ export function App() {
     setOrganizationCompetencies([]);
     setAvailableGlobalCompetencies([]);
     setCatalogItems([]);
+    setOrganizationQuestions([]);
+    setAvailableGlobalQuestions([]);
+    setQuestionCatalogItems([]);
+    setQuestionTab("catalog");
     setJobProfiles([]);
     setInactiveJobProfiles([]);
     setSelectedJobProfileId("");
@@ -335,6 +467,7 @@ export function App() {
         void loadDna(organizationId, organizationMemberships);
         void loadUnits(organizationId);
         void loadCompetencies(organizationId, organizationMemberships);
+        void loadQuestions(organizationId, organizationMemberships);
         void loadJobProfiles(organizationId, organizationMemberships);
       })
       .catch((error: Error) => setMessage(error.message));
@@ -419,6 +552,44 @@ export function App() {
       .catch(() => setAvailableGlobalCompetencies([]));
   }
 
+  function loadQuestions(organizationId: string, organizationMemberships = memberships) {
+    const membership = organizationMemberships.find(
+      (candidate) => candidate.userId === currentDevUserId && candidate.status === "active"
+    );
+    const canManage = membership?.role === "owner" || membership?.role === "admin";
+
+    fetch(`/api/organizations/${organizationId}/questions/catalog`, { headers: devHeaders })
+      .then(async (response) => {
+        setQuestionCatalogItems(
+          response.ok ? ((await response.json()) as UnifiedQuestionCatalogItem[]) : []
+        );
+      })
+      .catch(() => setQuestionCatalogItems([]));
+
+    if (!canManage) {
+      setOrganizationQuestions([]);
+      setAvailableGlobalQuestions([]);
+      return;
+    }
+
+    fetch(`/api/organizations/${organizationId}/questions`, { headers: devHeaders })
+      .then(async (response) => {
+        setOrganizationQuestions(
+          response.ok ? ((await response.json()) as OrganizationQuestion[]) : []
+        );
+      })
+      .catch(() => setOrganizationQuestions([]));
+    fetch(`/api/organizations/${organizationId}/questions/available-globals`, {
+      headers: devHeaders
+    })
+      .then(async (response) => {
+        setAvailableGlobalQuestions(
+          response.ok ? ((await response.json()) as GlobalQuestion[]) : []
+        );
+      })
+      .catch(() => setAvailableGlobalQuestions([]));
+  }
+
   function loadJobProfiles(organizationId: string, organizationMemberships = memberships) {
     const membership = organizationMemberships.find(
       (candidate) => candidate.userId === currentDevUserId && candidate.status === "active"
@@ -464,6 +635,12 @@ export function App() {
   function reloadCompetencies() {
     if (selectedOrganizationId) {
       loadCompetencies(selectedOrganizationId);
+    }
+  }
+
+  function reloadQuestions() {
+    if (selectedOrganizationId) {
+      loadQuestions(selectedOrganizationId);
     }
   }
 
@@ -667,6 +844,111 @@ export function App() {
 
         reloadCompetencies();
         setMessage(action === "activate" ? "Competencia ativada." : "Competencia inativada.");
+      })
+      .catch((error: Error) => setMessage(error.message));
+  }
+
+  function questionPayload(draft: QuestionDraft, allowCompetency: boolean) {
+    const base = {
+      code: draft.code,
+      title: draft.title,
+      questionText: draft.questionText,
+      type: draft.type,
+      category: draft.category,
+      status: "active",
+      description: "",
+      instructions: ""
+    };
+
+    const options =
+      draft.type === "single_choice" || draft.type === "multiple_choice"
+        ? [
+            { id: "opt_yes", text: "Sim", displayOrder: 0, status: "active" },
+            { id: "opt_no", text: "Nao", displayOrder: 1, status: "active" }
+          ]
+        : [];
+    const settings =
+      draft.type === "scale"
+        ? { min: 1, max: 5, step: 1, minLabel: "Baixo", maxLabel: "Alto" }
+        : draft.type === "numeric"
+          ? { min: null, max: null, decimals: 0, unit: null }
+          : {};
+
+    return {
+      ...base,
+      options,
+      settings,
+      competencyCatalogItemId:
+        allowCompetency && draft.competencyCatalogItemId ? draft.competencyCatalogItemId : undefined
+    };
+  }
+
+  function createOrganizationQuestion() {
+    if (!selectedOrganizationId) {
+      setMessage("Selecione uma Organization.");
+      return;
+    }
+
+    fetch(`/api/organizations/${selectedOrganizationId}/questions`, {
+      method: "POST",
+      headers: {
+        ...devHeaders,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify(questionPayload(organizationQuestionDraft, true))
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Acesso negado ou dados invalidos para criar pergunta.");
+        }
+
+        setOrganizationQuestionDraft(emptyQuestionDraft);
+        reloadQuestions();
+        setMessage("Pergunta propria criada e adicionada ao catalogo.");
+      })
+      .catch((error: Error) => setMessage(error.message));
+  }
+
+  function adoptGlobalQuestion(globalQuestionId: string) {
+    if (!selectedOrganizationId) {
+      return;
+    }
+
+    fetch(`/api/organizations/${selectedOrganizationId}/questions/adoptions`, {
+      method: "POST",
+      headers: {
+        ...devHeaders,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({ globalQuestionId })
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Acesso negado ou pergunta global indisponivel para adocao.");
+        }
+
+        reloadQuestions();
+        setMessage("Pergunta global adotada.");
+      })
+      .catch((error: Error) => setMessage(error.message));
+  }
+
+  function changeOrganizationQuestionStatus(questionId: string, action: "activate" | "inactivate") {
+    if (!selectedOrganizationId) {
+      return;
+    }
+
+    fetch(`/api/organizations/${selectedOrganizationId}/questions/${questionId}/${action}`, {
+      method: "POST",
+      headers: devHeaders
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Alteracao de status negada para pergunta.");
+        }
+
+        reloadQuestions();
+        setMessage(action === "activate" ? "Pergunta ativada." : "Pergunta inativada.");
       })
       .catch((error: Error) => setMessage(error.message));
   }
@@ -1934,6 +2216,202 @@ export function App() {
                     ))}
                     {availableGlobalCompetencies.length === 0 && (
                       <li>Nenhuma global disponivel para adocao.</li>
+                    )}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {selectedOrganization && (
+          <div className="panel competencies-panel">
+            <span>Banco de Perguntas</span>
+            <div className="unit-toolbar">
+              <button type="button" onClick={() => setQuestionTab("catalog")}>
+                Catalogo Utilizado
+              </button>
+              {canManageQuestions && (
+                <>
+                  <button type="button" onClick={() => setQuestionTab("organization")}>
+                    Perguntas da Empresa
+                  </button>
+                  <button type="button" onClick={() => setQuestionTab("global")}>
+                    Biblioteca Global
+                  </button>
+                </>
+              )}
+            </div>
+
+            {questionTab === "catalog" && (
+              <ul className="competency-list">
+                {questionCatalogItems.map((item) => (
+                  <li key={item.questionCatalogItemId}>
+                    <strong>{item.title}</strong>
+                    <small>
+                      {item.code} - {item.type} - {item.category} - {item.origin}
+                      {item.deprecated ? " - deprecated" : ""}
+                    </small>
+                    <code>{item.questionCatalogItemId}</code>
+                  </li>
+                ))}
+                {questionCatalogItems.length === 0 && <li>Nenhuma pergunta disponivel.</li>}
+              </ul>
+            )}
+
+            {questionTab === "organization" && (
+              <div className="competency-layout">
+                {canManageQuestions ? (
+                  <div className="competency-form">
+                    <input
+                      aria-label="Codigo da pergunta"
+                      placeholder="Codigo"
+                      value={organizationQuestionDraft.code}
+                      onChange={(event) =>
+                        setOrganizationQuestionDraft({
+                          ...organizationQuestionDraft,
+                          code: event.target.value
+                        })
+                      }
+                    />
+                    <input
+                      aria-label="Titulo da pergunta"
+                      placeholder="Titulo"
+                      value={organizationQuestionDraft.title}
+                      onChange={(event) =>
+                        setOrganizationQuestionDraft({
+                          ...organizationQuestionDraft,
+                          title: event.target.value
+                        })
+                      }
+                    />
+                    <textarea
+                      aria-label="Texto da pergunta"
+                      placeholder="Texto da pergunta"
+                      value={organizationQuestionDraft.questionText}
+                      onChange={(event) =>
+                        setOrganizationQuestionDraft({
+                          ...organizationQuestionDraft,
+                          questionText: event.target.value
+                        })
+                      }
+                    />
+                    <select
+                      aria-label="Tipo da pergunta"
+                      value={organizationQuestionDraft.type}
+                      onChange={(event) =>
+                        setOrganizationQuestionDraft({
+                          ...organizationQuestionDraft,
+                          type: event.target.value as QuestionType
+                        })
+                      }
+                    >
+                      {questionTypes.map((type) => (
+                        <option key={type} value={type}>
+                          {type}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      aria-label="Categoria da pergunta"
+                      value={organizationQuestionDraft.category}
+                      onChange={(event) =>
+                        setOrganizationQuestionDraft({
+                          ...organizationQuestionDraft,
+                          category: event.target.value as QuestionCategory
+                        })
+                      }
+                    >
+                      {questionCategories.map((category) => (
+                        <option key={category} value={category}>
+                          {category}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      aria-label="Competencia associada"
+                      value={organizationQuestionDraft.competencyCatalogItemId}
+                      onChange={(event) =>
+                        setOrganizationQuestionDraft({
+                          ...organizationQuestionDraft,
+                          competencyCatalogItemId: event.target.value
+                        })
+                      }
+                    >
+                      <option value="">Sem competencia</option>
+                      {catalogItems.map((item) => (
+                        <option
+                          key={item.competencyCatalogItemId}
+                          value={item.competencyCatalogItemId}
+                        >
+                          {item.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button type="button" onClick={createOrganizationQuestion}>
+                      Criar pergunta
+                    </button>
+                  </div>
+                ) : (
+                  <p>Visualizacao limitada ao catalogo utilizado.</p>
+                )}
+
+                <ul className="competency-list">
+                  {organizationQuestions.map((question) => (
+                    <li key={question.id}>
+                      <strong>{question.title}</strong>
+                      <small>
+                        {question.code} - {question.type} - {question.category} - {question.status}
+                      </small>
+                      {canManageQuestions && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            changeOrganizationQuestionStatus(
+                              question.id,
+                              question.status === "active" ? "inactivate" : "activate"
+                            )
+                          }
+                        >
+                          {question.status === "active" ? "Inativar" : "Ativar"}
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                  {organizationQuestions.length === 0 && <li>Nenhuma pergunta propria.</li>}
+                </ul>
+              </div>
+            )}
+
+            {questionTab === "global" && (
+              <div className="competency-layout">
+                <ul className="competency-list">
+                  {globalQuestions.map((question) => (
+                    <li key={question.id}>
+                      <strong>{question.title}</strong>
+                      <small>
+                        {question.code} - {question.type} - {question.category} - {question.status}
+                      </small>
+                    </li>
+                  ))}
+                  {globalQuestions.length === 0 && <li>Nenhuma pergunta global carregada.</li>}
+                </ul>
+
+                {canManageQuestions && (
+                  <ul className="competency-list">
+                    {availableGlobalQuestions.map((question) => (
+                      <li key={question.id}>
+                        <strong>{question.title}</strong>
+                        <small>
+                          {question.code} - {question.type} - {question.category}
+                        </small>
+                        <button type="button" onClick={() => adoptGlobalQuestion(question.id)}>
+                          Adotar
+                        </button>
+                      </li>
+                    ))}
+                    {availableGlobalQuestions.length === 0 && (
+                      <li>Nenhuma pergunta global disponivel para adocao.</li>
                     )}
                   </ul>
                 )}
