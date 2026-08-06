@@ -1,4 +1,5 @@
 import express from "express";
+import type { CandidateService } from "./candidates/service";
 import { AppError } from "./core/errors";
 import type { CompetencyService } from "./competencies/service";
 import type { CoreService } from "./core/service";
@@ -16,7 +17,8 @@ export function createServer(
   competencies?: CompetencyService,
   jobProfiles?: JobProfileService,
   questions?: QuestionService,
-  jobOpenings?: JobOpeningService
+  jobOpenings?: JobOpeningService,
+  candidates?: CandidateService
 ) {
   const app = express();
 
@@ -39,7 +41,8 @@ export function createServer(
       competencies,
       jobProfiles,
       questions,
-      jobOpenings
+      jobOpenings,
+      candidates
     )
   );
 

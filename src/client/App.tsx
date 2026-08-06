@@ -266,6 +266,37 @@ type JobOpeningDraft = {
   showSalary: boolean;
 };
 
+type Candidate = {
+  id: string;
+  fullName: string;
+  preferredName: string | null;
+  email?: string;
+  phone?: string | null;
+  secondaryPhone?: string | null;
+  status: "active" | "inactive";
+  source: string;
+  professionalSummary: string | null;
+  city?: string;
+  state?: string;
+  location?: { city: string; state: string; address?: string };
+  experiences: { company: string; title: string; startDate: string; current: boolean }[];
+  education: { institution: string; course: string; level: string }[];
+  certifications: { name: string; issuer: string }[];
+  languages: { language: string; level: string }[];
+  declaredCompetencies: string[];
+  professionalLinks: { type: string; url: string }[];
+};
+
+type CandidateDraft = {
+  fullName: string;
+  preferredName: string;
+  email: string;
+  source: string;
+  city: string;
+  state: string;
+  professionalSummary: string;
+};
+
 const emptyUnitDraft: OrganizationalUnitDraft = {
   code: "",
   name: "",
@@ -306,6 +337,16 @@ const emptyJobOpeningDraft: JobOpeningDraft = {
   publicSlug: "",
   applicationDeadline: "",
   showSalary: false
+};
+
+const emptyCandidateDraft: CandidateDraft = {
+  fullName: "",
+  preferredName: "",
+  email: "",
+  source: "manual",
+  city: "",
+  state: "",
+  professionalSummary: ""
 };
 
 const competencyCategories: CompetencyCategory[] = [
@@ -399,6 +440,9 @@ export function App() {
   const [jobProfileHistory, setJobProfileHistory] = useState<JobProfileVersion[]>([]);
   const [jobOpenings, setJobOpenings] = useState<JobOpening[]>([]);
   const [jobOpeningDraft, setJobOpeningDraft] = useState<JobOpeningDraft>(emptyJobOpeningDraft);
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [inactiveCandidates, setInactiveCandidates] = useState<Candidate[]>([]);
+  const [candidateDraft, setCandidateDraft] = useState<CandidateDraft>(emptyCandidateDraft);
   const [globalCompetencyDraft, setGlobalCompetencyDraft] =
     useState<CompetencyDraft>(emptyCompetencyDraft);
   const [organizationCompetencyDraft, setOrganizationCompetencyDraft] =
@@ -425,6 +469,8 @@ export function App() {
   const canManageJobOpenings =
     currentMembership?.role === "owner" || currentMembership?.role === "admin";
   const canPublishJobOpenings = currentMembership?.role === "owner";
+  const canManageCandidates =
+    currentMembership?.role === "owner" || currentMembership?.role === "admin";
 
   useEffect(() => {
     fetch("/api/organizations", { headers: devHeaders })
@@ -489,6 +535,9 @@ export function App() {
     setJobProfileHistory([]);
     setJobOpenings([]);
     setJobOpeningDraft(emptyJobOpeningDraft);
+    setCandidates([]);
+    setInactiveCandidates([]);
+    setCandidateDraft(emptyCandidateDraft);
 
     if (!organizationId) {
       setMessage("Nenhuma Organization selecionada.");
@@ -515,6 +564,7 @@ export function App() {
         void loadQuestions(organizationId, organizationMemberships);
         void loadJobProfiles(organizationId, organizationMemberships);
         void loadJobOpenings(organizationId);
+        void loadCandidates(organizationId, organizationMemberships);
       })
       .catch((error: Error) => setMessage(error.message));
   }
@@ -666,6 +716,30 @@ export function App() {
         setJobOpenings(response.ok ? ((await response.json()) as JobOpening[]) : []);
       })
       .catch(() => setJobOpenings([]));
+  }
+
+  function loadCandidates(organizationId: string, organizationMemberships = memberships) {
+    const membership = organizationMemberships.find(
+      (candidate) => candidate.userId === currentDevUserId && candidate.status === "active"
+    );
+    const canManage = membership?.role === "owner" || membership?.role === "admin";
+
+    fetch(`/api/organizations/${organizationId}/candidates`, { headers: devHeaders })
+      .then(async (response) => {
+        setCandidates(response.ok ? ((await response.json()) as Candidate[]) : []);
+      })
+      .catch(() => setCandidates([]));
+
+    if (!canManage) {
+      setInactiveCandidates([]);
+      return;
+    }
+
+    fetch(`/api/organizations/${organizationId}/candidates/inactive`, { headers: devHeaders })
+      .then(async (response) => {
+        setInactiveCandidates(response.ok ? ((await response.json()) as Candidate[]) : []);
+      })
+      .catch(() => setInactiveCandidates([]));
   }
 
   function reloadSelectedOrganization() {
@@ -1250,6 +1324,61 @@ export function App() {
         setJobOpeningDraft(emptyJobOpeningDraft);
         reloadJobOpenings();
         setMessage("Vaga criada com primeiro rascunho.");
+      })
+      .catch((error: Error) => setMessage(error.message));
+  }
+
+  function createCandidate() {
+    if (!selectedOrganizationId) {
+      return;
+    }
+
+    fetch(`/api/organizations/${selectedOrganizationId}/candidates`, {
+      method: "POST",
+      headers: {
+        ...devHeaders,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        fullName: candidateDraft.fullName,
+        preferredName: candidateDraft.preferredName || null,
+        email: candidateDraft.email,
+        source: candidateDraft.source,
+        professionalSummary: candidateDraft.professionalSummary,
+        location: { city: candidateDraft.city, state: candidateDraft.state },
+        consent: {
+          status: "granted",
+          source: "manual",
+          termsVersion: "v1",
+          purpose: "Cadastro de candidato"
+        }
+      })
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Nao foi possivel criar candidato.");
+        }
+        setCandidateDraft(emptyCandidateDraft);
+        setMessage("Candidato criado.");
+        loadCandidates(selectedOrganizationId);
+      })
+      .catch((error: Error) => setMessage(error.message));
+  }
+
+  function changeCandidateStatus(candidate: Candidate, action: "inactivate" | "reactivate") {
+    if (!selectedOrganizationId) {
+      return;
+    }
+    fetch(`/api/organizations/${selectedOrganizationId}/candidates/${candidate.id}/${action}`, {
+      method: "POST",
+      headers: devHeaders
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Nao foi possivel alterar candidato.");
+        }
+        setMessage(action === "inactivate" ? "Candidato inativado." : "Candidato reativado.");
+        loadCandidates(selectedOrganizationId);
       })
       .catch((error: Error) => setMessage(error.message));
   }
@@ -2287,6 +2416,149 @@ export function App() {
                   Exibir faixa salarial publicamente
                 </label>
               </div>
+            </div>
+          </div>
+        )}
+
+        {selectedOrganization && (
+          <div className="panel job-profiles-panel">
+            <span>Candidatos</span>
+            <div className="job-profile-layout">
+              <div>
+                {canManageCandidates && (
+                  <div className="job-profile-form">
+                    <input
+                      aria-label="Nome do candidato"
+                      placeholder="Nome completo"
+                      value={candidateDraft.fullName}
+                      onChange={(event) =>
+                        setCandidateDraft({ ...candidateDraft, fullName: event.target.value })
+                      }
+                    />
+                    <input
+                      aria-label="Nome preferido do candidato"
+                      placeholder="Nome preferido"
+                      value={candidateDraft.preferredName}
+                      onChange={(event) =>
+                        setCandidateDraft({ ...candidateDraft, preferredName: event.target.value })
+                      }
+                    />
+                    <input
+                      aria-label="Email do candidato"
+                      placeholder="email@exemplo.com"
+                      value={candidateDraft.email}
+                      onChange={(event) =>
+                        setCandidateDraft({ ...candidateDraft, email: event.target.value })
+                      }
+                    />
+                    <select
+                      aria-label="Origem do candidato"
+                      value={candidateDraft.source}
+                      onChange={(event) =>
+                        setCandidateDraft({ ...candidateDraft, source: event.target.value })
+                      }
+                    >
+                      {[
+                        "career_page",
+                        "referral",
+                        "recruiter",
+                        "agency",
+                        "linkedin",
+                        "job_board",
+                        "event",
+                        "import",
+                        "manual",
+                        "other"
+                      ].map((source) => (
+                        <option key={source} value={source}>
+                          {source}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      aria-label="Cidade do candidato"
+                      placeholder="Cidade"
+                      value={candidateDraft.city}
+                      onChange={(event) =>
+                        setCandidateDraft({ ...candidateDraft, city: event.target.value })
+                      }
+                    />
+                    <input
+                      aria-label="Estado do candidato"
+                      placeholder="Estado"
+                      value={candidateDraft.state}
+                      onChange={(event) =>
+                        setCandidateDraft({ ...candidateDraft, state: event.target.value })
+                      }
+                    />
+                    <textarea
+                      aria-label="Resumo profissional do candidato"
+                      placeholder="Resumo profissional"
+                      value={candidateDraft.professionalSummary}
+                      onChange={(event) =>
+                        setCandidateDraft({
+                          ...candidateDraft,
+                          professionalSummary: event.target.value
+                        })
+                      }
+                    />
+                    <button type="button" onClick={createCandidate}>
+                      Criar candidato
+                    </button>
+                  </div>
+                )}
+
+                <ul className="competency-list">
+                  {candidates.map((candidate) => (
+                    <li key={candidate.id}>
+                      <strong>{candidate.fullName}</strong>
+                      <small>
+                        {candidate.preferredName ? `${candidate.preferredName} - ` : ""}
+                        {candidate.status} - {candidate.source}
+                      </small>
+                      <small>
+                        {candidate.location?.city ?? candidate.city}{" "}
+                        {candidate.location?.state ?? candidate.state}
+                      </small>
+                      {candidate.professionalSummary && <p>{candidate.professionalSummary}</p>}
+                      <small>
+                        {candidate.experiences.length} experiencia(s), {candidate.education.length}{" "}
+                        escolaridade(s), {candidate.languages.length} idioma(s)
+                      </small>
+                      {canManageCandidates && candidate.status === "active" && (
+                        <button
+                          type="button"
+                          onClick={() => changeCandidateStatus(candidate, "inactivate")}
+                        >
+                          Inativar
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                  {candidates.length === 0 && <li>Nenhum candidato ativo.</li>}
+                </ul>
+              </div>
+
+              {canManageCandidates && (
+                <div>
+                  <strong>Inativos</strong>
+                  <ul className="competency-list">
+                    {inactiveCandidates.map((candidate) => (
+                      <li key={candidate.id}>
+                        <strong>{candidate.fullName}</strong>
+                        <small>{candidate.source}</small>
+                        <button
+                          type="button"
+                          onClick={() => changeCandidateStatus(candidate, "reactivate")}
+                        >
+                          Reativar
+                        </button>
+                      </li>
+                    ))}
+                    {inactiveCandidates.length === 0 && <li>Nenhum candidato inativo.</li>}
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
         )}

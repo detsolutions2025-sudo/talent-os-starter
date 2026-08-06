@@ -29,7 +29,7 @@
 | SPEC-008 | Cargos                     |    5 | v0.5.0 | Concluída |
 | SPEC-009 | Banco de Perguntas         |    6 | —      | Concluída |
 | SPEC-010 | Vagas                      |    7 | —      | Concluída |
-| SPEC-011 | Candidatos                 |    8 | —      | Rascunho  |
+| SPEC-011 | Candidatos                 |    8 | —      | Concluída |
 | SPEC-012 | Processo Seletivo          |    9 | —      | Rascunho  |
 | SPEC-013 | Entrevistas                |   10 | —      | Rascunho  |
 | SPEC-014 | Avaliação Assistida por IA |   11 | —      | Rascunho  |

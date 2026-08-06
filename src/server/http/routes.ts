@@ -1,6 +1,7 @@
 import type { Router } from "express";
 import type { Request, Response, NextFunction } from "express";
 import { Router as createRouter } from "express";
+import type { CandidateService } from "../candidates/service";
 import type { CompetencyService } from "../competencies/service";
 import { getActor } from "./dev-auth";
 import { forbidden } from "../core/errors";
@@ -18,7 +19,8 @@ export function createApiRouter(
   competencies?: CompetencyService,
   jobProfiles?: JobProfileService,
   questions?: QuestionService,
-  jobOpenings?: JobOpeningService
+  jobOpenings?: JobOpeningService,
+  candidates?: CandidateService
 ): Router {
   const router = createRouter();
 
@@ -1352,6 +1354,174 @@ export function createApiRouter(
       "/public/job-openings/:slug",
       asyncHandler(async (request, response) => {
         response.json(await jobOpenings.getPublicBySlug(routeParam(request.params.slug)));
+      })
+    );
+  }
+
+  if (candidates) {
+    router.post(
+      "/organizations/:organizationId/candidates",
+      asyncHandler(async (request, response) => {
+        const candidate = await candidates.createCandidate(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          request.body
+        );
+        response.status(201).json(candidate);
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/candidates",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await candidates.listActive(getActor(request), routeParam(request.params.organizationId))
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/candidates/inactive",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await candidates.listInactive(
+            getActor(request),
+            routeParam(request.params.organizationId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/candidates/:candidateId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await candidates.getCandidate(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.candidateId)
+          )
+        );
+      })
+    );
+
+    router.patch(
+      "/organizations/:organizationId/candidates/:candidateId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await candidates.updateCandidate(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.candidateId),
+            request.body
+          )
+        );
+      })
+    );
+
+    router.patch(
+      "/organizations/:organizationId/candidates/:candidateId/email",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await candidates.changeEmail(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.candidateId),
+            request.body
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/candidates/:candidateId/inactivate",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await candidates.setStatus(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.candidateId),
+            "inactive"
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/candidates/:candidateId/reactivate",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await candidates.setStatus(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.candidateId),
+            "active"
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/candidates/:candidateId/history",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await candidates.history(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.candidateId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/candidates/:candidateId/consents",
+      asyncHandler(async (request, response) => {
+        const consent = await candidates.addConsent(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          routeParam(request.params.candidateId),
+          request.body
+        );
+        response.status(201).json(consent);
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/candidates/:candidateId/consents/revoke",
+      asyncHandler(async (request, response) => {
+        const consent = await candidates.revokeConsent(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          routeParam(request.params.candidateId)
+        );
+        response.status(201).json(consent);
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/candidates/:candidateId/internal-notes",
+      asyncHandler(async (request, response) => {
+        const note = await candidates.addInternalNote(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          routeParam(request.params.candidateId),
+          request.body
+        );
+        response.status(201).json(note);
+      })
+    );
+
+    router.post(
+      "/platform/organizations/:organizationId/candidates/admin-read",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await candidates.adminRead(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            request.body
+          )
+        );
       })
     );
   }
