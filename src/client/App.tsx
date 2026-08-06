@@ -297,6 +297,52 @@ type CandidateDraft = {
   professionalSummary: string;
 };
 
+type CandidateApplicationStatus = "active" | "withdrawn" | "rejected" | "hired" | "cancelled";
+type CandidateApplicationStage =
+  "applied" | "screening" | "interview" | "assessment" | "offer" | "completed";
+
+type CandidateApplication = {
+  id: string;
+  candidateId?: string;
+  jobOpeningId?: string;
+  jobOpeningVersionId?: string;
+  applicationStatus?: CandidateApplicationStatus;
+  application_status?: CandidateApplicationStatus;
+  currentStage?: CandidateApplicationStage;
+  current_stage?: CandidateApplicationStage;
+  source?: string;
+  appliedAt?: string;
+  applied_at?: string;
+  finalizedAt?: string | null;
+  finalizationReason?: string | null;
+  candidate?: {
+    id: string;
+    fullName?: string;
+    full_name?: string;
+    preferredName?: string | null;
+    preferred_name?: string | null;
+  } | null;
+  job_opening?: { id: string; title: string } | null;
+  job_opening_version?: { id: string; public_title: string; version_number: number | null } | null;
+  notes?: CandidateApplicationNote[];
+};
+
+type CandidateApplicationNote = {
+  id: string;
+  content: string;
+  createdByUserId: string;
+  createdAt: string;
+};
+
+type CandidateApplicationDraft = {
+  candidateId: string;
+  jobOpeningId: string;
+  jobOpeningVersionId: string;
+  source: string;
+  note: string;
+  finalizationReason: string;
+};
+
 const emptyUnitDraft: OrganizationalUnitDraft = {
   code: "",
   name: "",
@@ -348,6 +394,45 @@ const emptyCandidateDraft: CandidateDraft = {
   state: "",
   professionalSummary: ""
 };
+
+const emptyCandidateApplicationDraft: CandidateApplicationDraft = {
+  candidateId: "",
+  jobOpeningId: "",
+  jobOpeningVersionId: "",
+  source: "manual",
+  note: "",
+  finalizationReason: ""
+};
+
+const applicationStages: CandidateApplicationStage[] = [
+  "applied",
+  "screening",
+  "interview",
+  "assessment",
+  "offer",
+  "completed"
+];
+
+function applicationStatusOf(application: CandidateApplication) {
+  return application.applicationStatus ?? application.application_status ?? "active";
+}
+
+function applicationStageOf(application: CandidateApplication) {
+  return application.currentStage ?? application.current_stage ?? "applied";
+}
+
+function applicationAppliedAtOf(application: CandidateApplication) {
+  return application.appliedAt ?? application.applied_at ?? "";
+}
+
+function applicationCandidateName(application: CandidateApplication) {
+  return (
+    application.candidate?.fullName ??
+    application.candidate?.full_name ??
+    application.candidateId ??
+    application.id
+  );
+}
 
 const competencyCategories: CompetencyCategory[] = [
   "technical",
@@ -443,6 +528,9 @@ export function App() {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [inactiveCandidates, setInactiveCandidates] = useState<Candidate[]>([]);
   const [candidateDraft, setCandidateDraft] = useState<CandidateDraft>(emptyCandidateDraft);
+  const [candidateApplications, setCandidateApplications] = useState<CandidateApplication[]>([]);
+  const [candidateApplicationDraft, setCandidateApplicationDraft] =
+    useState<CandidateApplicationDraft>(emptyCandidateApplicationDraft);
   const [globalCompetencyDraft, setGlobalCompetencyDraft] =
     useState<CompetencyDraft>(emptyCompetencyDraft);
   const [organizationCompetencyDraft, setOrganizationCompetencyDraft] =
@@ -471,6 +559,9 @@ export function App() {
   const canPublishJobOpenings = currentMembership?.role === "owner";
   const canManageCandidates =
     currentMembership?.role === "owner" || currentMembership?.role === "admin";
+  const canManageApplications =
+    currentMembership?.role === "owner" || currentMembership?.role === "admin";
+  const canHireApplications = currentMembership?.role === "owner";
 
   useEffect(() => {
     fetch("/api/organizations", { headers: devHeaders })
@@ -538,6 +629,8 @@ export function App() {
     setCandidates([]);
     setInactiveCandidates([]);
     setCandidateDraft(emptyCandidateDraft);
+    setCandidateApplications([]);
+    setCandidateApplicationDraft(emptyCandidateApplicationDraft);
 
     if (!organizationId) {
       setMessage("Nenhuma Organization selecionada.");
@@ -565,6 +658,7 @@ export function App() {
         void loadJobProfiles(organizationId, organizationMemberships);
         void loadJobOpenings(organizationId);
         void loadCandidates(organizationId, organizationMemberships);
+        void loadCandidateApplications(organizationId);
       })
       .catch((error: Error) => setMessage(error.message));
   }
@@ -742,6 +836,16 @@ export function App() {
       .catch(() => setInactiveCandidates([]));
   }
 
+  function loadCandidateApplications(organizationId: string) {
+    fetch(`/api/organizations/${organizationId}/candidate-applications`, { headers: devHeaders })
+      .then(async (response) => {
+        setCandidateApplications(
+          response.ok ? ((await response.json()) as CandidateApplication[]) : []
+        );
+      })
+      .catch(() => setCandidateApplications([]));
+  }
+
   function reloadSelectedOrganization() {
     if (selectedOrganizationId) {
       selectOrganization(selectedOrganizationId);
@@ -784,6 +888,12 @@ export function App() {
   function reloadJobOpenings() {
     if (selectedOrganizationId) {
       loadJobOpenings(selectedOrganizationId);
+    }
+  }
+
+  function reloadCandidateApplications() {
+    if (selectedOrganizationId) {
+      loadCandidateApplications(selectedOrganizationId);
     }
   }
 
@@ -1379,6 +1489,131 @@ export function App() {
         }
         setMessage(action === "inactivate" ? "Candidato inativado." : "Candidato reativado.");
         loadCandidates(selectedOrganizationId);
+        reloadCandidateApplications();
+      })
+      .catch((error: Error) => setMessage(error.message));
+  }
+
+  function createCandidateApplication() {
+    if (!selectedOrganizationId) {
+      return;
+    }
+    if (
+      !candidateApplicationDraft.candidateId ||
+      !candidateApplicationDraft.jobOpeningId ||
+      !candidateApplicationDraft.jobOpeningVersionId
+    ) {
+      setMessage("Selecione candidato, vaga aberta e versao publicada.");
+      return;
+    }
+
+    fetch(`/api/organizations/${selectedOrganizationId}/candidate-applications`, {
+      method: "POST",
+      headers: {
+        ...devHeaders,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        candidateId: candidateApplicationDraft.candidateId,
+        jobOpeningId: candidateApplicationDraft.jobOpeningId,
+        jobOpeningVersionId: candidateApplicationDraft.jobOpeningVersionId,
+        source: candidateApplicationDraft.source
+      })
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Nao foi possivel criar candidatura.");
+        }
+        setCandidateApplicationDraft(emptyCandidateApplicationDraft);
+        setMessage("Candidatura criada.");
+        reloadCandidateApplications();
+      })
+      .catch((error: Error) => setMessage(error.message));
+  }
+
+  function moveCandidateApplication(
+    application: CandidateApplication,
+    currentStage: CandidateApplicationStage
+  ) {
+    if (!selectedOrganizationId) {
+      return;
+    }
+    fetch(
+      `/api/organizations/${selectedOrganizationId}/candidate-applications/${application.id}/stage`,
+      {
+        method: "POST",
+        headers: {
+          ...devHeaders,
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({ currentStage, reason: "Movimentacao via interface minima." })
+      }
+    )
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Nao foi possivel mover candidatura.");
+        }
+        setMessage("Etapa atualizada.");
+        reloadCandidateApplications();
+      })
+      .catch((error: Error) => setMessage(error.message));
+  }
+
+  function finalizeCandidateApplication(
+    application: CandidateApplication,
+    action: "withdraw" | "reject" | "hire" | "cancel"
+  ) {
+    if (!selectedOrganizationId || !candidateApplicationDraft.finalizationReason.trim()) {
+      setMessage("Informe o motivo da finalizacao.");
+      return;
+    }
+    fetch(
+      `/api/organizations/${selectedOrganizationId}/candidate-applications/${application.id}/${action}`,
+      {
+        method: "POST",
+        headers: {
+          ...devHeaders,
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({ reason: candidateApplicationDraft.finalizationReason })
+      }
+    )
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Nao foi possivel finalizar candidatura.");
+        }
+        setCandidateApplicationDraft({
+          ...candidateApplicationDraft,
+          finalizationReason: ""
+        });
+        setMessage("Candidatura finalizada.");
+        reloadCandidateApplications();
+      })
+      .catch((error: Error) => setMessage(error.message));
+  }
+
+  function addCandidateApplicationNote(application: CandidateApplication) {
+    if (!selectedOrganizationId || !candidateApplicationDraft.note.trim()) {
+      return;
+    }
+    fetch(
+      `/api/organizations/${selectedOrganizationId}/candidate-applications/${application.id}/notes`,
+      {
+        method: "POST",
+        headers: {
+          ...devHeaders,
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({ content: candidateApplicationDraft.note })
+      }
+    )
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Nao foi possivel adicionar nota.");
+        }
+        setCandidateApplicationDraft({ ...candidateApplicationDraft, note: "" });
+        setMessage("Nota registrada.");
+        reloadCandidateApplications();
       })
       .catch((error: Error) => setMessage(error.message));
   }
@@ -2557,6 +2792,205 @@ export function App() {
                     ))}
                     {inactiveCandidates.length === 0 && <li>Nenhum candidato inativo.</li>}
                   </ul>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {selectedOrganization && (
+          <div className="panel job-profiles-panel">
+            <span>Processo Seletivo</span>
+            <div className="job-profile-layout">
+              <div>
+                {canManageApplications && (
+                  <div className="job-profile-form">
+                    <select
+                      aria-label="Candidato da candidatura"
+                      value={candidateApplicationDraft.candidateId}
+                      onChange={(event) =>
+                        setCandidateApplicationDraft({
+                          ...candidateApplicationDraft,
+                          candidateId: event.target.value
+                        })
+                      }
+                    >
+                      <option value="">Candidato ativo</option>
+                      {candidates.map((candidate) => (
+                        <option key={candidate.id} value={candidate.id}>
+                          {candidate.fullName}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      aria-label="Vaga da candidatura"
+                      value={candidateApplicationDraft.jobOpeningId}
+                      onChange={(event) => {
+                        const opening = jobOpenings.find(
+                          (candidate) => candidate.id === event.target.value
+                        );
+                        setCandidateApplicationDraft({
+                          ...candidateApplicationDraft,
+                          jobOpeningId: event.target.value,
+                          jobOpeningVersionId: opening?.publishedVersion?.id ?? ""
+                        });
+                      }}
+                    >
+                      <option value="">Vaga aberta</option>
+                      {jobOpenings
+                        .filter((opening) => opening.status === "open" && opening.publishedVersion)
+                        .map((opening) => (
+                          <option key={opening.id} value={opening.id}>
+                            {opening.title}
+                          </option>
+                        ))}
+                    </select>
+                    <select
+                      aria-label="Origem da candidatura"
+                      value={candidateApplicationDraft.source}
+                      onChange={(event) =>
+                        setCandidateApplicationDraft({
+                          ...candidateApplicationDraft,
+                          source: event.target.value
+                        })
+                      }
+                    >
+                      {["career_page", "referral", "recruiter", "import", "manual", "other"].map(
+                        (source) => (
+                          <option key={source} value={source}>
+                            {source}
+                          </option>
+                        )
+                      )}
+                    </select>
+                    <button type="button" onClick={createCandidateApplication}>
+                      Criar candidatura
+                    </button>
+                  </div>
+                )}
+
+                <ul className="competency-list">
+                  {candidateApplications.map((application) => {
+                    const status = applicationStatusOf(application);
+                    const currentStage = applicationStageOf(application);
+                    const opening = jobOpenings.find(
+                      (entry) => entry.id === application.jobOpeningId
+                    );
+                    const stageIndex = applicationStages.indexOf(currentStage);
+                    return (
+                      <li key={application.id}>
+                        <strong>{applicationCandidateName(application)}</strong>
+                        <small>
+                          {opening?.title ??
+                            application.job_opening?.title ??
+                            application.jobOpeningId ??
+                            "vaga"}{" "}
+                          - {status} - {currentStage}
+                        </small>
+                        <small>
+                          {application.source ?? "origem restrita"} -{" "}
+                          {applicationAppliedAtOf(application)
+                            ? new Date(applicationAppliedAtOf(application)).toLocaleString()
+                            : "data restrita"}
+                        </small>
+                        {canManageApplications && status === "active" && (
+                          <div className="member-actions">
+                            {stageIndex > 0 && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  moveCandidateApplication(
+                                    application,
+                                    applicationStages[stageIndex - 1]
+                                  )
+                                }
+                              >
+                                Voltar etapa
+                              </button>
+                            )}
+                            {stageIndex < applicationStages.length - 1 && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  moveCandidateApplication(
+                                    application,
+                                    applicationStages[stageIndex + 1]
+                                  )
+                                }
+                              >
+                                Avancar etapa
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => addCandidateApplicationNote(application)}
+                            >
+                              Adicionar nota
+                            </button>
+                          </div>
+                        )}
+                        {canManageApplications && status === "active" && (
+                          <div className="member-actions">
+                            <button
+                              type="button"
+                              onClick={() => finalizeCandidateApplication(application, "withdraw")}
+                            >
+                              Retirar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => finalizeCandidateApplication(application, "reject")}
+                            >
+                              Rejeitar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => finalizeCandidateApplication(application, "cancel")}
+                            >
+                              Cancelar
+                            </button>
+                            {canHireApplications && (
+                              <button
+                                type="button"
+                                onClick={() => finalizeCandidateApplication(application, "hire")}
+                              >
+                                Contratar
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
+                  {candidateApplications.length === 0 && <li>Nenhuma candidatura cadastrada.</li>}
+                </ul>
+              </div>
+
+              {canManageApplications && (
+                <div className="job-profile-form">
+                  <strong>Operacoes</strong>
+                  <textarea
+                    aria-label="Nota da candidatura"
+                    placeholder="Nota interna da candidatura"
+                    value={candidateApplicationDraft.note}
+                    onChange={(event) =>
+                      setCandidateApplicationDraft({
+                        ...candidateApplicationDraft,
+                        note: event.target.value
+                      })
+                    }
+                  />
+                  <textarea
+                    aria-label="Motivo de finalizacao"
+                    placeholder="Motivo de finalizacao"
+                    value={candidateApplicationDraft.finalizationReason}
+                    onChange={(event) =>
+                      setCandidateApplicationDraft({
+                        ...candidateApplicationDraft,
+                        finalizationReason: event.target.value
+                      })
+                    }
+                  />
                 </div>
               )}
             </div>

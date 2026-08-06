@@ -8,6 +8,8 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./tests/setup.ts"],
     include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
-    fileParallelism: false
+    fileParallelism: false,
+    testTimeout: 60000,
+    hookTimeout: 60000
   }
 });

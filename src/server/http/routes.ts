@@ -1,6 +1,7 @@
 import type { Router } from "express";
 import type { Request, Response, NextFunction } from "express";
 import { Router as createRouter } from "express";
+import type { CandidateApplicationService } from "../candidate-applications/service";
 import type { CandidateService } from "../candidates/service";
 import type { CompetencyService } from "../competencies/service";
 import { getActor } from "./dev-auth";
@@ -20,7 +21,8 @@ export function createApiRouter(
   jobProfiles?: JobProfileService,
   questions?: QuestionService,
   jobOpenings?: JobOpeningService,
-  candidates?: CandidateService
+  candidates?: CandidateService,
+  candidateApplications?: CandidateApplicationService
 ): Router {
   const router = createRouter();
 
@@ -1517,6 +1519,145 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await candidates.adminRead(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            request.body
+          )
+        );
+      })
+    );
+  }
+
+  if (candidateApplications) {
+    router.post(
+      "/organizations/:organizationId/candidate-applications",
+      asyncHandler(async (request, response) => {
+        const application = await candidateApplications.createApplication(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          request.body
+        );
+        response.status(201).json(application);
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/candidate-applications",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await candidateApplications.listApplications(
+            getActor(request),
+            routeParam(request.params.organizationId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/candidate-applications/:applicationId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await candidateApplications.getApplication(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.applicationId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/candidate-applications/:applicationId/stage",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await candidateApplications.moveStage(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.applicationId),
+            request.body
+          )
+        );
+      })
+    );
+
+    for (const [path, action] of [
+      ["withdraw", "withdraw"],
+      ["reject", "reject"],
+      ["hire", "hire"],
+      ["cancel", "cancel"]
+    ] as const) {
+      router.post(
+        `/organizations/:organizationId/candidate-applications/:applicationId/${path}`,
+        asyncHandler(async (request, response) => {
+          response.json(
+            await candidateApplications[action](
+              getActor(request),
+              routeParam(request.params.organizationId),
+              routeParam(request.params.applicationId),
+              request.body
+            )
+          );
+        })
+      );
+    }
+
+    router.post(
+      "/organizations/:organizationId/candidate-applications/:applicationId/notes",
+      asyncHandler(async (request, response) => {
+        const note = await candidateApplications.addNote(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          routeParam(request.params.applicationId),
+          request.body
+        );
+        response.status(201).json(note);
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/candidate-applications/:applicationId/events",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await candidateApplications.listEvents(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.applicationId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/candidate-applications/:applicationId/notes",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await candidateApplications.listNotes(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.applicationId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/candidate-applications/:applicationId/history",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await candidateApplications.history(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.applicationId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/platform/organizations/:organizationId/candidate-applications/admin-read",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await candidateApplications.adminRead(
             getActor(request),
             routeParam(request.params.organizationId),
             request.body

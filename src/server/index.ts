@@ -1,4 +1,5 @@
 import { createServer } from "./app";
+import { createPostgresCandidateApplicationService } from "./candidate-applications/service";
 import { createPostgresCandidateService } from "./candidates/service";
 import { createPostgresCompetencyService } from "./competencies/service";
 import { createCoreService } from "./core/service";
@@ -21,7 +22,8 @@ const app = createServer(
   createPostgresJobProfileService(pool),
   createPostgresQuestionService(pool),
   createPostgresJobOpeningService(pool),
-  createPostgresCandidateService(pool)
+  createPostgresCandidateService(pool),
+  createPostgresCandidateApplicationService(pool)
 );
 
 app.listen(port, () => {
