@@ -238,6 +238,34 @@ type JobProfileVersion = {
   discardedAt: string | null;
 };
 
+type JobOpening = {
+  id: string;
+  code: string;
+  title: string;
+  status: "draft" | "open" | "paused" | "closed" | "cancelled";
+  isPublic: boolean;
+  publicSlug: string | null;
+  applicationDeadline: string | null;
+  isPubliclyAvailable: boolean;
+  publishedVersion: {
+    id: string;
+    publicTitle: string;
+    positionsCount: number;
+    salaryRange: { min: number; max: number; currency: string; periodicity: string } | null;
+    internalInstructions: string;
+  } | null;
+};
+
+type JobOpeningDraft = {
+  code: string;
+  title: string;
+  publicTitle: string;
+  positionsCount: number;
+  publicSlug: string;
+  applicationDeadline: string;
+  showSalary: boolean;
+};
+
 const emptyUnitDraft: OrganizationalUnitDraft = {
   code: "",
   name: "",
@@ -268,6 +296,16 @@ const emptyQuestionDraft: QuestionDraft = {
 const emptyJobProfileDraft: JobProfileDraft = {
   code: "",
   name: ""
+};
+
+const emptyJobOpeningDraft: JobOpeningDraft = {
+  code: "",
+  title: "",
+  publicTitle: "",
+  positionsCount: 1,
+  publicSlug: "",
+  applicationDeadline: "",
+  showSalary: false
 };
 
 const competencyCategories: CompetencyCategory[] = [
@@ -359,6 +397,8 @@ export function App() {
   const [jobDraftVersion, setJobDraftVersion] = useState<JobProfileVersion | null>(null);
   const [publishedJobVersion, setPublishedJobVersion] = useState<JobProfileVersion | null>(null);
   const [jobProfileHistory, setJobProfileHistory] = useState<JobProfileVersion[]>([]);
+  const [jobOpenings, setJobOpenings] = useState<JobOpening[]>([]);
+  const [jobOpeningDraft, setJobOpeningDraft] = useState<JobOpeningDraft>(emptyJobOpeningDraft);
   const [globalCompetencyDraft, setGlobalCompetencyDraft] =
     useState<CompetencyDraft>(emptyCompetencyDraft);
   const [organizationCompetencyDraft, setOrganizationCompetencyDraft] =
@@ -382,6 +422,9 @@ export function App() {
     currentMembership?.role === "owner" || currentMembership?.role === "admin";
   const canManageJobs = currentMembership?.role === "owner" || currentMembership?.role === "admin";
   const canPublishJobs = currentMembership?.role === "owner";
+  const canManageJobOpenings =
+    currentMembership?.role === "owner" || currentMembership?.role === "admin";
+  const canPublishJobOpenings = currentMembership?.role === "owner";
 
   useEffect(() => {
     fetch("/api/organizations", { headers: devHeaders })
@@ -444,6 +487,8 @@ export function App() {
     setJobDraftVersion(null);
     setPublishedJobVersion(null);
     setJobProfileHistory([]);
+    setJobOpenings([]);
+    setJobOpeningDraft(emptyJobOpeningDraft);
 
     if (!organizationId) {
       setMessage("Nenhuma Organization selecionada.");
@@ -469,6 +514,7 @@ export function App() {
         void loadCompetencies(organizationId, organizationMemberships);
         void loadQuestions(organizationId, organizationMemberships);
         void loadJobProfiles(organizationId, organizationMemberships);
+        void loadJobOpenings(organizationId);
       })
       .catch((error: Error) => setMessage(error.message));
   }
@@ -614,6 +660,14 @@ export function App() {
       .catch(() => setInactiveJobProfiles([]));
   }
 
+  function loadJobOpenings(organizationId: string) {
+    fetch(`/api/organizations/${organizationId}/job-openings`, { headers: devHeaders })
+      .then(async (response) => {
+        setJobOpenings(response.ok ? ((await response.json()) as JobOpening[]) : []);
+      })
+      .catch(() => setJobOpenings([]));
+  }
+
   function reloadSelectedOrganization() {
     if (selectedOrganizationId) {
       selectOrganization(selectedOrganizationId);
@@ -650,6 +704,12 @@ export function App() {
       if (selectedJobProfileId) {
         loadSelectedJobProfile(selectedJobProfileId);
       }
+    }
+  }
+
+  function reloadJobOpenings() {
+    if (selectedOrganizationId) {
+      loadJobOpenings(selectedOrganizationId);
     }
   }
 
@@ -1160,6 +1220,99 @@ export function App() {
           ]
         : []
     };
+  }
+
+  function createJobOpening() {
+    if (!selectedOrganizationId || !publishedJobVersion) {
+      setMessage("Selecione um cargo com versao publicada.");
+      return;
+    }
+
+    fetch(`/api/organizations/${selectedOrganizationId}/job-openings`, {
+      method: "POST",
+      headers: {
+        ...devHeaders,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        code: jobOpeningDraft.code,
+        title: jobOpeningDraft.title,
+        publicTitle: jobOpeningDraft.publicTitle || jobOpeningDraft.title,
+        positionsCount: jobOpeningDraft.positionsCount,
+        jobProfileVersionId: publishedJobVersion.id
+      })
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Acesso negado ou dados invalidos para criar vaga.");
+        }
+
+        setJobOpeningDraft(emptyJobOpeningDraft);
+        reloadJobOpenings();
+        setMessage("Vaga criada com primeiro rascunho.");
+      })
+      .catch((error: Error) => setMessage(error.message));
+  }
+
+  function publishAndOpenJobOpening(opening: JobOpening) {
+    if (!selectedOrganizationId) {
+      return;
+    }
+
+    const draftUrl = `/api/organizations/${selectedOrganizationId}/job-openings/${opening.id}/draft`;
+    fetch(draftUrl, { headers: devHeaders })
+      .then(async (draftResponse) => {
+        if (!draftResponse.ok) {
+          throw new Error("Rascunho da vaga nao encontrado.");
+        }
+        const draft = (await draftResponse.json()) as { id: string };
+        const publishResponse = await fetch(
+          `/api/organizations/${selectedOrganizationId}/job-openings/${opening.id}/drafts/${draft.id}/publish`,
+          { method: "POST", headers: devHeaders }
+        );
+        if (!publishResponse.ok) {
+          throw new Error("Publicacao interna da vaga negada.");
+        }
+        const openResponse = await fetch(
+          `/api/organizations/${selectedOrganizationId}/job-openings/${opening.id}/open`,
+          { method: "POST", headers: devHeaders }
+        );
+        if (!openResponse.ok) {
+          throw new Error("Abertura da vaga negada.");
+        }
+        reloadJobOpenings();
+        setMessage("Vaga publicada internamente e aberta.");
+      })
+      .catch((error: Error) => setMessage(error.message));
+  }
+
+  function publishJobOpeningPublicly(opening: JobOpening) {
+    if (!selectedOrganizationId || !jobOpeningDraft.publicSlug.trim()) {
+      setMessage("Informe um slug publico.");
+      return;
+    }
+
+    fetch(`/api/organizations/${selectedOrganizationId}/job-openings/${opening.id}/publication`, {
+      method: "PATCH",
+      headers: {
+        ...devHeaders,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        isPublic: true,
+        publicSlug: jobOpeningDraft.publicSlug,
+        applicationDeadline: jobOpeningDraft.applicationDeadline || null,
+        showSalary: jobOpeningDraft.showSalary
+      })
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Divulgacao publica negada.");
+        }
+        reloadJobOpenings();
+        setMessage("Divulgacao publica configurada.");
+      })
+      .catch((error: Error) => setMessage(error.message));
   }
 
   function createDnaDraft() {
@@ -2008,6 +2161,131 @@ export function App() {
                     ))}
                   </ul>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {selectedOrganization && (
+          <div className="panel job-profiles-panel">
+            <span>Vagas</span>
+            <div className="job-profile-layout">
+              <div>
+                {canManageJobOpenings && (
+                  <div className="job-profile-form">
+                    <input
+                      aria-label="Codigo da vaga"
+                      placeholder="Codigo"
+                      value={jobOpeningDraft.code}
+                      onChange={(event) =>
+                        setJobOpeningDraft({ ...jobOpeningDraft, code: event.target.value })
+                      }
+                    />
+                    <input
+                      aria-label="Titulo interno da vaga"
+                      placeholder="Titulo interno"
+                      value={jobOpeningDraft.title}
+                      onChange={(event) =>
+                        setJobOpeningDraft({ ...jobOpeningDraft, title: event.target.value })
+                      }
+                    />
+                    <input
+                      aria-label="Titulo publico da vaga"
+                      placeholder="Titulo publico"
+                      value={jobOpeningDraft.publicTitle}
+                      onChange={(event) =>
+                        setJobOpeningDraft({ ...jobOpeningDraft, publicTitle: event.target.value })
+                      }
+                    />
+                    <input
+                      aria-label="Quantidade de posicoes"
+                      type="number"
+                      min="1"
+                      max="1000"
+                      value={jobOpeningDraft.positionsCount}
+                      onChange={(event) =>
+                        setJobOpeningDraft({
+                          ...jobOpeningDraft,
+                          positionsCount: Number(event.target.value)
+                        })
+                      }
+                    />
+                    <button
+                      type="button"
+                      onClick={createJobOpening}
+                      disabled={!publishedJobVersion}
+                    >
+                      Criar vaga
+                    </button>
+                  </div>
+                )}
+
+                <ul className="competency-list">
+                  {jobOpenings.map((opening) => (
+                    <li key={opening.id}>
+                      <strong>{opening.title}</strong>
+                      <small>
+                        {opening.code} - {opening.status} -{" "}
+                        {opening.isPubliclyAvailable ? "publica" : "restrita"}
+                      </small>
+                      {opening.publishedVersion && (
+                        <small>
+                          {opening.publishedVersion.publicTitle} -{" "}
+                          {opening.publishedVersion.positionsCount} posicao(oes)
+                        </small>
+                      )}
+                      <div className="member-actions">
+                        {canPublishJobOpenings && opening.status === "draft" && (
+                          <button type="button" onClick={() => publishAndOpenJobOpening(opening)}>
+                            Publicar e abrir
+                          </button>
+                        )}
+                        {canManageJobOpenings && opening.status === "open" && (
+                          <button type="button" onClick={() => publishJobOpeningPublicly(opening)}>
+                            Divulgar
+                          </button>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                  {jobOpenings.length === 0 && <li>Nenhuma vaga cadastrada.</li>}
+                </ul>
+              </div>
+
+              <div className="job-profile-form">
+                <strong>Divulgacao publica</strong>
+                <input
+                  aria-label="Slug publico"
+                  placeholder="slug-publico"
+                  value={jobOpeningDraft.publicSlug}
+                  onChange={(event) =>
+                    setJobOpeningDraft({ ...jobOpeningDraft, publicSlug: event.target.value })
+                  }
+                />
+                <input
+                  aria-label="Prazo de candidatura"
+                  type="datetime-local"
+                  value={jobOpeningDraft.applicationDeadline}
+                  onChange={(event) =>
+                    setJobOpeningDraft({
+                      ...jobOpeningDraft,
+                      applicationDeadline: event.target.value
+                    })
+                  }
+                />
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={jobOpeningDraft.showSalary}
+                    onChange={(event) =>
+                      setJobOpeningDraft({
+                        ...jobOpeningDraft,
+                        showSalary: event.target.checked
+                      })
+                    }
+                  />
+                  Exibir faixa salarial publicamente
+                </label>
               </div>
             </div>
           </div>

@@ -28,7 +28,7 @@
 | SPEC-007 | Catálogo de Competências   |    4 | v0.4.0 | Concluída |
 | SPEC-008 | Cargos                     |    5 | v0.5.0 | Concluída |
 | SPEC-009 | Banco de Perguntas         |    6 | —      | Concluída |
-| SPEC-010 | Vagas                      |    7 | —      | Rascunho  |
+| SPEC-010 | Vagas                      |    7 | —      | Concluída |
 | SPEC-011 | Candidatos                 |    8 | —      | Rascunho  |
 | SPEC-012 | Processo Seletivo          |    9 | —      | Rascunho  |
 | SPEC-013 | Entrevistas                |   10 | —      | Rascunho  |

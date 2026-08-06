@@ -6,6 +6,7 @@ import { getActor } from "./dev-auth";
 import { forbidden } from "../core/errors";
 import type { CoreService } from "../core/service";
 import type { DnaService } from "../dna/service";
+import type { JobOpeningService } from "../job-openings/service";
 import type { JobProfileService } from "../job-profiles/service";
 import type { OrganizationalUnitService } from "../organizational-units/service";
 import type { QuestionService } from "../questions/service";
@@ -16,7 +17,8 @@ export function createApiRouter(
   organizationalUnits?: OrganizationalUnitService,
   competencies?: CompetencyService,
   jobProfiles?: JobProfileService,
-  questions?: QuestionService
+  questions?: QuestionService,
+  jobOpenings?: JobOpeningService
 ): Router {
   const router = createRouter();
 
@@ -1109,6 +1111,247 @@ export function createApiRouter(
             request.body
           )
         );
+      })
+    );
+  }
+
+  if (jobOpenings) {
+    router.post(
+      "/organizations/:organizationId/job-openings",
+      asyncHandler(async (request, response) => {
+        const opening = await jobOpenings.createJobOpening(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          request.body
+        );
+        response.status(201).json(opening);
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/job-openings",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await jobOpenings.listJobOpenings(
+            getActor(request),
+            routeParam(request.params.organizationId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/job-openings/inactive",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await jobOpenings.listInactive(
+            getActor(request),
+            routeParam(request.params.organizationId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/job-openings/:jobOpeningId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await jobOpenings.getJobOpening(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.jobOpeningId)
+          )
+        );
+      })
+    );
+
+    router.patch(
+      "/organizations/:organizationId/job-openings/:jobOpeningId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await jobOpenings.updateJobOpening(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.jobOpeningId),
+            request.body
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/job-openings/:jobOpeningId/drafts",
+      asyncHandler(async (request, response) => {
+        const draft = await jobOpenings.createDraft(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          routeParam(request.params.jobOpeningId)
+        );
+        response.status(201).json(draft);
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/job-openings/:jobOpeningId/draft",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await jobOpenings.getActiveDraft(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.jobOpeningId)
+          )
+        );
+      })
+    );
+
+    router.patch(
+      "/organizations/:organizationId/job-openings/:jobOpeningId/drafts/:versionId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await jobOpenings.updateDraft(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.jobOpeningId),
+            routeParam(request.params.versionId),
+            request.body
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/job-openings/:jobOpeningId/drafts/:versionId/publish",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await jobOpenings.publishDraft(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.jobOpeningId),
+            routeParam(request.params.versionId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/job-openings/:jobOpeningId/drafts/:versionId/discard",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await jobOpenings.discardDraft(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.jobOpeningId),
+            routeParam(request.params.versionId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/job-openings/:jobOpeningId/published",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await jobOpenings.getPublished(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.jobOpeningId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/job-openings/:jobOpeningId/versions",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await jobOpenings.listVersions(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.jobOpeningId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/job-openings/:jobOpeningId/versions/:versionId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await jobOpenings.getVersion(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.jobOpeningId),
+            routeParam(request.params.versionId)
+          )
+        );
+      })
+    );
+
+    for (const [path, status] of [
+      ["open", "open"],
+      ["pause", "paused"],
+      ["close", "closed"],
+      ["cancel", "cancelled"]
+    ] as const) {
+      router.post(
+        `/organizations/:organizationId/job-openings/:jobOpeningId/${path}`,
+        asyncHandler(async (request, response) => {
+          response.json(
+            await jobOpenings.transition(
+              getActor(request),
+              routeParam(request.params.organizationId),
+              routeParam(request.params.jobOpeningId),
+              status
+            )
+          );
+        })
+      );
+    }
+
+    router.patch(
+      "/organizations/:organizationId/job-openings/:jobOpeningId/publication",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await jobOpenings.configurePublication(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.jobOpeningId),
+            request.body
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/job-openings/:jobOpeningId/history",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await jobOpenings.history(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.jobOpeningId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/platform/organizations/:organizationId/job-openings/admin-read",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await jobOpenings.adminRead(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            request.body
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/public/job-openings/:slug",
+      asyncHandler(async (request, response) => {
+        response.json(await jobOpenings.getPublicBySlug(routeParam(request.params.slug)));
       })
     );
   }
