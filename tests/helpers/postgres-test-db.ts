@@ -40,7 +40,23 @@ export async function createPostgresTestDatabase(): Promise<PostgresTestDatabase
     await setupClient.end();
   }
 
-  const pool = createPostgresPool(withSearchPath(connectionString, schema));
+  // A small, bounded pool keeps the peak number of simultaneous connections against the
+  // shared remote test database low across the (sequential, fileParallelism:false) suite of
+  // Postgres test files, each of which opens its own pool for the lifetime of one file.
+  const pool = createPostgresPool(withSearchPath(connectionString, schema), {
+    max: 5,
+    idleTimeoutMillis: 10_000,
+    connectionTimeoutMillis: 15_000
+  });
+  // node-postgres Pool is an EventEmitter: a backend error on an otherwise-idle pooled
+  // client (e.g. a connection reset between tests) emits "error" with no default handler.
+  // An EventEmitter "error" event with zero listeners throws and kills the process, which
+  // is exactly the intermittent "Worker exited unexpectedly" crash the Vitest run showed —
+  // unrelated to whichever test happened to be running when the idle connection dropped.
+  // Attaching a listener here turns that into a safely logged, non-fatal event.
+  pool.on("error", (error) => {
+    console.error(`Idle PostgreSQL client error in test schema ${schema}:`, error);
+  });
 
   return {
     pool,

@@ -343,6 +343,48 @@ type CandidateApplicationDraft = {
   finalizationReason: string;
 };
 
+type InterviewStatus =
+  "draft" | "scheduled" | "in_progress" | "completed" | "cancelled" | "no_show";
+type InterviewType =
+  | "screening"
+  | "behavioral"
+  | "technical"
+  | "cultural"
+  | "leadership"
+  | "management"
+  | "panel"
+  | "final"
+  | "other";
+type InterviewLocationType = "onsite" | "video" | "phone" | "other";
+
+type Interview = {
+  id: string;
+  candidateApplicationId?: string;
+  candidate_application_id?: string;
+  title: string;
+  type: InterviewType;
+  status: InterviewStatus;
+  scheduledStartAt?: string | null;
+  scheduled_start_at?: string | null;
+  scheduledEndAt?: string | null;
+  scheduled_end_at?: string | null;
+  timezone: string;
+  locationType?: InterviewLocationType;
+  location_type?: InterviewLocationType;
+};
+
+type InterviewDraft = {
+  candidateApplicationId: string;
+  title: string;
+  type: InterviewType;
+  scheduledStartAt: string;
+  scheduledEndAt: string;
+  timezone: string;
+  locationType: InterviewLocationType;
+  locationDetails: string;
+  reason: string;
+};
+
 const emptyUnitDraft: OrganizationalUnitDraft = {
   code: "",
   name: "",
@@ -404,6 +446,18 @@ const emptyCandidateApplicationDraft: CandidateApplicationDraft = {
   finalizationReason: ""
 };
 
+const emptyInterviewDraft: InterviewDraft = {
+  candidateApplicationId: "",
+  title: "",
+  type: "technical",
+  scheduledStartAt: "",
+  scheduledEndAt: "",
+  timezone: "America/Sao_Paulo",
+  locationType: "onsite",
+  locationDetails: "",
+  reason: ""
+};
+
 const applicationStages: CandidateApplicationStage[] = [
   "applied",
   "screening",
@@ -432,6 +486,18 @@ function applicationCandidateName(application: CandidateApplication) {
     application.candidateId ??
     application.id
   );
+}
+
+function interviewApplicationId(interview: Interview) {
+  return interview.candidateApplicationId ?? interview.candidate_application_id ?? "";
+}
+
+function interviewScheduledStart(interview: Interview) {
+  return interview.scheduledStartAt ?? interview.scheduled_start_at ?? "";
+}
+
+function interviewScheduledEnd(interview: Interview) {
+  return interview.scheduledEndAt ?? interview.scheduled_end_at ?? "";
 }
 
 const competencyCategories: CompetencyCategory[] = [
@@ -531,6 +597,8 @@ export function App() {
   const [candidateApplications, setCandidateApplications] = useState<CandidateApplication[]>([]);
   const [candidateApplicationDraft, setCandidateApplicationDraft] =
     useState<CandidateApplicationDraft>(emptyCandidateApplicationDraft);
+  const [interviews, setInterviews] = useState<Interview[]>([]);
+  const [interviewDraft, setInterviewDraft] = useState<InterviewDraft>(emptyInterviewDraft);
   const [globalCompetencyDraft, setGlobalCompetencyDraft] =
     useState<CompetencyDraft>(emptyCompetencyDraft);
   const [organizationCompetencyDraft, setOrganizationCompetencyDraft] =
@@ -562,6 +630,8 @@ export function App() {
   const canManageApplications =
     currentMembership?.role === "owner" || currentMembership?.role === "admin";
   const canHireApplications = currentMembership?.role === "owner";
+  const canManageInterviews =
+    currentMembership?.role === "owner" || currentMembership?.role === "admin";
 
   useEffect(() => {
     fetch("/api/organizations", { headers: devHeaders })
@@ -631,6 +701,8 @@ export function App() {
     setCandidateDraft(emptyCandidateDraft);
     setCandidateApplications([]);
     setCandidateApplicationDraft(emptyCandidateApplicationDraft);
+    setInterviews([]);
+    setInterviewDraft(emptyInterviewDraft);
 
     if (!organizationId) {
       setMessage("Nenhuma Organization selecionada.");
@@ -659,6 +731,7 @@ export function App() {
         void loadJobOpenings(organizationId);
         void loadCandidates(organizationId, organizationMemberships);
         void loadCandidateApplications(organizationId);
+        void loadInterviews(organizationId);
       })
       .catch((error: Error) => setMessage(error.message));
   }
@@ -846,6 +919,14 @@ export function App() {
       .catch(() => setCandidateApplications([]));
   }
 
+  function loadInterviews(organizationId: string) {
+    fetch(`/api/organizations/${organizationId}/interviews`, { headers: devHeaders })
+      .then(async (response) => {
+        setInterviews(response.ok ? ((await response.json()) as Interview[]) : []);
+      })
+      .catch(() => setInterviews([]));
+  }
+
   function reloadSelectedOrganization() {
     if (selectedOrganizationId) {
       selectOrganization(selectedOrganizationId);
@@ -894,6 +975,12 @@ export function App() {
   function reloadCandidateApplications() {
     if (selectedOrganizationId) {
       loadCandidateApplications(selectedOrganizationId);
+    }
+  }
+
+  function reloadInterviews() {
+    if (selectedOrganizationId) {
+      loadInterviews(selectedOrganizationId);
     }
   }
 
@@ -1614,6 +1701,104 @@ export function App() {
         setCandidateApplicationDraft({ ...candidateApplicationDraft, note: "" });
         setMessage("Nota registrada.");
         reloadCandidateApplications();
+      })
+      .catch((error: Error) => setMessage(error.message));
+  }
+
+  function createInterview() {
+    if (
+      !selectedOrganizationId ||
+      !interviewDraft.candidateApplicationId ||
+      !interviewDraft.title.trim()
+    ) {
+      setMessage("Selecione candidatura e titulo da entrevista.");
+      return;
+    }
+
+    fetch(`/api/organizations/${selectedOrganizationId}/interviews`, {
+      method: "POST",
+      headers: {
+        ...devHeaders,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        candidateApplicationId: interviewDraft.candidateApplicationId,
+        title: interviewDraft.title,
+        type: interviewDraft.type,
+        timezone: interviewDraft.timezone,
+        locationType: interviewDraft.locationType,
+        locationDetails: interviewDraft.locationDetails || null
+      })
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Nao foi possivel criar entrevista.");
+        }
+        setInterviewDraft({ ...emptyInterviewDraft, timezone: interviewDraft.timezone });
+        setMessage("Entrevista criada em rascunho.");
+        reloadInterviews();
+      })
+      .catch((error: Error) => setMessage(error.message));
+  }
+
+  function scheduleInterview(interview: Interview) {
+    if (
+      !selectedOrganizationId ||
+      !interviewDraft.scheduledStartAt ||
+      !interviewDraft.scheduledEndAt
+    ) {
+      setMessage("Informe inicio e fim para agendar.");
+      return;
+    }
+
+    fetch(`/api/organizations/${selectedOrganizationId}/interviews/${interview.id}/schedule`, {
+      method: "POST",
+      headers: {
+        ...devHeaders,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        scheduledStartAt: new Date(interviewDraft.scheduledStartAt).toISOString(),
+        scheduledEndAt: new Date(interviewDraft.scheduledEndAt).toISOString(),
+        timezone: interviewDraft.timezone,
+        locationType: interviewDraft.locationType,
+        locationDetails: interviewDraft.locationDetails || null
+      })
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Nao foi possivel agendar entrevista.");
+        }
+        setMessage("Entrevista agendada.");
+        reloadInterviews();
+      })
+      .catch((error: Error) => setMessage(error.message));
+  }
+
+  function changeInterviewStatus(interview: Interview, action: "start" | "cancel" | "no-show") {
+    if (!selectedOrganizationId) {
+      return;
+    }
+    if ((action === "cancel" || action === "no-show") && !interviewDraft.reason.trim()) {
+      setMessage("Informe o motivo da acao.");
+      return;
+    }
+
+    fetch(`/api/organizations/${selectedOrganizationId}/interviews/${interview.id}/${action}`, {
+      method: "POST",
+      headers: {
+        ...devHeaders,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({ reason: interviewDraft.reason })
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Nao foi possivel alterar entrevista.");
+        }
+        setInterviewDraft({ ...interviewDraft, reason: "" });
+        setMessage("Entrevista atualizada.");
+        reloadInterviews();
       })
       .catch((error: Error) => setMessage(error.message));
   }
@@ -2989,6 +3174,205 @@ export function App() {
                         ...candidateApplicationDraft,
                         finalizationReason: event.target.value
                       })
+                    }
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {selectedOrganization && (
+          <div className="panel job-profiles-panel">
+            <span>Entrevistas</span>
+            <div className="job-profile-layout">
+              <div>
+                {canManageInterviews && (
+                  <div className="job-profile-form">
+                    <select
+                      aria-label="Candidatura da entrevista"
+                      value={interviewDraft.candidateApplicationId}
+                      onChange={(event) =>
+                        setInterviewDraft({
+                          ...interviewDraft,
+                          candidateApplicationId: event.target.value
+                        })
+                      }
+                    >
+                      <option value="">Candidatura ativa</option>
+                      {candidateApplications
+                        .filter((application) => applicationStatusOf(application) === "active")
+                        .map((application) => (
+                          <option key={application.id} value={application.id}>
+                            {applicationCandidateName(application)}
+                          </option>
+                        ))}
+                    </select>
+                    <input
+                      aria-label="Titulo da entrevista"
+                      placeholder="Titulo"
+                      value={interviewDraft.title}
+                      onChange={(event) =>
+                        setInterviewDraft({ ...interviewDraft, title: event.target.value })
+                      }
+                    />
+                    <select
+                      aria-label="Tipo da entrevista"
+                      value={interviewDraft.type}
+                      onChange={(event) =>
+                        setInterviewDraft({
+                          ...interviewDraft,
+                          type: event.target.value as InterviewType
+                        })
+                      }
+                    >
+                      {[
+                        "screening",
+                        "behavioral",
+                        "technical",
+                        "cultural",
+                        "leadership",
+                        "management",
+                        "panel",
+                        "final",
+                        "other"
+                      ].map((type) => (
+                        <option key={type} value={type}>
+                          {type}
+                        </option>
+                      ))}
+                    </select>
+                    <button type="button" onClick={createInterview}>
+                      Criar entrevista
+                    </button>
+                  </div>
+                )}
+
+                <ul className="competency-list">
+                  {interviews.map((interview) => {
+                    const application = candidateApplications.find(
+                      (candidate) => candidate.id === interviewApplicationId(interview)
+                    );
+                    return (
+                      <li key={interview.id}>
+                        <strong>{interview.title}</strong>
+                        <small>
+                          {application ? applicationCandidateName(application) : interview.id} -{" "}
+                          {interview.type} - {interview.status}
+                        </small>
+                        <small>
+                          {interviewScheduledStart(interview)
+                            ? `${new Date(interviewScheduledStart(interview)).toLocaleString()} ate ${new Date(
+                                interviewScheduledEnd(interview)
+                              ).toLocaleString()}`
+                            : "sem agenda"}
+                        </small>
+                        {canManageInterviews && (
+                          <div className="member-actions">
+                            {interview.status === "draft" && (
+                              <button type="button" onClick={() => scheduleInterview(interview)}>
+                                Agendar
+                              </button>
+                            )}
+                            {interview.status === "scheduled" && (
+                              <button
+                                type="button"
+                                onClick={() => changeInterviewStatus(interview, "start")}
+                              >
+                                Iniciar
+                              </button>
+                            )}
+                            {["draft", "scheduled", "in_progress"].includes(interview.status) && (
+                              <button
+                                type="button"
+                                onClick={() => changeInterviewStatus(interview, "cancel")}
+                              >
+                                Cancelar
+                              </button>
+                            )}
+                            {interview.status === "scheduled" && (
+                              <button
+                                type="button"
+                                onClick={() => changeInterviewStatus(interview, "no-show")}
+                              >
+                                No-show
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
+                  {interviews.length === 0 && <li>Nenhuma entrevista cadastrada.</li>}
+                </ul>
+              </div>
+
+              {canManageInterviews && (
+                <div className="job-profile-form">
+                  <strong>Agenda</strong>
+                  <input
+                    aria-label="Inicio da entrevista"
+                    type="datetime-local"
+                    value={interviewDraft.scheduledStartAt}
+                    onChange={(event) =>
+                      setInterviewDraft({
+                        ...interviewDraft,
+                        scheduledStartAt: event.target.value
+                      })
+                    }
+                  />
+                  <input
+                    aria-label="Fim da entrevista"
+                    type="datetime-local"
+                    value={interviewDraft.scheduledEndAt}
+                    onChange={(event) =>
+                      setInterviewDraft({
+                        ...interviewDraft,
+                        scheduledEndAt: event.target.value
+                      })
+                    }
+                  />
+                  <input
+                    aria-label="Fuso da entrevista"
+                    placeholder="Timezone"
+                    value={interviewDraft.timezone}
+                    onChange={(event) =>
+                      setInterviewDraft({ ...interviewDraft, timezone: event.target.value })
+                    }
+                  />
+                  <select
+                    aria-label="Local da entrevista"
+                    value={interviewDraft.locationType}
+                    onChange={(event) =>
+                      setInterviewDraft({
+                        ...interviewDraft,
+                        locationType: event.target.value as InterviewLocationType
+                      })
+                    }
+                  >
+                    {["onsite", "video", "phone", "other"].map((type) => (
+                      <option key={type} value={type}>
+                        {type}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    aria-label="Detalhes do local"
+                    placeholder="Detalhes do local"
+                    value={interviewDraft.locationDetails}
+                    onChange={(event) =>
+                      setInterviewDraft({
+                        ...interviewDraft,
+                        locationDetails: event.target.value
+                      })
+                    }
+                  />
+                  <textarea
+                    aria-label="Motivo da entrevista"
+                    placeholder="Motivo para cancelamento ou no-show"
+                    value={interviewDraft.reason}
+                    onChange={(event) =>
+                      setInterviewDraft({ ...interviewDraft, reason: event.target.value })
                     }
                   />
                 </div>

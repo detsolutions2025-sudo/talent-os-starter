@@ -10,6 +10,7 @@ import type { CoreService } from "../core/service";
 import type { DnaService } from "../dna/service";
 import type { JobOpeningService } from "../job-openings/service";
 import type { JobProfileService } from "../job-profiles/service";
+import type { InterviewService } from "../interviews/service";
 import type { OrganizationalUnitService } from "../organizational-units/service";
 import type { QuestionService } from "../questions/service";
 
@@ -22,7 +23,8 @@ export function createApiRouter(
   questions?: QuestionService,
   jobOpenings?: JobOpeningService,
   candidates?: CandidateService,
-  candidateApplications?: CandidateApplicationService
+  candidateApplications?: CandidateApplicationService,
+  interviews?: InterviewService
 ): Router {
   const router = createRouter();
 
@@ -1658,6 +1660,216 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await candidateApplications.adminRead(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            request.body
+          )
+        );
+      })
+    );
+  }
+
+  if (interviews) {
+    router.post(
+      "/organizations/:organizationId/interviews",
+      asyncHandler(async (request, response) => {
+        const interview = await interviews.createInterview(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          request.body
+        );
+        response.status(201).json(interview);
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/interviews",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await interviews.listInterviews(
+            getActor(request),
+            routeParam(request.params.organizationId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/candidate-applications/:applicationId/interviews",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await interviews.listByApplication(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.applicationId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/interviews/:interviewId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await interviews.getInterview(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.interviewId)
+          )
+        );
+      })
+    );
+
+    router.patch(
+      "/organizations/:organizationId/interviews/:interviewId/draft",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await interviews.updateDraft(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.interviewId),
+            request.body
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/interviews/:interviewId/participants",
+      asyncHandler(async (request, response) => {
+        const participant = await interviews.addParticipant(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          routeParam(request.params.interviewId),
+          request.body
+        );
+        response.status(201).json(participant);
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/interviews/:interviewId/participants/:userId/remove",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await interviews.removeParticipant(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.interviewId),
+            routeParam(request.params.userId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/interviews/:interviewId/questions",
+      asyncHandler(async (request, response) => {
+        const question = await interviews.addQuestion(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          routeParam(request.params.interviewId),
+          request.body
+        );
+        response.status(201).json(question);
+      })
+    );
+
+    for (const [path, action] of [
+      ["schedule", "schedule"],
+      ["reschedule", "reschedule"]
+    ] as const) {
+      router.post(
+        `/organizations/:organizationId/interviews/:interviewId/${path}`,
+        asyncHandler(async (request, response) => {
+          response.json(
+            await interviews[action](
+              getActor(request),
+              routeParam(request.params.organizationId),
+              routeParam(request.params.interviewId),
+              request.body
+            )
+          );
+        })
+      );
+    }
+
+    router.post(
+      "/organizations/:organizationId/interviews/:interviewId/start",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await interviews.start(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.interviewId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/interviews/:interviewId/responses",
+      asyncHandler(async (request, response) => {
+        const result = await interviews.recordResponse(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          routeParam(request.params.interviewId),
+          request.body
+        );
+        response.status(201).json(result);
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/interviews/:interviewId/evaluations",
+      asyncHandler(async (request, response) => {
+        const result = await interviews.recordEvaluation(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          routeParam(request.params.interviewId),
+          request.body
+        );
+        response.status(201).json(result);
+      })
+    );
+
+    for (const [path, action] of [
+      ["complete", "complete"],
+      ["cancel", "cancel"],
+      ["no-show", "noShow"]
+    ] as const) {
+      router.post(
+        `/organizations/:organizationId/interviews/:interviewId/${path}`,
+        asyncHandler(async (request, response) => {
+          response.json(
+            await interviews[action](
+              getActor(request),
+              routeParam(request.params.organizationId),
+              routeParam(request.params.interviewId),
+              request.body
+            )
+          );
+        })
+      );
+    }
+
+    router.get(
+      "/organizations/:organizationId/interviews/:interviewId/timeline",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await interviews.timeline(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.interviewId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/platform/organizations/:organizationId/interviews/admin-read",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await interviews.adminRead(
             getActor(request),
             routeParam(request.params.organizationId),
             request.body

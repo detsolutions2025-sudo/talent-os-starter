@@ -6,6 +6,7 @@ import type { CompetencyService } from "./competencies/service";
 import type { CoreService } from "./core/service";
 import type { DnaService } from "./dna/service";
 import { createApiRouter } from "./http/routes";
+import type { InterviewService } from "./interviews/service";
 import type { JobOpeningService } from "./job-openings/service";
 import type { JobProfileService } from "./job-profiles/service";
 import type { OrganizationalUnitService } from "./organizational-units/service";
@@ -20,7 +21,8 @@ export function createServer(
   questions?: QuestionService,
   jobOpenings?: JobOpeningService,
   candidates?: CandidateService,
-  candidateApplications?: CandidateApplicationService
+  candidateApplications?: CandidateApplicationService,
+  interviews?: InterviewService
 ) {
   const app = express();
 
@@ -45,7 +47,8 @@ export function createServer(
       questions,
       jobOpenings,
       candidates,
-      candidateApplications
+      candidateApplications,
+      interviews
     )
   );
 

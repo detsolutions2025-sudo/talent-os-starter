@@ -30,8 +30,8 @@
 | SPEC-009 | Banco de Perguntas         |    6 | —      | Concluída |
 | SPEC-010 | Vagas                      |    7 | —      | Concluída |
 | SPEC-011 | Candidatos                 |    8 | —      | Concluída |
-| SPEC-012 | Processo Seletivo          |    9 | —      | Rascunho  |
-| SPEC-013 | Entrevistas                |   10 | —      | Rascunho  |
+| SPEC-012 | Processo Seletivo          |    9 | —      | Concluída |
+| SPEC-013 | Entrevistas                |   10 | —      | Concluída |
 | SPEC-014 | Avaliação Assistida por IA |   11 | —      | Rascunho  |
 | SPEC-015 | Propostas                  |   12 | —      | Rascunho  |
 | SPEC-016 | Onboarding                 |   13 | —      | Rascunho  |
