@@ -1,6 +1,8 @@
 import type { Router } from "express";
 import type { Request, Response, NextFunction } from "express";
 import { Router as createRouter } from "express";
+import type { AIService } from "../ai/service";
+import { validateOrganizationAiEnabledInput, validatePlatformAllowedInput } from "../ai/validation";
 import type { CandidateApplicationService } from "../candidate-applications/service";
 import type { CandidateService } from "../candidates/service";
 import type { CompetencyService } from "../competencies/service";
@@ -24,7 +26,8 @@ export function createApiRouter(
   jobOpenings?: JobOpeningService,
   candidates?: CandidateService,
   candidateApplications?: CandidateApplicationService,
-  interviews?: InterviewService
+  interviews?: InterviewService,
+  ai?: AIService
 ): Router {
   const router = createRouter();
 
@@ -1873,6 +1876,430 @@ export function createApiRouter(
             getActor(request),
             routeParam(request.params.organizationId),
             request.body
+          )
+        );
+      })
+    );
+  }
+
+  if (ai) {
+    // --- Platform Admin: global catalogs and platform-level availability -----------------
+    router.get(
+      "/platform/ai/features",
+      asyncHandler(async (request, response) => {
+        response.json(await ai.policy.listFeatureCatalogAsPlatformAdmin(getActor(request)));
+      })
+    );
+    router.post(
+      "/platform/ai/features",
+      asyncHandler(async (request, response) => {
+        response.status(201).json(await ai.policy.createFeature(getActor(request), request.body));
+      })
+    );
+    router.patch(
+      "/platform/ai/features/:featureKey/availability",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await ai.policy.setFeatureAvailability(
+            getActor(request),
+            routeParam(request.params.featureKey),
+            request.body
+          )
+        );
+      })
+    );
+    router.patch(
+      "/platform/ai/features/:featureKey/fallback-allowed",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await ai.policy.setFallbackAllowedOnPlatform(
+            getActor(request),
+            routeParam(request.params.featureKey),
+            request.body
+          )
+        );
+      })
+    );
+    router.patch(
+      "/platform/ai/features/:featureKey/default-prompt",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await ai.policy.setDefaultPromptKey(
+            getActor(request),
+            routeParam(request.params.featureKey),
+            request.body
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/platform/organizations/:organizationId/ai/settings",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await ai.policy.getOrganizationSettingsAsPlatformAdmin(
+            getActor(request),
+            routeParam(request.params.organizationId)
+          )
+        );
+      })
+    );
+    router.put(
+      "/platform/organizations/:organizationId/ai/settings/platform-allowed",
+      asyncHandler(async (request, response) => {
+        const value = validatePlatformAllowedInput(request.body);
+        response.json(
+          await ai.policy.setPlatformAllowed(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            value
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/platform/ai/providers",
+      asyncHandler(async (request, response) => {
+        response.json(await ai.providerCatalog.listAsPlatformAdmin(getActor(request)));
+      })
+    );
+    router.post(
+      "/platform/ai/providers",
+      asyncHandler(async (request, response) => {
+        response
+          .status(201)
+          .json(await ai.providerCatalog.register(getActor(request), request.body));
+      })
+    );
+    router.patch(
+      "/platform/ai/providers/:provider/retire",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await ai.providerCatalog.retire(getActor(request), routeParam(request.params.provider))
+        );
+      })
+    );
+
+    router.get(
+      "/platform/ai/models",
+      asyncHandler(async (request, response) => {
+        response.json(await ai.modelRegistry.listAsPlatformAdmin(getActor(request)));
+      })
+    );
+    router.post(
+      "/platform/ai/models",
+      asyncHandler(async (request, response) => {
+        response.status(201).json(await ai.modelRegistry.register(getActor(request), request.body));
+      })
+    );
+    router.patch(
+      "/platform/ai/models/:provider/:modelKey/retire",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await ai.modelRegistry.retire(
+            getActor(request),
+            routeParam(request.params.provider),
+            routeParam(request.params.modelKey)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/platform/ai/prompts/:promptKey/versions",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await ai.promptRegistry.listVersionsAsPlatformAdmin(
+            getActor(request),
+            routeParam(request.params.promptKey)
+          )
+        );
+      })
+    );
+    router.post(
+      "/platform/ai/prompts",
+      asyncHandler(async (request, response) => {
+        response
+          .status(201)
+          .json(await ai.promptRegistry.createDraft(getActor(request), request.body));
+      })
+    );
+    router.post(
+      "/platform/ai/prompts/:promptKey/versions/:version/publish",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await ai.promptRegistry.publish(
+            getActor(request),
+            routeParam(request.params.promptKey),
+            Number(routeParam(request.params.version))
+          )
+        );
+      })
+    );
+    router.post(
+      "/platform/ai/prompts/:promptKey/archive",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await ai.promptRegistry.archivePublished(
+            getActor(request),
+            routeParam(request.params.promptKey)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/platform/organizations/:organizationId/ai/providers/:provider/platform-managed",
+      asyncHandler(async (request, response) => {
+        response.status(201).json(
+          await ai.providerConfig.configureCredential(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            {
+              provider: routeParam(request.params.provider),
+              credentialMode: "platform_managed",
+              secret: request.body?.secret
+            }
+          )
+        );
+      })
+    );
+    router.delete(
+      "/platform/organizations/:organizationId/ai/providers/:provider/platform-managed",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await ai.providerConfig.revokeCredential(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.provider)
+          )
+        );
+      })
+    );
+    router.post(
+      "/platform/organizations/:organizationId/ai/providers/:provider/test-connection",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await ai.providerConfig.testConnection(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.provider)
+          )
+        );
+      })
+    );
+
+    // --- Organization: Owner administers, Admin only reads, Member has no access ---------
+    router.get(
+      "/organizations/:organizationId/ai/settings",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await ai.policy.getOrganizationSettings(
+            getActor(request),
+            routeParam(request.params.organizationId)
+          )
+        );
+      })
+    );
+    router.put(
+      "/organizations/:organizationId/ai/settings",
+      asyncHandler(async (request, response) => {
+        const value = validateOrganizationAiEnabledInput(request.body);
+        response.json(
+          await ai.policy.setOrganizationPreference(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            value
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/ai/features",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await ai.policy.listAvailableFeatures(
+            getActor(request),
+            routeParam(request.params.organizationId)
+          )
+        );
+      })
+    );
+    router.get(
+      "/organizations/:organizationId/ai/features/:featureKey",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await ai.policy.getFeatureSettings(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.featureKey)
+          )
+        );
+      })
+    );
+    router.patch(
+      "/organizations/:organizationId/ai/features/:featureKey/enabled",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await ai.policy.setOrganizationFeatureEnabled(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.featureKey),
+            request.body
+          )
+        );
+      })
+    );
+    router.patch(
+      "/organizations/:organizationId/ai/features/:featureKey/fallback",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await ai.policy.setOrganizationFallbackEnabled(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.featureKey),
+            request.body
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/ai/providers",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await ai.providerCatalog.listActiveForOrganization(
+            getActor(request),
+            routeParam(request.params.organizationId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/ai/provider-configs",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await ai.providerConfig.listForOrganization(
+            getActor(request),
+            routeParam(request.params.organizationId)
+          )
+        );
+      })
+    );
+    router.get(
+      "/organizations/:organizationId/ai/provider-configs/:provider",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await ai.providerConfig.getStatus(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.provider)
+          )
+        );
+      })
+    );
+    router.post(
+      "/organizations/:organizationId/ai/provider-configs",
+      asyncHandler(async (request, response) => {
+        response
+          .status(201)
+          .json(
+            await ai.providerConfig.configureCredential(
+              getActor(request),
+              routeParam(request.params.organizationId),
+              request.body
+            )
+          );
+      })
+    );
+    router.delete(
+      "/organizations/:organizationId/ai/provider-configs/:provider",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await ai.providerConfig.revokeCredential(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.provider)
+          )
+        );
+      })
+    );
+    router.post(
+      "/organizations/:organizationId/ai/provider-configs/:provider/test-connection",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await ai.providerConfig.testConnection(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.provider)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/ai/models",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await ai.modelRegistry.listAvailableForOrganization(
+            getActor(request),
+            routeParam(request.params.organizationId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/ai/routing/:featureKey",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await ai.routing.listRoutes(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.featureKey)
+          )
+        );
+      })
+    );
+    router.post(
+      "/organizations/:organizationId/ai/routing",
+      asyncHandler(async (request, response) => {
+        response
+          .status(201)
+          .json(
+            await ai.routing.createRoute(
+              getActor(request),
+              routeParam(request.params.organizationId),
+              request.body
+            )
+          );
+      })
+    );
+    router.post(
+      "/organizations/:organizationId/ai/routing/:routingId/deactivate",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await ai.routing.deactivateRoute(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.routingId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/ai/executions",
+      asyncHandler(async (request, response) => {
+        const featureKey = request.query.featureKey;
+        response.json(
+          await ai.listExecutions(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            typeof featureKey === "string" ? featureKey : undefined
           )
         );
       })

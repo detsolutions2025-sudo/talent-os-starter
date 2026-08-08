@@ -1,4 +1,7 @@
 import { createServer } from "./app";
+import { createPostgresAIService } from "./ai/service";
+import { UnavailableProviderAdapter } from "./ai/providers/unavailable-adapter";
+import { UnavailableSecretManager } from "./ai/secrets/secret-manager";
 import { createPostgresCandidateApplicationService } from "./candidate-applications/service";
 import { createPostgresCandidateService } from "./candidates/service";
 import { createPostgresCompetencyService } from "./competencies/service";
@@ -15,6 +18,31 @@ import { createPostgresQuestionService } from "./questions/service";
 const port = Number(process.env.PORT ?? 3001);
 const connectionString = requirePostgresDatabaseUrl();
 const pool = createPostgresPool(connectionString);
+
+// Phase 11 ships no real Secret Manager / provider adapter yet (SPEC-014 "Fora do escopo":
+// "implementacao fisica do Secret Manager", "adapters de provider concretos"). InMemorySecretManager
+// refuses to even construct when APP_ENV=production (see ai/secrets/secret-manager.ts), and
+// FakeProviderAdapter must never be reachable in production either -- both would otherwise be a
+// silent fake standing in for real infrastructure. At the same time, AI is an optional capability
+// (ADR-0016): the rest of the platform (Candidate, Job Opening, CandidateApplication, Interview,
+// ...) must keep booting and working normally even though no production-grade AI infrastructure is
+// wired up yet. So in production the AI service is still created and mounted -- every endpoint that
+// does not need a real secret or a real provider call (Feature Catalog, Provider Catalog, Model
+// Registry, Prompt Registry, routing, policy toggles) keeps working -- but any operation that would
+// need to actually store/resolve a secret or call a provider fails immediately and safely with a
+// normalized configuration_error, instead of crashing the whole process at boot or silently
+// pretending a fake credential/response is real.
+const appEnv = process.env.APP_ENV ?? "development";
+const aiService = createPostgresAIService(
+  pool,
+  appEnv === "production"
+    ? {
+        secretManager: new UnavailableSecretManager(),
+        resolveAdapter: () => new UnavailableProviderAdapter()
+      }
+    : {}
+);
+
 const app = createServer(
   createCoreService(new PostgresCoreRepository(pool)),
   createPostgresDnaService(pool),
@@ -25,7 +53,8 @@ const app = createServer(
   createPostgresJobOpeningService(pool),
   createPostgresCandidateService(pool),
   createPostgresCandidateApplicationService(pool),
-  createPostgresInterviewService(pool)
+  createPostgresInterviewService(pool),
+  aiService
 );
 
 app.listen(port, () => {
