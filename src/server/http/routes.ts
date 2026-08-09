@@ -3,6 +3,7 @@ import type { Request, Response, NextFunction } from "express";
 import { Router as createRouter } from "express";
 import type { AIService } from "../ai/service";
 import { validateOrganizationAiEnabledInput, validatePlatformAllowedInput } from "../ai/validation";
+import type { BlueprintService } from "../blueprints/service";
 import type { CandidateApplicationService } from "../candidate-applications/service";
 import type { CandidateService } from "../candidates/service";
 import type { CompetencyService } from "../competencies/service";
@@ -27,7 +28,8 @@ export function createApiRouter(
   candidates?: CandidateService,
   candidateApplications?: CandidateApplicationService,
   interviews?: InterviewService,
-  ai?: AIService
+  ai?: AIService,
+  blueprints?: BlueprintService
 ): Router {
   const router = createRouter();
 
@@ -865,6 +867,121 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await jobProfiles.adminRead(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            request.body
+          )
+        );
+      })
+    );
+  }
+
+  if (blueprints) {
+    router.get(
+      "/organizations/:organizationId/blueprint",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await blueprints.getStatus(getActor(request), routeParam(request.params.organizationId))
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/blueprint/readiness",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await blueprints.getReadiness(
+            getActor(request),
+            routeParam(request.params.organizationId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/blueprint/draft",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await blueprints.getDraft(getActor(request), routeParam(request.params.organizationId))
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/blueprint/drafts",
+      asyncHandler(async (request, response) => {
+        const draft = await blueprints.createDraft(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          request.body
+        );
+        response.status(201).json(draft);
+      })
+    );
+
+    // "Validar draft" (SPEC-018 secao 21, API conceitual) recalcula readiness sob demanda --
+    // e a mesma operacao de leitura de `getReadiness`, exposta tambem sob o path de draft
+    // pedido para manter o contrato de API do plano tecnico.
+    router.post(
+      "/organizations/:organizationId/blueprint/draft/validate",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await blueprints.getReadiness(
+            getActor(request),
+            routeParam(request.params.organizationId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/blueprint/draft/activate",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await blueprints.activateBlueprint(
+            getActor(request),
+            routeParam(request.params.organizationId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/blueprint/active",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await blueprints.getActive(getActor(request), routeParam(request.params.organizationId))
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/blueprint/history",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await blueprints.getHistory(getActor(request), routeParam(request.params.organizationId))
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/blueprint/versions/:versionId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await blueprints.getVersion(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.versionId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/platform/organizations/:organizationId/blueprint/admin-read",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await blueprints.adminRead(
             getActor(request),
             routeParam(request.params.organizationId),
             request.body

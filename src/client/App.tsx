@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { BlueprintPanel } from "./BlueprintPanel";
 import "./styles.css";
 
 type Organization = {
@@ -2175,6 +2176,14 @@ export function App() {
               {selectedOrganization.slug} - {selectedOrganization.status}
             </p>
           </div>
+        )}
+
+        {selectedOrganization && (
+          <BlueprintPanel
+            organizationId={selectedOrganization.id}
+            role={currentMembership?.role}
+            headers={devHeaders}
+          />
         )}
 
         <div className="panel members">

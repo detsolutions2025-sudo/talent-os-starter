@@ -45,8 +45,24 @@ type UpdateMembershipInput = {
   status?: MembershipStatus;
 };
 
+// Fase 15 (SPEC-018, RN-001/RN-002; Plano Tecnico Revisado, item 21): hook generico, opcional
+// e neutro de persistencia -- `core/service.ts` nunca importa nada do modulo `blueprints/`.
+// Recebe o `CoreRepository` transacional ja usado por `createOrganization` (o mesmo client
+// fisico), permitindo que um chamador de wiring (ver
+// `blueprints/organization-onboarding.ts`) crie o primeiro Blueprint Version `draft` da
+// Organization na MESMA transacao: se o hook lancar, a excecao propaga para o
+// `catch`/`ROLLBACK` ja existente de `CoreRepository.transaction()`, revertendo a criacao da
+// Organization tambem.
+export type OnOrganizationCreatedHook = (
+  repository: CoreRepository,
+  organization: Organization
+) => Promise<void>;
+
 export class CoreService {
-  constructor(private readonly repository: CoreRepository) {}
+  constructor(
+    private readonly repository: CoreRepository,
+    private readonly onOrganizationCreated?: OnOrganizationCreatedHook
+  ) {}
 
   getRepository() {
     return this.repository;
@@ -114,7 +130,7 @@ export class CoreService {
 
   async createOrganization(actor: Actor, input: CreateOrganizationInput) {
     return this.repository.transaction(async (repository) => {
-      const scopedService = new CoreService(repository);
+      const scopedService = new CoreService(repository, this.onOrganizationCreated);
 
       return scopedService.withDeniedAudit(actor, null, "organization.create_denied", async () => {
         await authorize(repository, { actor, permission: "platform.organization.create" });
@@ -193,6 +209,13 @@ export class CoreService {
             userId: owner.id
           }
         );
+
+        // SPEC-018 RN-001/RN-002: o primeiro Blueprint Version `draft` nasce na mesma
+        // transacao fisica da Organization. Falha aqui reverte tambem a criacao da
+        // Organization (mesmo catch/ROLLBACK do `repository.transaction()` acima).
+        if (scopedService.onOrganizationCreated) {
+          await scopedService.onOrganizationCreated(repository, organization);
+        }
 
         return { organization, membership };
       });
@@ -582,8 +605,11 @@ export class CoreService {
   }
 }
 
-export function createCoreService(repository: CoreRepository) {
-  return new CoreService(repository);
+export function createCoreService(
+  repository: CoreRepository,
+  onOrganizationCreated?: OnOrganizationCreatedHook
+) {
+  return new CoreService(repository, onOrganizationCreated);
 }
 
 export function createMemoryCoreService() {

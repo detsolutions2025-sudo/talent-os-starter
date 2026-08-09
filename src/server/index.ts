@@ -2,6 +2,8 @@ import { createServer } from "./app";
 import { createPostgresAIService } from "./ai/service";
 import { UnavailableProviderAdapter } from "./ai/providers/unavailable-adapter";
 import { UnavailableSecretManager } from "./ai/secrets/secret-manager";
+import { createOrganizationBlueprintOnboardingHook } from "./blueprints/organization-onboarding";
+import { createPostgresBlueprintService } from "./blueprints/service";
 import { createPostgresCandidateApplicationService } from "./candidate-applications/service";
 import { createPostgresCandidateService } from "./candidates/service";
 import { createPostgresCompetencyService } from "./competencies/service";
@@ -44,7 +46,10 @@ const aiService = createPostgresAIService(
 );
 
 const app = createServer(
-  createCoreService(new PostgresCoreRepository(pool)),
+  // Fase 15 (SPEC-018, RN-001/RN-002): toda Organization criada nasce com um Blueprint
+  // Version `draft`, na mesma transacao fisica da propria criacao (ver
+  // blueprints/organization-onboarding.ts).
+  createCoreService(new PostgresCoreRepository(pool), createOrganizationBlueprintOnboardingHook()),
   createPostgresDnaService(pool),
   createPostgresOrganizationalUnitService(pool),
   createPostgresCompetencyService(pool),
@@ -54,7 +59,8 @@ const app = createServer(
   createPostgresCandidateService(pool),
   createPostgresCandidateApplicationService(pool),
   createPostgresInterviewService(pool),
-  aiService
+  aiService,
+  createPostgresBlueprintService(pool)
 );
 
 app.listen(port, () => {
