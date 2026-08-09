@@ -2133,11 +2133,12 @@ export function App() {
     <main className="app-shell">
       <section className="intro" aria-labelledby="page-title">
         <p className="eyebrow">Fase 3</p>
-        <h1 id="page-title">Talent OS</h1>
+        <h1 id="page-title">DoF — Gente & Seleção</h1>
         <p className="lead">
           Nucleo multiempresa, DNA Organizacional e Estrutura Organizacional com autorizacao no
           servidor.
         </p>
+        <p className="eyebrow">por DocFounder</p>
       </section>
 
       <section className="workspace" aria-label="Nucleo multiempresa">

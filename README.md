@@ -1,6 +1,8 @@
-# Talent OS
+# DoF — Gente & Seleção
 
-Plataforma SaaS multiempresa para gestao inteligente de talentos.
+Plataforma inteligente de recrutamento, seleção e gestão da jornada de talentos.
+
+Produto da DocFounder.
 
 ## Objetivo inicial
 

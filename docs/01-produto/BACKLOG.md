@@ -1,4 +1,4 @@
-# Backlog Oficial — Talent OS
+# Backlog Oficial — DoF — Gente & Seleção
 
 ## Estados
 
@@ -32,7 +32,7 @@
 | SPEC-011 | Candidatos                 |    8 | —      | Concluída |
 | SPEC-012 | Processo Seletivo          |    9 | —      | Concluída |
 | SPEC-013 | Entrevistas                |   10 | —      | Concluída |
-| SPEC-014 | Avaliação Assistida por IA |   11 | —      | Rascunho  |
+| SPEC-014 | Avaliação Assistida por IA |   11 | —      | Concluída |
 | SPEC-015 | Propostas                  |   12 | —      | Rascunho  |
 | SPEC-016 | Onboarding                 |   13 | —      | Rascunho  |
 | SPEC-017 | Desenvolvimento e Retenção |   14 | —      | Rascunho  |

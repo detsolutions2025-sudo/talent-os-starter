@@ -1,4 +1,4 @@
-# Processo de Desenvolvimento do Talent OS
+# Processo de Desenvolvimento do DoF — Gente & Seleção
 
 ## Fluxo obrigatório
 

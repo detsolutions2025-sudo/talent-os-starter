@@ -1,4 +1,4 @@
-# Constituição do Projeto Talent OS
+# Constituição do Projeto DoF — Gente & Seleção
 
 Este documento contém regras obrigatórias para qualquer pessoa ou agente de IA que altere o projeto.
 
