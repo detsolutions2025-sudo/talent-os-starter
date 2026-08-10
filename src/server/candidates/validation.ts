@@ -52,7 +52,12 @@ export function normalizeCandidateEmail(value: unknown) {
     .toLowerCase();
 }
 
-export function validateCreateCandidate(input: CandidateInput) {
+// Separada de `validateCreateCandidate` (que agrega o consentimento) para que a criacao
+// publica (Fase 17, SPEC-020) possa reutilizar exatamente as mesmas regras de validacao do
+// Candidate sem ser forcada a moldar um objeto de consentimento no formato interno --
+// consentimento publico e registrado em um passo transacional proprio (ver
+// `CandidateService.addPublicConsent`), nunca embutido na criacao do Candidate.
+export function validateCreateCandidateWithoutConsent(input: CandidateInput) {
   return {
     fullName: validateFullName(input.fullName ?? input.full_name),
     preferredName: validateOptionalText(input.preferredName ?? input.preferred_name, 100),
@@ -83,7 +88,13 @@ export function validateCreateCandidate(input: CandidateInput) {
     ),
     salaryExpectation: validateSalaryExpectation(
       input.salaryExpectation ?? input.salary_expectation
-    ),
+    )
+  };
+}
+
+export function validateCreateCandidate(input: CandidateInput) {
+  return {
+    ...validateCreateCandidateWithoutConsent(input),
     consent: validateConsentInput(input.consent)
   };
 }
@@ -148,11 +159,31 @@ export function validateEmail(value: unknown) {
   return email;
 }
 
-export function validateConsentInput(value: unknown): Required<CandidateConsentInput> {
+// Reservado exclusivamente ao fluxo publico da SPEC-020 (SPEC-011 v1.2, secao 8.14.1,
+// RN-061 a RN-065): unico valor de `source` que a constraint fisica de `candidate_consents`
+// (migration 0018) aceita com `created_by_user_id` nulo. Correcao pontual (revisao final):
+// o fluxo interno tambem precisa recusar esse valor na camada de aplicacao -- confiar apenas
+// na constraint do banco produziria um erro de violacao de CHECK generico e menos claro do
+// que uma validacao de negocio explicita.
+export const PUBLIC_CONSENT_SOURCE = "public_application";
+
+export function validateConsentInput(
+  value: unknown,
+  options: { allowPublicOrigin?: boolean } = {}
+): Required<CandidateConsentInput> {
   const entry = normalizeObject(value, "consent");
   const status = String(entry.status ?? "");
   const consentAt = validateOptionalDate(entry.consentAt ?? entry.consent_at, "consent_at");
   const source = validateText(entry.source, 200, "consent_source");
+  if (source === PUBLIC_CONSENT_SOURCE && !options.allowPublicOrigin) {
+    // Nunca alcancavel pelo fluxo publico legitimo (que nunca aceita `source` do cliente --
+    // ver `public-applications/validation.ts`), apenas por um User interno tentando fornecer
+    // esse valor manualmente via criacao/atualizacao de Consent.
+    throw badRequest(
+      "candidate_consent_source_reserved",
+      "This consent source is reserved for the public application flow."
+    );
+  }
   const termsVersion = validateText(
     entry.termsVersion ?? entry.terms_version,
     100,

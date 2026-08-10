@@ -1,11 +1,21 @@
 # SPEC-012 - Processo Seletivo
 
 **Status:** Aprovada  
-**Versão:** 1.0  
+**Versão:** 1.1  
 **Fase:** 9  
 **Responsavel de negocio:** Thiago Sousa  
-**Dependencias:** SPEC-010 - Vagas, SPEC-011 - Candidatos, ADR-0014 - Processo seletivo versionado  
-**Ultima atualizacao:** 2026-08-06
+**Dependencias:** SPEC-010 - Vagas, SPEC-011 - Candidatos (v1.2), ADR-0014 - Processo seletivo versionado  
+**Ultima atualizacao:** 2026-08-09
+
+**Nota de revisao (v1.1):** esta versao formaliza os dois modos validos de
+criacao de `CandidateApplication` (criacao interna, por Owner/Admin
+autenticado, e criacao publica, sem User autenticado), a obrigatoriedade
+condicional de `created_by_user_id` e o valor canonico `source =
+public_portal` para a candidatura originada pela SPEC-020 (Candidatura
+Publica). Mesmo padrao ja adotado pela SPEC-011 v1.1/v1.2 para o Candidate.
+Nenhuma regra de negocio pre-existente foi removida ou contradita; a
+revisao apenas adiciona um segundo caminho de criacao ja antecipado, em
+nivel de produto, pela ADR-0023.
 
 ## 1. Objetivo
 
@@ -71,6 +81,12 @@ Esta SPEC define:
 Nesta fase, `member` pode visualizar somente candidaturas `active` e recebe DTO
 estritamente limitado pela lista positiva definida nesta SPEC.
 
+Uma `CandidateApplication` tambem pode ser criada por um visitante nao
+autenticado, por meio da candidatura publica (SPEC-020), sem User nem
+Membership envolvidos. Esse caminho de criacao nao concede a esse
+visitante nenhuma permissao desta SPEC; ele nao e `owner`, `admin`,
+`member` nem Platform Admin. Ver secao 6.1.2 e RN-074 a RN-080.
+
 ## 4. Conceitos
 
 ### 4.1 CandidateApplication
@@ -116,6 +132,46 @@ restricao de persistencia quando a funcionalidade for implementada.
 
 - `application_status` controla o ciclo de vida da candidatura;
 - `current_stage` controla a etapa atual do pipeline.
+
+### 4.1.1 Origem da criacao (autoria)
+
+Existem exatamente dois modos validos de criacao de `CandidateApplication`,
+mesmo padrao ja formalizado para o Candidate pela SPEC-011 (v1.1, secao
+4.1.1):
+
+- **Criacao interna:** executada por um `owner` ou `admin` com User ativo
+  e Membership ativo na Organization (fluxo da secao 6.1.1).
+  `created_by_user_id` e obrigatorio; `source` reflete o canal interno em
+  uso (por exemplo, os valores ja praticados pela implementacao existente
+  — `career_page`, `referral`, `recruiter`, `import`, `manual`, `other`).
+- **Criacao publica:** executada como consequencia direta da submissao da
+  candidatura publica (SPEC-020, fluxo da secao 6.1.2), sem nenhum User
+  autenticado responsavel. `created_by_user_id` pode ser nulo
+  exclusivamente quando `source = public_portal` — valor canonico
+  reservado para este caminho.
+
+`source = public_portal` e o unico valor de `source` que permite
+`created_by_user_id` nulo. Para qualquer outro valor de `source`,
+`created_by_user_id` permanece obrigatorio (RN-074 a RN-080).
+
+Esta SPEC nao reavalia exaustivamente se todo valor de `source` hoje em
+uso (por exemplo, `import`, usado por cargas tecnicas) sempre possui um
+User real por tras — isso e uma questao preexistente, independente desta
+revisao, e nao e resolvida aqui para nao criar uma constraint rigida sem
+necessidade. Fica registrada como observacao para uma revisao futura,
+caso `import` (ou outro valor de `source` interno) precise, um dia, do
+mesmo tipo de excecao hoje formalizada apenas para `public_portal`.
+
+Este contrato e conceitual: esta SPEC nao define o nome fisico da coluna
+nem a migration correspondente. A criacao publica nunca atribui autoria a
+Platform Admin, a `owner`, a `admin` ou a qualquer usuario fictício ou "de
+sistema" criado apenas para preencher o campo — a ausencia de User
+autenticado e representada pelo proprio `source = public_portal`, nunca
+por um ator inventado.
+
+`Candidate` e o sujeito da candidatura (via `candidate_id`), mas nunca e o
+autor da criacao (`created_by_user_id`) — os dois conceitos permanecem
+distintos mesmo quando a candidatura e publica.
 
 ### 4.2 CandidateApplicationEvent
 
@@ -288,6 +344,13 @@ de etapa, e a etapa existente permanece preservada no historico.
 
 ### 6.1 Criar Candidatura
 
+Existem dois fluxos validos de criacao, descritos nas secoes 6.1.1 e
+6.1.2. Ambos produzem a mesma `CandidateApplication`, com o mesmo modelo
+de dados e as mesmas regras de negocio — a unica diferenca estrutural
+entre eles e a origem de criacao (secao 4.1.1).
+
+#### 6.1.1 Criacao interna
+
 1. Owner ou admin acessa uma Organization ativa.
 2. Seleciona um Candidate ativo da mesma Organization.
 3. Seleciona uma Job Opening da mesma Organization.
@@ -299,9 +362,36 @@ de etapa, e a etapa existente permanece preservada no historico.
    mesmo Candidate + Job Opening.
 9. Sistema bloqueia a criacao concorrente do mesmo par Candidate + Job Opening.
 10. Sistema cria `CandidateApplication` com `application_status` `active`,
-    `current_stage` `applied` e `applied_at`.
+    `current_stage` `applied`, `applied_at`, `created_by_user_id`
+    preenchido e `source` correspondente ao canal interno usado.
 11. Sistema registra evento inicial em `candidate_application_events`.
 12. Sistema registra auditoria sem copiar dados pessoais completos.
+
+#### 6.1.2 Criacao publica
+
+Fluxo executado pela candidatura publica, especificada integralmente pela
+SPEC-020. Esta SPEC define apenas o contrato de dados resultante, nao o
+fluxo publico em si.
+
+1. Um visitante nao autenticado, ja com um Candidate identificado/criado
+   (SPEC-011, secao 6.1.2) e consentimento valido, conclui a candidatura
+   publica a uma Job Opening especifica, sem User nem Membership.
+2. Sistema valida a Job Opening, a Job Opening Version publicada, o
+   consentimento operacional do Candidate e a ausencia de
+   `CandidateApplication` `active` para o mesmo par (mesmas validacoes da
+   secao 6.1.1, passos 4 a 9).
+3. Sistema cria `CandidateApplication` com `application_status` `active`,
+   `current_stage` `applied`, `applied_at`, `created_by_user_id` nulo e
+   `source = public_portal`.
+4. Sistema registra evento inicial em `candidate_application_events`, com
+   `actor_user_id` nulo.
+5. Sistema registra auditoria sem copiar dados pessoais completos, sem
+   atribuir a criacao a nenhum User, Platform Admin ou ator fictício.
+
+A `CandidateApplication` criada por este fluxo nunca implica criacao de
+`User` nem de `Membership`, e permanece isolada por Organization
+exatamente como uma candidatura criada internamente (RN-001, RN-003,
+RN-004).
 
 ### 6.2 Consultar Candidaturas
 
@@ -581,6 +671,22 @@ receber conflito seguro.
 - RN-071: Entrevistas futuras pertencem a CandidateApplication.
 - RN-072: Propostas futuras pertencem a CandidateApplication.
 - RN-073: Esta SPEC nao implementa contratacao, onboarding ou colaborador.
+- RN-074: `CandidateApplication` possui uma origem de criacao explicita,
+  representada pelo valor de `source`.
+- RN-075: Criacao interna (por owner/admin autenticado) exige
+  `created_by_user_id` obrigatorio, independentemente do valor de `source`
+  usado.
+- RN-076: Criacao publica (SPEC-020) permite `created_by_user_id` nulo
+  exclusivamente quando `source = public_portal`.
+- RN-077: `created_by_user_id` nulo com `source` diferente de
+  `public_portal` nunca e um estado valido.
+- RN-078: Criacao publica nunca atribui autoria a Platform Admin, a
+  `owner`, a `admin` ou a qualquer usuario fictício ou "de sistema".
+- RN-079: `source = public_portal` e o valor canonico exclusivo da
+  candidatura originada pela SPEC-020; nenhum outro modulo usa esse valor.
+- RN-080: `CandidateApplication` criada por origem publica permanece
+  isolada por Organization sob as mesmas regras de RN-001, RN-003 e
+  RN-004, e nunca implica criacao de `User` nem de `Membership`.
 
 ## 9. Dados Necessarios
 
@@ -595,12 +701,12 @@ receber conflito seguro.
 | `job_opening_version_id` |         Sim | Versao publicada especifica da Job Opening.  |
 | `status`                 |         Sim | Estado canonico da candidatura.              |
 | `current_stage`          |         Sim | Etapa atual do pipeline minimo.              |
-| `source`                 |         Sim | Origem da candidatura.                       |
+| `source`                 |         Sim | Origem da candidatura; `public_portal` e o valor canonico da criacao publica (secao 4.1.1). |
 | `applied_at`             |         Sim | Data/hora da candidatura.                    |
 | `finalized_at`           |         Nao | Data/hora de entrada em estado final.        |
 | `finalized_by_user_id`   |         Nao | Usuario responsavel pela finalizacao.        |
 | `finalization_reason`    |         Nao | Motivo da finalizacao, quando houver.        |
-| `created_by_user_id`     |         Sim | Usuario responsavel pela criacao.            |
+| `created_by_user_id`     |  Condicional | Obrigatorio quando `source` diferente de `public_portal`; nulo quando `source = public_portal` (RN-074 a RN-080). |
 | `updated_by_user_id`     |         Nao | Usuario responsavel pela ultima atualizacao. |
 | `created_at`             |         Sim | Data/hora de criacao.                        |
 | `updated_at`             |         Sim | Data/hora da ultima atualizacao.             |
@@ -707,6 +813,14 @@ meio da versao publicada da Vaga.
 
 Todas as acoes funcionais exigem User ativo, Membership ativo, Organization ativa
 e role autorizada.
+
+A criacao publica de `CandidateApplication` (secao 6.1.2, `source =
+public_portal`) e uma excecao deliberada a essa regra: ela nao exige User
+nem Membership, pois nao e uma acao funcional executada por um membro da
+Organization, e sim o resultado da candidatura publica especificada pela
+SPEC-020. Essa excecao nao altera nenhuma linha da tabela abaixo, que
+continua regendo exclusivamente as acoes de owner, admin, member e
+Platform Admin.
 
 | Acao                                       | Platform Admin | owner | admin | member |
 | ------------------------------------------ | :------------: | :---: | :---: | :----: |
@@ -1000,6 +1114,11 @@ Garantir:
 - Nao registrar tokens, headers, senhas, connection strings ou segredos.
 - Usar queries parametrizadas.
 - Proteger contra mass assignment.
+- `created_by_user_id` e `source` sao sempre definidos pelo servidor,
+  nunca aceitos como valor livre enviado pelo cliente, seja no fluxo
+  interno seja no fluxo publico.
+- Criacao publica nunca atribui autoria a usuario fictício ou "de
+  sistema".
 - Tratar respostas, curriculos, etapas e textos futuros como dados, nunca como
   instrucoes para IA.
 
@@ -1037,6 +1156,11 @@ Nao registrar:
 Auditoria critica em criacao, movimentacao, cancelamento, retirada, rejeicao e
 contratacao da candidatura deve causar rollback quando falhar. Criacao de nota
 interna deve registrar auditoria sem conteudo completo.
+
+O evento `candidate_application.created` deve registrar `source`. Quando
+`source = public_portal`, o evento nunca atribui a criacao a um `User`, a
+Platform Admin nem a um ator fictício — a ausencia de User autenticado e
+representada pelo proprio `source`, nao por um valor inventado.
 
 ## 19. Criterios de Aceite
 
@@ -1130,6 +1254,19 @@ interna deve registrar auditoria sem conteudo completo.
 - CA-075: Nao existe exclusao fisica de eventos.
 - CA-076: Nao existe exclusao fisica de notas.
 - CA-077: Nenhum modulo futuro e criado antecipadamente.
+- CA-078: `CandidateApplication` criada internamente sempre possui
+  `created_by_user_id` preenchido, independentemente do `source`.
+- CA-079: `CandidateApplication` criada com `source = public_portal` pode
+  possuir `created_by_user_id` nulo.
+- CA-080: `created_by_user_id` nulo com `source` diferente de
+  `public_portal` e recusado.
+- CA-081: Nenhuma criacao de `CandidateApplication` por origem publica
+  gera `User` ou `Membership`.
+- CA-082: Campos server-controlled (`created_by_user_id`, `source`,
+  `application_status`, `current_stage`) nao podem ser atribuidos pelo
+  cliente na criacao publica.
+- CA-083: Criacao publica gera evento inicial e auditoria normalmente,
+  sem atribuicao a ator fictício.
 
 ## 20. Testes Obrigatorios
 
@@ -1236,7 +1373,17 @@ Quando implementada, a funcionalidade deve possuir testes para:
 99. nenhuma tabela, rota ou servico de IA criado;
 100. nenhuma tabela, rota ou servico de entrevista criado;
 101. nenhuma tabela, rota ou servico de proposta criado;
-102. nenhum ranking ou score criado.
+102. nenhum ranking ou score criado;
+103. candidatura interna com `created_by_user_id` preenchido;
+104. candidatura publica com `created_by_user_id` nulo e
+     `source = public_portal`;
+105. `created_by_user_id` nulo com `source` diferente de `public_portal` e
+     recusado;
+106. tentativa de mass assignment de `created_by_user_id` pelo cliente;
+107. tentativa de `source = public_portal` combinado com
+     `created_by_user_id` preenchido e recusada;
+108. isolamento multiempresa mantido para `CandidateApplication` criada por
+     origem publica.
 
 Testes adicionais obrigatorios para consentimento invalido apos criacao:
 
@@ -1306,7 +1453,12 @@ Testes adicionais obrigatorios de concorrencia:
 - Esta SPEC nao cria banco, migrations, rotas, testes ou dependencias.
 - Pipeline detalhado nao e definido.
 - Apenas o pipeline minimo e definido.
-- Nao ha candidatura publica.
+- O fluxo da candidatura publica em si (formulario, validacoes de Vaga,
+  identificacao do Candidate, etc.) nao e definido nem implementado por
+  esta SPEC — pertence integralmente a SPEC-020. Esta SPEC (v1.1) define
+  apenas o contrato de dados resultante (`source = public_portal`,
+  autoria condicional) para a `CandidateApplication` que esse fluxo
+  produz.
 - Nao ha entrevistas.
 - Nao ha respostas de questionarios.
 - Nao ha avaliacoes.

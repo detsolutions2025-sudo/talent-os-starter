@@ -20,6 +20,15 @@ export interface CandidateApplicationRepository {
     candidateId: string,
     jobOpeningId: string
   ): Promise<CandidateApplication | null>;
+  // Fase 17 (SPEC-020 v1.1, secao 14): usado exclusivamente pela reaplicacao publica, para
+  // decidir se uma nova CandidateApplication pode ser criada com base no `applicationStatus`
+  // da candidatura mais recente (nao apenas da `active`, que `findActiveApplication` ja
+  // cobre). Ordenado deterministicamente pela candidatura mais recente.
+  findLatestApplicationByCandidateAndJobOpening(
+    organizationId: string,
+    candidateId: string,
+    jobOpeningId: string
+  ): Promise<CandidateApplication | null>;
   listApplications(organizationId: string): Promise<CandidateApplication[]>;
   addEvent(event: CandidateApplicationEvent): Promise<void>;
   listEvents(applicationId: string): Promise<CandidateApplicationEvent[]>;

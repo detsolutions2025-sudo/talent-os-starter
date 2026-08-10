@@ -33,16 +33,41 @@ export class PostgresCandidateRepository implements CandidateRepository {
           secondary_phone, status, source, source_details, professional_summary, location,
           experiences, education, certifications, languages, professional_links,
           declared_competencies, availability, work_authorization, salary_expectation,
-          created_by_user_id, updated_by_user_id, created_at, updated_at, inactivated_at
+          creation_origin, created_by_user_id, updated_by_user_id, created_at, updated_at,
+          inactivated_at
         )
         VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb,
           $14::jsonb, $15::jsonb, $16::jsonb, $17::jsonb, $18::jsonb, $19::jsonb,
-          $20::jsonb, $21::jsonb, $22::jsonb, $23, $24, $25, $26, $27
+          $20::jsonb, $21::jsonb, $22::jsonb, $23, $24, $25, $26, $27, $28
         )
       `,
       candidateParams(candidate)
     );
+  }
+
+  async createCandidateIfAbsent(candidate: Candidate) {
+    const result = await this.connection.query(
+      `
+        INSERT INTO candidates (
+          id, organization_id, full_name, preferred_name, email, normalized_email, phone,
+          secondary_phone, status, source, source_details, professional_summary, location,
+          experiences, education, certifications, languages, professional_links,
+          declared_competencies, availability, work_authorization, salary_expectation,
+          creation_origin, created_by_user_id, updated_by_user_id, created_at, updated_at,
+          inactivated_at
+        )
+        VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb,
+          $14::jsonb, $15::jsonb, $16::jsonb, $17::jsonb, $18::jsonb, $19::jsonb,
+          $20::jsonb, $21::jsonb, $22::jsonb, $23, $24, $25, $26, $27, $28
+        )
+        ON CONFLICT (organization_id, normalized_email) DO NOTHING
+        RETURNING id
+      `,
+      candidateParams(candidate)
+    );
+    return (result.rowCount ?? 0) > 0;
   }
 
   async updateCandidate(candidate: Candidate) {
@@ -69,11 +94,12 @@ export class PostgresCandidateRepository implements CandidateRepository {
             availability = $20::jsonb,
             work_authorization = $21::jsonb,
             salary_expectation = $22::jsonb,
-            created_by_user_id = $23,
-            updated_by_user_id = $24,
-            created_at = $25,
-            updated_at = $26,
-            inactivated_at = $27
+            creation_origin = $23,
+            created_by_user_id = $24,
+            updated_by_user_id = $25,
+            created_at = $26,
+            updated_at = $27,
+            inactivated_at = $28
         WHERE id = $1
           AND organization_id = $2
       `,
@@ -215,6 +241,7 @@ function candidateParams(candidate: Candidate) {
     JSON.stringify(candidate.availability),
     JSON.stringify(candidate.workAuthorization),
     candidate.salaryExpectation ? JSON.stringify(candidate.salaryExpectation) : null,
+    candidate.creationOrigin,
     candidate.createdByUserId,
     candidate.updatedByUserId,
     candidate.createdAt,
@@ -265,7 +292,8 @@ function mapCandidate(row: Record<string, unknown>): Candidate {
     availability: normalizeObject(row.availability),
     workAuthorization: normalizeObject(row.work_authorization),
     salaryExpectation: row.salary_expectation ? normalizeObject(row.salary_expectation) : null,
-    createdByUserId: String(row.created_by_user_id),
+    creationOrigin: row.creation_origin as Candidate["creationOrigin"],
+    createdByUserId: nullableString(row.created_by_user_id),
     updatedByUserId: nullableString(row.updated_by_user_id),
     createdAt: toIso(row.created_at),
     updatedAt: toIso(row.updated_at),
@@ -285,7 +313,7 @@ function mapConsent(row: Record<string, unknown>): CandidateConsent {
     purpose: String(row.purpose),
     expiresAt: nullableIso(row.expires_at),
     revokedAt: nullableIso(row.revoked_at),
-    createdByUserId: String(row.created_by_user_id),
+    createdByUserId: nullableString(row.created_by_user_id),
     createdAt: toIso(row.created_at),
     updatedAt: toIso(row.updated_at)
   };

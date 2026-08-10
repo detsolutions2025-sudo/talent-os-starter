@@ -15,6 +15,7 @@ import { createPostgresJobProfileService } from "./job-profiles/service";
 import { createPostgresOrganizationalUnitService } from "./organizational-units/service";
 import { PostgresCoreRepository } from "./persistence/postgres-core-repository";
 import { createPostgresPool, requirePostgresDatabaseUrl } from "./postgres";
+import { createPostgresPublicApplicationService } from "./public-applications/service";
 import { createPostgresQuestionService } from "./questions/service";
 
 const port = Number(process.env.PORT ?? 3001);
@@ -45,6 +46,14 @@ const aiService = createPostgresAIService(
     : {}
 );
 
+// Fase 17 (SPEC-020 v1.1): o orquestrador da candidatura publica reutiliza as mesmas
+// instancias de CandidateService/CandidateApplicationService do resto da plataforma -- seus
+// metodos publicos dedicados (`createCandidateFromPublicApplication`, `addPublicConsent`,
+// `createApplicationFromPublicSubmission`) recebem a transacao ja aberta pelo orquestrador,
+// em vez de abrir a sua propria, entao nao ha necessidade de nenhuma instancia separada.
+const candidateService = createPostgresCandidateService(pool);
+const candidateApplicationService = createPostgresCandidateApplicationService(pool);
+
 const app = createServer(
   // Fase 15 (SPEC-018, RN-001/RN-002): toda Organization criada nasce com um Blueprint
   // Version `draft`, na mesma transacao fisica da propria criacao (ver
@@ -56,11 +65,12 @@ const app = createServer(
   createPostgresJobProfileService(pool),
   createPostgresQuestionService(pool),
   createPostgresJobOpeningService(pool),
-  createPostgresCandidateService(pool),
-  createPostgresCandidateApplicationService(pool),
+  candidateService,
+  candidateApplicationService,
   createPostgresInterviewService(pool),
   aiService,
-  createPostgresBlueprintService(pool)
+  createPostgresBlueprintService(pool),
+  createPostgresPublicApplicationService(pool, candidateService, candidateApplicationService)
 );
 
 app.listen(port, () => {

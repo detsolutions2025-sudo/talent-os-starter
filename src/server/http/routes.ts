@@ -15,6 +15,7 @@ import type { JobOpeningService } from "../job-openings/service";
 import type { JobProfileService } from "../job-profiles/service";
 import type { InterviewService } from "../interviews/service";
 import type { OrganizationalUnitService } from "../organizational-units/service";
+import type { PublicApplicationService } from "../public-applications/service";
 import type { QuestionService } from "../questions/service";
 
 export function createApiRouter(
@@ -29,7 +30,8 @@ export function createApiRouter(
   candidateApplications?: CandidateApplicationService,
   interviews?: InterviewService,
   ai?: AIService,
-  blueprints?: BlueprintService
+  blueprints?: BlueprintService,
+  publicApplications?: PublicApplicationService
 ): Router {
   const router = createRouter();
 
@@ -1478,6 +1480,26 @@ export function createApiRouter(
       "/public/job-openings/:slug",
       asyncHandler(async (request, response) => {
         response.json(await jobOpenings.getPublicBySlug(routeParam(request.params.slug)));
+      })
+    );
+  }
+
+  // Fase 17 -- Candidatura Publica (SPEC-020 v1.1). Rota publica, sem `getActor`, sem
+  // Membership, sem `organization_id` no body -- a Organization e sempre derivada do slug da
+  // Vaga, nunca aceita do cliente (SPEC-020, secao 26).
+  if (publicApplications) {
+    router.post(
+      "/public/job-openings/:slug/applications",
+      asyncHandler(async (request, response) => {
+        const result = await publicApplications.submit(
+          routeParam(request.params.slug),
+          request.body,
+          {
+            idempotencyKey: request.header("Idempotency-Key"),
+            ip: request.ip ?? request.socket.remoteAddress ?? "unknown"
+          }
+        );
+        response.status(201).json(result);
       })
     );
   }

@@ -12,6 +12,7 @@ import type { InterviewService } from "./interviews/service";
 import type { JobOpeningService } from "./job-openings/service";
 import type { JobProfileService } from "./job-profiles/service";
 import type { OrganizationalUnitService } from "./organizational-units/service";
+import type { PublicApplicationService } from "./public-applications/service";
 import type { QuestionService } from "./questions/service";
 
 export function createServer(
@@ -26,11 +27,19 @@ export function createServer(
   candidateApplications?: CandidateApplicationService,
   interviews?: InterviewService,
   ai?: AIService,
-  blueprints?: BlueprintService
+  blueprints?: BlueprintService,
+  publicApplications?: PublicApplicationService
 ) {
   const app = express();
 
-  app.use(express.json());
+  // Limite de tamanho de body explicito (revisao destrutiva da Fase 17, item 24) -- antes
+  // desta revisao, `express.json()` sem opcoes ja aplicava o limite implicito padrao do
+  // Express (100kb), mas de forma nao documentada/nao intencional. Tornado explicito para
+  // toda a API (nao apenas a rota publica): 256kb cobre confortavelmente os payloads internos
+  // legitimos existentes (drafts de Job Profile/Job Opening com listas de competencias,
+  // perguntas etc.) e ainda impede um body arbitrariamente grande como vetor trivial de DoS
+  // na rota publica, que nunca precisa de mais do que poucos KB.
+  app.use(express.json({ limit: "256kb" }));
 
   app.get("/api/health", (_request, response) => {
     response.json({
@@ -54,7 +63,8 @@ export function createServer(
       candidateApplications,
       interviews,
       ai,
-      blueprints
+      blueprints,
+      publicApplications
     )
   );
 

@@ -24,3 +24,15 @@ export function notFound(code: string, message: string) {
 export function conflict(code: string, message: string) {
   return new AppError(409, code, message);
 }
+
+export function gone(code: string, message: string) {
+  return new AppError(410, code, message);
+}
+
+export function tooManyRequests(code: string, message: string) {
+  return new AppError(429, code, message);
+}
+
+export function serviceUnavailable(code: string, message: string) {
+  return new AppError(503, code, message);
+}

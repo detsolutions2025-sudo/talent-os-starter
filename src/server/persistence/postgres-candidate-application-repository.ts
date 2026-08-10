@@ -105,6 +105,26 @@ export class PostgresCandidateApplicationRepository implements CandidateApplicat
     return result.rows[0] ? mapApplication(result.rows[0]) : null;
   }
 
+  async findLatestApplicationByCandidateAndJobOpening(
+    organizationId: string,
+    candidateId: string,
+    jobOpeningId: string
+  ) {
+    const result = await this.connection.query(
+      `
+        SELECT *
+        FROM candidate_applications
+        WHERE organization_id = $1
+          AND candidate_id = $2
+          AND job_opening_id = $3
+        ORDER BY applied_at DESC, id DESC
+        LIMIT 1
+      `,
+      [organizationId, candidateId, jobOpeningId]
+    );
+    return result.rows[0] ? mapApplication(result.rows[0]) : null;
+  }
+
   async listApplications(organizationId: string) {
     const result = await this.connection.query(
       `
@@ -290,7 +310,7 @@ function mapApplication(row: Record<string, unknown>): CandidateApplication {
     finalizedAt: nullableIso(row.finalized_at),
     finalizedByUserId: nullableString(row.finalized_by_user_id),
     finalizationReason: nullableString(row.finalization_reason),
-    createdByUserId: String(row.created_by_user_id),
+    createdByUserId: nullableString(row.created_by_user_id),
     updatedByUserId: nullableString(row.updated_by_user_id),
     createdAt: toIso(row.created_at),
     updatedAt: toIso(row.updated_at)

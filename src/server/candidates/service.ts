@@ -19,12 +19,18 @@ import {
   requireAdminReason,
   validateConsentInput,
   validateCreateCandidate,
+  validateCreateCandidateWithoutConsent,
   validateEmail,
   validateInternalNote,
   validateUpdateCandidate
 } from "./validation";
 
-type CandidateTransaction = {
+// Exportado para que o orquestrador da candidatura publica (Fase 17,
+// `src/server/public-applications/service.ts`) possa abrir sua PROPRIA transacao (um unico
+// `PoolClient` cobrindo Candidate + CandidateConsent + CandidateApplication, SPEC-020 v1.1,
+// secao 12) e passar o mesmo par `{core, candidates}` para os metodos publicos abaixo, em vez
+// de cada modulo abrir sua propria transacao isolada.
+export type CandidateTransaction = {
   core: CoreRepository;
   candidates: CandidateRepository;
 };
@@ -74,6 +80,7 @@ export class CandidateService {
         availability: normalized.availability,
         workAuthorization: normalized.workAuthorization,
         salaryExpectation: normalized.salaryExpectation,
+        creationOrigin: "internal_user",
         createdByUserId: userId,
         updatedByUserId: userId,
         createdAt: now,
@@ -98,10 +105,103 @@ export class CandidateService {
         throw error;
       }
       await service.audit(actor, organizationId, "candidate.created", {
-        candidateId: candidate.id
+        candidateId: candidate.id,
+        creationOrigin: candidate.creationOrigin
       });
       return service.serializeOwnerAdmin(candidate);
     });
+  }
+
+  // Criacao publica (SPEC-011 v1.2, secao 6.1.2; SPEC-020 v1.1) -- sem Actor, sem Membership.
+  // Chamada exclusivamente pelo orquestrador `PublicApplicationService`, dentro de uma
+  // transacao ja aberta por ele (`transaction`). Reutiliza a mesma validacao de negocio do
+  // fluxo interno (`validateCreateCandidateWithoutConsent`) e o mesmo indice de unicidade de
+  // e-mail por Organization -- a unica diferenca e a ausencia de autorizacao de User e a
+  // origem de criacao resultante. Nunca escreve auditoria (responsabilidade do orquestrador,
+  // que possui o contexto completo de Vaga/Organization exigido pela SPEC-020, secao 24).
+  // Retorna `created: false` quando uma submissao concorrente ja havia inserido o mesmo
+  // e-mail primeiro -- nesse caso, `candidate` e o registro vencedor real (relido dentro da
+  // MESMA transacao, que permanece utilizavel porque `createCandidateIfAbsent` nunca lanca
+  // 23505 -- revisao destrutiva, item 15). O chamador nunca precisa capturar
+  // `candidate_email_duplicate` para este caminho.
+  async createCandidateFromPublicApplication(
+    transaction: CandidateTransaction,
+    organizationId: string,
+    input: CandidateInput
+  ): Promise<{ candidate: Candidate; created: boolean }> {
+    this.ensureNoProtectedAssignment(input, ["email"]);
+    const normalized = validateCreateCandidateWithoutConsent(input);
+    const now = transaction.candidates.now();
+    const candidate: Candidate = {
+      id: transaction.candidates.nextId("cand"),
+      organizationId,
+      fullName: normalized.fullName,
+      preferredName: normalized.preferredName,
+      email: normalized.email,
+      normalizedEmail: normalized.normalizedEmail,
+      phone: normalized.phone,
+      secondaryPhone: normalized.secondaryPhone,
+      status: "active",
+      source: normalized.source,
+      sourceDetails: normalized.sourceDetails,
+      professionalSummary: normalized.professionalSummary,
+      location: normalized.location,
+      experiences: normalized.experiences,
+      education: normalized.education,
+      certifications: normalized.certifications,
+      languages: normalized.languages,
+      professionalLinks: normalized.professionalLinks,
+      declaredCompetencies: normalized.declaredCompetencies,
+      availability: normalized.availability,
+      workAuthorization: normalized.workAuthorization,
+      salaryExpectation: normalized.salaryExpectation,
+      creationOrigin: "public_application",
+      createdByUserId: null,
+      updatedByUserId: null,
+      createdAt: now,
+      updatedAt: now,
+      inactivatedAt: null
+    };
+    const created = await transaction.candidates.createCandidateIfAbsent(candidate);
+    if (created) {
+      return { candidate, created: true };
+    }
+    const winner = await transaction.candidates.findCandidateByNormalizedEmail(
+      organizationId,
+      normalized.normalizedEmail
+    );
+    if (!winner) {
+      // Estado pratica e teoricamente inalcancavel (o INSERT so nao insere quando o conflito
+      // ja existe), mas nunca inventa um Candidate nem falha silenciosamente.
+      throw conflict("candidate_email_duplicate", "Candidate email exists.");
+    }
+    return { candidate: winner, created: false };
+  }
+
+  // Consentimento manifestado diretamente pelo visitante no fluxo publico (SPEC-011 v1.2,
+  // secao 8.14.1, RN-061 a RN-065). Reutiliza o mesmo campo `source` e o mesmo
+  // `validateConsentInput` do fluxo interno -- a unica diferenca e `created_by_user_id` nulo,
+  // coerente com `source = public_application`.
+  async addPublicConsent(
+    transaction: CandidateTransaction,
+    organizationId: string,
+    candidateId: string,
+    input: CandidateConsentInput
+  ): Promise<CandidateConsent> {
+    const now = transaction.candidates.now();
+    const consent = toConsent(
+      transaction.candidates,
+      organizationId,
+      candidateId,
+      null,
+      // Unico chamador autorizado a fornecer `source = public_application` -- `input` aqui e
+      // sempre construido pelo servidor (`PublicApplicationService`), nunca o body bruto do
+      // cliente (correcao pontual, revisao final).
+      validateConsentInput(input, { allowPublicOrigin: true }),
+      now
+    );
+    await transaction.candidates.addConsent(consent);
+    return consent;
   }
 
   async listActive(actor: Actor, organizationId: string) {
@@ -422,6 +522,8 @@ export class CandidateService {
       "consent",
       "internalNote",
       "internal_note",
+      "creationOrigin",
+      "creation_origin",
       "createdByUserId",
       "created_by_user_id",
       "updatedByUserId",
@@ -590,7 +692,7 @@ function toConsent(
   repository: CandidateRepository,
   organizationId: string,
   candidateId: string,
-  userId: string,
+  userId: string | null,
   input: ReturnType<typeof validateConsentInput>,
   now: string
 ): CandidateConsent {

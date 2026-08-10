@@ -31,6 +31,12 @@ export class PostgresJobOpeningRepository implements JobOpeningRepository {
     );
   }
 
+  async lockJobOpening(jobOpeningId: string) {
+    await this.connection.query("SELECT id FROM job_openings WHERE id = $1 FOR UPDATE", [
+      jobOpeningId
+    ]);
+  }
+
   async lockVersions(jobOpeningId: string) {
     await this.connection.query(
       "SELECT id FROM job_opening_versions WHERE job_opening_id = $1 FOR UPDATE",

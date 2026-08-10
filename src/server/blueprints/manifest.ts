@@ -1,29 +1,15 @@
-import { createHash } from "node:crypto";
+import { fingerprint } from "../core/canonical-hash";
 import type { ComponentType, ManifestItem, ResolvedComponents } from "./types";
 
 // Manifest e uma composicao de referencias + snapshot minimo allow-listed, nunca uma copia
 // integral dos modulos (SPEC-018 secao 4/5/6; ADR-0022, "Principio: manifesto de contexto").
 // Construido apenas durante a ativacao (secao 8), a partir do MESMO objeto `resolved` ja usado
 // por `calculateReadiness` -- nunca reconsulta os modulos aqui.
-
-export function fingerprint(snapshot: Record<string, unknown>) {
-  return createHash("sha256").update(stableStringify(snapshot)).digest("hex");
-}
-
-function stableStringify(value: unknown): string {
-  if (Array.isArray(value)) {
-    return `[${value.map(stableStringify).join(",")}]`;
-  }
-
-  if (value && typeof value === "object") {
-    const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
-      a.localeCompare(b)
-    );
-    return `{${entries.map(([key, entry]) => `${JSON.stringify(key)}:${stableStringify(entry)}`).join(",")}}`;
-  }
-
-  return JSON.stringify(value ?? null);
-}
+//
+// `fingerprint` (canonicalizacao + SHA-256) foi extraida para `core/canonical-hash.ts` na Fase
+// 17 para ser reutilizada pela candidatura publica -- reexportada aqui para preservar o mesmo
+// caminho de import ja usado por `tests/phase15/blueprint-fingerprint.test.ts`.
+export { fingerprint };
 
 type BuiltManifestItem = {
   componentType: ComponentType;

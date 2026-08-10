@@ -27,7 +27,10 @@ import {
   validateStageInput
 } from "./validation";
 
-type CandidateApplicationTransaction = {
+// Exportado para o orquestrador da candidatura publica (Fase 17,
+// `src/server/public-applications/service.ts`) reutilizar a mesma transacao fisica aberta por
+// ele para Candidate + CandidateConsent + CandidateApplication (SPEC-020 v1.1, secao 12).
+export type CandidateApplicationTransaction = {
   core: CoreRepository;
   applications: CandidateApplicationRepository;
 };
@@ -181,6 +184,101 @@ export class CandidateApplicationService {
       });
       return service.serializeOwnerAdmin(application);
     });
+  }
+
+  // Criacao publica (SPEC-012 v1.1, secao 6.1.2; SPEC-020 v1.1) -- sem Actor, sem Membership.
+  // Chamada exclusivamente pelo orquestrador `PublicApplicationService`, dentro de uma
+  // transacao ja aberta por ele. Reutiliza as mesmas validacoes de Vaga/versao/consentimento
+  // do fluxo interno (`createApplication`) e adiciona a politica de reaplicacao determinada
+  // pela SPEC-020 v1.1, secao 14 -- exclusiva deste canal, nunca aplicada ao fluxo interno.
+  // Nunca escreve auditoria (responsabilidade do orquestrador).
+  async createApplicationFromPublicSubmission(
+    transaction: CandidateApplicationTransaction,
+    organizationId: string,
+    input: { candidateId: string; jobOpeningId: string; jobOpeningVersionId: string }
+  ): Promise<CandidateApplication> {
+    const opening = await this.findOpeningInOrganizationNoAudit(
+      transaction,
+      organizationId,
+      input.jobOpeningId
+    );
+    const version = await this.findVersionInOrganizationNoAudit(
+      transaction,
+      organizationId,
+      input.jobOpeningVersionId
+    );
+    if (version.jobOpeningId !== opening.id) {
+      throw notFound("job_opening_version_not_found", "Job opening version not found.");
+    }
+    if (opening.status !== "open") {
+      throw conflict("job_opening_not_open", "Job opening must be open.");
+    }
+    if (version.status !== "published") {
+      throw conflict("job_opening_version_not_published", "Job opening version must be published.");
+    }
+    if (
+      opening.applicationDeadline &&
+      new Date(opening.applicationDeadline).getTime() <= Date.now()
+    ) {
+      throw conflict(
+        "job_opening_deadline_expired",
+        "Job opening no longer receives applications."
+      );
+    }
+
+    const latest = await transaction.applications.findLatestApplicationByCandidateAndJobOpening(
+      organizationId,
+      input.candidateId,
+      opening.id
+    );
+    ensureReapplicationAllowed(latest);
+
+    const now = transaction.applications.now();
+    const application: CandidateApplication = {
+      id: transaction.applications.nextId("capp"),
+      organizationId,
+      candidateId: input.candidateId,
+      jobOpeningId: opening.id,
+      jobOpeningVersionId: version.id,
+      applicationStatus: "active",
+      currentStage: "applied",
+      source: "public_portal",
+      appliedAt: now,
+      finalizedAt: null,
+      finalizedByUserId: null,
+      finalizationReason: null,
+      createdByUserId: null,
+      updatedByUserId: null,
+      createdAt: now,
+      updatedAt: now
+    };
+    try {
+      await transaction.applications.createApplication(application);
+    } catch (error) {
+      if (isUniqueViolation(error, "idx_candidate_applications_one_active")) {
+        // Mesmo codigo/mensagem generico de `ensureReapplicationAllowed` -- concorrencia nao
+        // pode revelar mais do que a checagem sequencial ja revela (SPEC-020, secao 22).
+        throw conflict(
+          "candidate_application_reapplication_blocked",
+          "Application could not be completed."
+        );
+      }
+      throw error;
+    }
+    await transaction.applications.addEvent({
+      id: transaction.applications.nextId("caevt"),
+      organizationId,
+      candidateApplicationId: application.id,
+      eventType: "application_created",
+      stageBefore: null,
+      stageAfter: "applied",
+      statusBefore: null,
+      statusAfter: "active",
+      actorUserId: null,
+      reason: null,
+      createdAt: transaction.applications.now()
+    });
+    return application;
   }
 
   async listApplications(actor: Actor, organizationId: string) {
@@ -719,6 +817,34 @@ export class CandidateApplicationService {
     return opening;
   }
 
+  // Variantes sem Actor/auditoria de negacao, usadas exclusivamente pela criacao publica
+  // (`createApplicationFromPublicSubmission`), que nao possui Actor para auditar. O
+  // orquestrador publico (`PublicApplicationService`) e responsavel por qualquer auditoria de
+  // negacao relacionada a Vaga invalida, com o contexto completo que ele ja possui.
+  private async findOpeningInOrganizationNoAudit(
+    transaction: CandidateApplicationTransaction,
+    organizationId: string,
+    jobOpeningId: string
+  ) {
+    const opening = await transaction.applications.findJobOpening(jobOpeningId);
+    if (!opening || opening.organizationId !== organizationId) {
+      throw notFound("job_opening_not_found", "Job opening not found.");
+    }
+    return opening;
+  }
+
+  private async findVersionInOrganizationNoAudit(
+    transaction: CandidateApplicationTransaction,
+    organizationId: string,
+    jobOpeningVersionId: string
+  ) {
+    const version = await transaction.applications.findJobOpeningVersion(jobOpeningVersionId);
+    if (!version || version.organizationId !== organizationId) {
+      throw notFound("job_opening_version_not_found", "Job opening version not found.");
+    }
+    return version;
+  }
+
   private async findVersionInOrganization(
     actor: Actor,
     organizationId: string,
@@ -918,6 +1044,27 @@ function requireUserActorId(actor: Actor) {
     throw forbidden("permission_denied", "Permission denied.");
   }
   return actor.userId;
+}
+
+// SPEC-020 v1.1, secao 14 -- politica de reaplicacao do canal publico. Determinista: nunca
+// interpreta `finalizationReason` (texto livre). Exclusiva deste canal -- nao altera o
+// comportamento do fluxo interno de criacao (secao 6.1.1), que continua usando apenas
+// `findActiveApplication`.
+//
+// As tres causas de bloqueio (`active` duplicada; `cancelled`/`rejected` bloqueados nesta v1;
+// `hired` bloqueado) usam **o mesmo codigo e a mesma mensagem genericos**, de proposito: a
+// SPEC-020 (secao 22, protecao contra enumeracao) proibe que a resposta publica permita
+// distinguir "ja existe candidatura ativa" de "candidatura anterior foi rejeitada/aceita" --
+// essa distincao, sozinha, ja seria um vazamento de resultado de selecao. O motivo interno
+// real fica disponivel apenas via auditoria (nunca na resposta HTTP).
+function ensureReapplicationAllowed(latest: CandidateApplication | null) {
+  if (!latest || latest.applicationStatus === "withdrawn") {
+    return;
+  }
+  throw conflict(
+    "candidate_application_reapplication_blocked",
+    "Application could not be completed."
+  );
 }
 
 function isUniqueViolation(error: unknown, constraint: string) {

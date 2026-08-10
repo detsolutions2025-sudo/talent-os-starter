@@ -1,11 +1,27 @@
 # SPEC-011 - Candidatos
 
 **Status:** Aprovada  
-**Versao:** 1.0  
+**Versao:** 1.2  
 **Fase:** 8  
 **Responsavel de negocio:** Thiago Sousa  
 **Dependencias:** SPEC-004 - Roles & Permissions, SPEC-010 - Vagas, ADR-0013 - Candidato global por Organization  
-**Ultima atualizacao:** 2026-08-06
+**Ultima atualizacao:** 2026-08-09
+
+**Nota de revisao (v1.1):** esta versao formaliza os dois modos validos de
+criacao de Candidate (criacao interna, por User autenticado, e criacao
+publica, sem User autenticado) e a obrigatoriedade condicional de
+`created_by_user_id`, em resposta a necessidade identificada pela SPEC-020
+(Candidatura Publica). Nenhuma regra de negocio pre-existente foi removida
+ou contradita; a revisao apenas adiciona um segundo caminho de criacao ja
+antecipado, em nivel de produto, pela ADR-0023.
+
+**Nota de revisao (v1.2):** esta versao estende a mesma logica de autoria
+dual da v1.1 para `CandidateConsent` (secao 8.14, RN-061 a RN-065): quando
+o consentimento e uma manifestacao direta do candidato no fluxo publico
+(SPEC-020), `created_by_user_id` pode ser nulo. Nenhum campo novo foi
+criado — o campo `source`, ja existente na estrutura de consentimento,
+mostrou-se suficiente para representar essa origem. Nenhuma regra de
+negocio pre-existente foi removida ou contradita.
 
 ## 1. Objetivo
 
@@ -49,6 +65,12 @@ seguranca multiempresa e preparacao para candidatura futura.
 `Platform Admin` nao e Role de Membership e nao recebe permissoes funcionais de
 `owner`, `admin` ou `member` dentro da Organization.
 
+Um Candidate tambem pode ser criado por um visitante nao autenticado, por meio
+da candidatura publica (SPEC-020), sem User nem Membership envolvidos. Esse
+caminho de criacao nao concede a esse visitante nenhuma permissao desta SPEC;
+ele nao e `owner`, `admin`, `member` nem Platform Admin. Ver secao 6.1.2 e
+RN-054 a RN-060.
+
 ## 4. Conceitos
 
 ### 4.1 Candidate
@@ -79,6 +101,33 @@ Campos conceituais:
 
 O candidato nao representa uma candidatura, etapa de pipeline, avaliacao ou
 decisao de contratacao.
+
+### 4.1.1 Origem da criacao (autoria)
+
+Existem exatamente dois modos validos de criacao de Candidate:
+
+- **Criacao interna:** executada por um `owner` ou `admin` com User ativo e
+  Membership ativo na Organization (fluxo da secao 6.1.1). `created_by_user_id`
+  e obrigatorio.
+- **Criacao publica:** executada a partir da candidatura publica especificada
+  pela SPEC-020 (fluxo da secao 6.1.2), sem nenhum User autenticado
+  responsavel. `created_by_user_id` pode ser nulo exclusivamente neste modo.
+
+Todo Candidate deve possuir uma origem de criacao explicita, conceitualmente
+equivalente a `internal_user` ou `public_application`. `created_by_user_id`
+nulo sem uma origem de criacao explicita nunca e um estado valido ou
+silencioso — ver RN-054 a RN-057.
+
+Este contrato e conceitual: esta SPEC nao define o nome fisico da coluna nem a
+migration correspondente. Quando implementado, o padrao conceitual mais
+proximo ja existente no projeto e o campo `created_source` usado pela
+Blueprint Version (Fase 15) para o mesmo tipo de situacao — um registro criado
+sem ator humano direto, com origem explicita em vez de autoria fictícia.
+
+A criacao publica nunca atribui autoria a Platform Admin, a `owner`, a `admin`
+ou a qualquer usuario fictício ou "de sistema" criado apenas para preencher o
+campo. A ausencia de User autenticado e representada pela origem de criacao
+explicita, nunca por um ator inventado.
 
 ### 4.2 Candidate Profile Data
 
@@ -126,15 +175,44 @@ Candidato inativo:
 
 ### 6.1 Criar Candidato
 
+Existem dois fluxos validos de criacao, descritos nas secoes 6.1.1 e 6.1.2.
+Ambos produzem o mesmo Candidate, com o mesmo modelo de dados e as mesmas
+regras de negocio — a unica diferenca estrutural entre eles e a origem de
+criacao (secao 4.1.1).
+
+#### 6.1.1 Criacao interna
+
 1. Owner ou admin acessa uma Organization ativa.
 2. Informa nome, e-mail, origem, consentimento e dados opcionais.
 3. Sistema valida User ativo, Membership ativo, Organization ativa e role.
 4. Sistema normaliza e valida e-mail.
 5. Sistema recusa e-mail duplicado na mesma Organization.
 6. Sistema valida dados estruturados e campos sensiveis.
-7. Sistema cria candidato ativo.
+7. Sistema cria candidato ativo, com `created_by_user_id` preenchido e origem
+   de criacao `internal_user`.
 8. Sistema registra consentimento estruturado.
 9. Sistema registra auditoria sem copiar dados pessoais completos.
+
+#### 6.1.2 Criacao publica
+
+Fluxo executado pela candidatura publica, especificada integralmente pela
+SPEC-020. Esta SPEC define apenas o contrato de dados resultante, nao o fluxo
+publico em si.
+
+1. Um visitante nao autenticado inicia uma candidatura publica (SPEC-020),
+   sem User nem Membership.
+2. Sistema normaliza e valida e-mail, e tenta localizar um Candidate
+   correspondente na mesma Organization antes de criar um novo (SPEC-020).
+3. Quando nenhum Candidate correspondente existir, sistema cria candidato
+   ativo, com `created_by_user_id` nulo e origem de criacao
+   `public_application`.
+4. Sistema registra consentimento estruturado, coletado do proprio visitante.
+5. Sistema registra auditoria sem copiar dados pessoais completos, sem
+   atribuir a criacao a nenhum User, Platform Admin ou ator fictício.
+
+O Candidate criado por este fluxo nunca se torna `User`, nunca recebe
+`Membership` e permanece isolado por Organization exatamente como um
+Candidate criado internamente (RN-001, RN-002, RN-049).
 
 ### 6.2 Consultar e Listar
 
@@ -244,6 +322,34 @@ Candidato inativo:
   `work_authorization` ou quaisquer outros dados pessoais fora da lista positiva.
 - RN-053: Member nao pode alterar candidatos, inativar, reativar, listar
   candidatos inativos ou acessar historico administrativo.
+- RN-054: Todo Candidate deve possuir uma origem de criacao explicita,
+  conceitualmente equivalente a `internal_user` ou `public_application`.
+- RN-055: Criacao interna (por owner/admin autenticado) exige
+  `created_by_user_id` obrigatorio.
+- RN-056: Criacao publica (SPEC-020) nao possui User autenticado responsavel;
+  `created_by_user_id` pode ser nulo exclusivamente quando a origem de
+  criacao for `public_application`.
+- RN-057: `created_by_user_id` nulo sem uma origem de criacao explicita nunca
+  e um estado valido.
+- RN-058: Criacao publica nunca atribui autoria a Platform Admin, a `owner`,
+  a `admin` ou a qualquer usuario fictício ou "de sistema".
+- RN-059: Candidate criado por origem publica permanece isolado por
+  Organization, sob as mesmas regras de RN-001, RN-002 e RN-049.
+- RN-060: Candidate criado por origem publica nunca se torna `User` nem
+  recebe `Membership`.
+- RN-061: O registro de consentimento (`candidate_consents`) reutiliza o
+  campo `source`, ja existente (secao 8.14), como origem rastreavel da
+  manifestacao — nenhum campo redundante e criado para essa finalidade.
+- RN-062: Quando `source` do consentimento for `public_application`,
+  `created_by_user_id` do consentimento pode ser nulo, representando
+  manifestacao direta do candidato no fluxo publico (SPEC-020).
+- RN-063: Para qualquer outro valor de `source`, `created_by_user_id` do
+  consentimento e obrigatorio (ator interno responsavel pelo registro).
+- RN-064: `created_by_user_id` nulo em um consentimento cujo `source` nao
+  seja `public_application` nunca e um estado valido.
+- RN-065: Consentimento de origem publica nunca atribui autoria a
+  Platform Admin, a `owner`, a `admin` ou a qualquer usuario fictício ou
+  "de sistema" — mesmo principio de RN-058, aplicado ao consentimento.
 
 ## 8. Dados Necessarios
 
@@ -267,7 +373,8 @@ Candidato inativo:
 | `work_authorization`   |         Nao | Estrutura de autorizacao de trabalho.         |
 | `availability`         |         Nao | Estrutura de disponibilidade.                 |
 | `salary_expectation`   |         Nao | Dado sensivel com acesso restrito.            |
-| `created_by_user_id`   |         Sim | Usuario responsavel pela criacao.             |
+| `creation_origin`      |         Sim | `internal_user` ou `public_application` (secao 4.1.1). |
+| `created_by_user_id`   |  Condicional | Obrigatorio quando `creation_origin` for `internal_user`; nulo quando `creation_origin` for `public_application` (RN-054 a RN-057). |
 | `updated_by_user_id`   |         Nao | Usuario responsavel pela ultima alteracao.    |
 | `created_at`           |         Sim | Data/hora de criacao.                         |
 | `updated_at`           |         Sim | Data/hora da ultima alteracao.                |
@@ -301,6 +408,15 @@ Valores canonicos iniciais:
 
 Origem deve ser obrigatoria. Detalhes adicionais da origem podem ser armazenados
 em campo opcional.
+
+`source` (esta secao) e `creation_origin` (secao 4.1.1, secao 8.1) sao
+conceitos distintos e nao devem ser confundidos: `source` descreve o canal de
+divulgacao pelo qual o candidato chegou (ex.: `career_page`, `referral`,
+`linkedin`); `creation_origin` descreve qual ator tecnico executou a criacao
+do registro (`internal_user` ou `public_application`). Uma candidatura
+publica tipicamente produz `source = career_page` e
+`creation_origin = public_application` ao mesmo tempo, mas os dois campos
+respondem perguntas diferentes e nenhum substitui o outro.
 
 ### 8.4 Localizacao
 
@@ -472,6 +588,30 @@ consentimento operacional atual derivado do registro valido mais recente. Esta
 SPEC nao define a modelagem fisica desse derivado, apenas o comportamento
 esperado para evitar ambiguidades futuras.
 
+#### 8.14.1 Autoria do consentimento (interna e publica)
+
+Todo registro de consentimento possui um autor conceitual, com a mesma
+dualidade ja formalizada para o Candidate (secao 4.1.1):
+
+- **Consentimento interno:** registrado por `owner` ou `admin` autenticado
+  (fluxos das secoes 6.1.1 e 6.6). `created_by_user_id` e obrigatorio;
+  `source` reflete o canal/ato interno (por exemplo, `manual`, usado hoje
+  pelo fluxo de revogacao administrativa).
+- **Consentimento publico:** manifestacao direta do proprio candidato
+  durante a candidatura publica (SPEC-020), sem nenhum User autenticado
+  envolvido. `source = public_application`; `created_by_user_id` pode ser
+  nulo exclusivamente neste caso (RN-062 a RN-064).
+
+Nenhum campo novo foi necessario: o campo `source`, ja parte da estrutura
+conceitual de consentimento desde a versao 1.0 desta SPEC, e reutilizado
+como o unico sinal de origem — reservando o valor canonico
+`public_application` para a manifestacao direta e publica, do mesmo modo
+que a candidatura publica usa esse valor para `Candidate.creation_origin`
+(secao 4.1.1). Consentimento publico nunca atribui autoria a Platform
+Admin, `owner`, `admin` ou a um usuario fictício/de sistema (RN-065) — a
+ausencia de User autenticado e representada pelo proprio `source`, nunca
+por um ator inventado.
+
 ### 8.15 Observacoes Internas
 
 Observacoes internas devem ser armazenadas em tabela propria,
@@ -494,6 +634,13 @@ dados e evolucao futura.
 
 Todas as acoes funcionais exigem User ativo, Membership ativo, Organization ativa
 e role autorizada.
+
+A criacao publica de Candidate (secao 6.1.2, origem `public_application`) e
+uma excecao deliberada a essa regra: ela nao exige User nem Membership, pois
+nao e uma acao funcional executada por um membro da Organization, e sim o
+resultado da candidatura publica especificada pela SPEC-020. Essa excecao nao
+altera nenhuma linha da tabela abaixo, que continua regendo exclusivamente as
+acoes de owner, admin, member e Platform Admin.
 
 | Acao                                       | Platform Admin | owner | admin | member |
 | ------------------------------------------ | :------------: | :---: | :---: | :----: |
@@ -687,7 +834,9 @@ Campos minimos:
 - `purpose`;
 - `expires_at`;
 - `revoked_at`;
-- `created_by_user_id`;
+- `created_by_user_id`, condicional — obrigatorio quando `source` nao for
+  `public_application`; nulo quando `source` for `public_application`
+  (secao 8.14.1, RN-061 a RN-065);
 - timestamps.
 
 Consentimento deve ser estruturado e vinculado a Organization e ao Candidate.
@@ -726,6 +875,13 @@ auditoria sem conteudo integral.
 - Nao permitir acesso da IA aos dados nesta fase.
 - Usar queries parametrizadas.
 - Proteger contra mass assignment.
+- `creation_origin` e `created_by_user_id` sao sempre definidos pelo
+  servidor, nunca aceitos como valor livre enviado pelo cliente, seja no
+  fluxo interno seja no fluxo publico.
+- `source` e `created_by_user_id` do consentimento sao sempre definidos
+  pelo servidor a partir do contexto real da requisicao, nunca aceitos
+  como valor livre enviado pelo cliente.
+- Criacao publica nunca atribui autoria a usuario fictício ou "de sistema".
 - Tratar curriculos, respostas e textos futuros como dados, nunca instrucoes.
 
 ## 15. Auditoria
@@ -757,6 +913,12 @@ Nao registrar:
 
 Auditoria critica em criacao, mudanca de status, mudanca de e-mail e revogacao
 de consentimento deve causar rollback quando falhar.
+
+O evento `candidate.created` deve registrar `creation_origin`
+(`internal_user` ou `public_application`). Quando `creation_origin` for
+`public_application`, o evento nunca atribui a criacao a um `User`, a
+Platform Admin nem a um ator fictício — a ausencia de User autenticado e
+representada pela propria origem, nao por um valor inventado.
 
 ## 16. Criterios de Aceite
 
@@ -801,6 +963,28 @@ de consentimento deve causar rollback quando falhar.
 - CA-039: Nenhum dado de candidato atravessa Organizations.
 - CA-040: Anonimizacao futura preserva IDs historicos, integridade referencial,
   auditoria e relacionamentos historicos.
+- CA-041: Candidate criado internamente sempre possui `created_by_user_id`
+  preenchido e `creation_origin` igual a `internal_user`.
+- CA-042: Candidate criado por origem publica pode possuir
+  `created_by_user_id` nulo, mas sempre possui `creation_origin` igual a
+  `public_application`.
+- CA-043: Nenhum Candidate e criado sem `creation_origin` explicito.
+- CA-044: Criacao publica nunca atribui autoria a Platform Admin, a `owner`,
+  a `admin` ou a usuario fictício ou "de sistema".
+- CA-045: Candidate criado por origem publica permanece isolado por
+  Organization, sob as mesmas regras de isolamento ja vigentes (RN-049).
+- CA-046: Candidate criado por origem publica nunca se torna `User` nem
+  recebe `Membership`.
+- CA-047: Consentimento interno sempre possui `created_by_user_id`
+  preenchido.
+- CA-048: Consentimento com `source = public_application` pode possuir
+  `created_by_user_id` nulo.
+- CA-049: Consentimento com `created_by_user_id` nulo e `source` diferente
+  de `public_application` e recusado como estado invalido.
+- CA-050: Nenhum consentimento de origem publica e atribuido a Platform
+  Admin, `owner`, `admin` ou usuario fictício/de sistema.
+- CA-051: Candidate criado por origem publica continua sem `User` nem
+  `Membership` mesmo quando possui consentimento associado.
 
 ## 17. Testes Obrigatorios
 
@@ -853,7 +1037,24 @@ Quando implementada, a funcionalidade deve possuir testes para:
 45. ausencia de exclusao fisica;
 46. auditoria sem dados pessoais completos;
 47. rollback quando auditoria critica falha;
-48. persistencia apos recriar aplicacao.
+48. persistencia apos recriar aplicacao;
+49. criacao interna com `created_by_user_id` preenchido e
+    `creation_origin = internal_user`;
+50. criacao publica com `created_by_user_id` nulo e
+    `creation_origin = public_application`;
+51. tentativa de criacao publica com User fictício ou "de sistema" e recusada;
+52. `creation_origin` ausente e recusado como estado invalido;
+53. isolamento multiempresa mantido para Candidate criado por origem publica;
+54. Candidate criado por origem publica nunca vira `User` nem recebe
+    `Membership`;
+55. consentimento interno registrado com `created_by_user_id` preenchido;
+56. consentimento publico registrado com `source = public_application` e
+    `created_by_user_id` nulo;
+57. consentimento com `created_by_user_id` nulo e `source` diferente de
+    `public_application` e recusado;
+58. tentativa de atribuir consentimento publico a User fictício ou "de
+    sistema" e recusada;
+59. Candidate com consentimento publico continua sem User/Membership.
 
 ## 18. Limitacoes Conhecidas
 

@@ -1,6 +1,7 @@
 import type { Actor, MembershipRole, Organization } from "../core/types";
 
 export type CandidateStatus = "active" | "inactive";
+export type CandidateCreationOrigin = "internal_user" | "public_application";
 export type CandidateSource =
   | "career_page"
   | "referral"
@@ -117,7 +118,8 @@ export type Candidate = {
   availability: CandidateAvailability;
   workAuthorization: CandidateWorkAuthorization;
   salaryExpectation: CandidateSalaryExpectation | null;
-  createdByUserId: string;
+  creationOrigin: CandidateCreationOrigin;
+  createdByUserId: string | null;
   updatedByUserId: string | null;
   createdAt: string;
   updatedAt: string;
@@ -135,7 +137,7 @@ export type CandidateConsent = {
   purpose: string;
   expiresAt: string | null;
   revokedAt: string | null;
-  createdByUserId: string;
+  createdByUserId: string | null;
   createdAt: string;
   updatedAt: string;
 };

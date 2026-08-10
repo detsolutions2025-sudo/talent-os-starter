@@ -19,7 +19,7 @@ export type ApplicationEventType =
   | "cancelled"
   | "note_added";
 export type ApplicationSource =
-  "career_page" | "referral" | "recruiter" | "import" | "manual" | "other";
+  "career_page" | "referral" | "recruiter" | "import" | "manual" | "other" | "public_portal";
 
 export type CandidateApplication = {
   id: string;
@@ -34,7 +34,7 @@ export type CandidateApplication = {
   finalizedAt: string | null;
   finalizedByUserId: string | null;
   finalizationReason: string | null;
-  createdByUserId: string;
+  createdByUserId: string | null;
   updatedByUserId: string | null;
   createdAt: string;
   updatedAt: string;
