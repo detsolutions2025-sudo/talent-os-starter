@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { BlueprintPanel } from "./BlueprintPanel";
+import { PreInterviewPanel } from "./PreInterviewPanel";
 import "./styles.css";
 
 type Organization = {
@@ -2180,6 +2181,14 @@ export function App() {
 
         {selectedOrganization && (
           <BlueprintPanel
+            organizationId={selectedOrganization.id}
+            role={currentMembership?.role}
+            headers={devHeaders}
+          />
+        )}
+
+        {selectedOrganization && (
+          <PreInterviewPanel
             organizationId={selectedOrganization.id}
             role={currentMembership?.role}
             headers={devHeaders}

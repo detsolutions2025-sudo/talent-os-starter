@@ -128,7 +128,13 @@ export class PublicApplicationService {
         );
       }
       if (submission.status === "completed") {
-        return { status: "received", submissionId: submission.id };
+        // `candidateApplicationId` e sempre NOT NULL quando `status = 'completed'`
+        // (public_application_submissions CHECK, migration 0018).
+        return {
+          status: "received",
+          submissionId: submission.id,
+          candidateApplicationId: submission.candidateApplicationId as string
+        };
       }
       if (submission.status === "pending") {
         throw conflict(
@@ -264,7 +270,13 @@ export class PublicApplicationService {
         submission.id,
         result.candidateApplicationId
       );
-      return { status: "received", submissionId: submission.id };
+      // Fase 18: `candidateApplicationId` sai apenas neste objeto de retorno INTERNO -- nunca
+      // e o DTO publico final (ver public-applications/types.ts).
+      return {
+        status: "received",
+        submissionId: submission.id,
+        candidateApplicationId: result.candidateApplicationId
+      };
     } catch (error) {
       await this.publicApplications.markSubmissionFailed(submission.id);
       throw error;

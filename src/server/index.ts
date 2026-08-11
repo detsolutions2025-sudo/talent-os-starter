@@ -14,6 +14,7 @@ import { createPostgresJobOpeningService } from "./job-openings/service";
 import { createPostgresJobProfileService } from "./job-profiles/service";
 import { createPostgresOrganizationalUnitService } from "./organizational-units/service";
 import { PostgresCoreRepository } from "./persistence/postgres-core-repository";
+import { createPostgresPreInterviewService } from "./pre-interviews/service";
 import { createPostgresPool, requirePostgresDatabaseUrl } from "./postgres";
 import { createPostgresPublicApplicationService } from "./public-applications/service";
 import { createPostgresQuestionService } from "./questions/service";
@@ -70,7 +71,8 @@ const app = createServer(
   createPostgresInterviewService(pool),
   aiService,
   createPostgresBlueprintService(pool),
-  createPostgresPublicApplicationService(pool, candidateService, candidateApplicationService)
+  createPostgresPublicApplicationService(pool, candidateService, candidateApplicationService),
+  createPostgresPreInterviewService(pool)
 );
 
 app.listen(port, () => {

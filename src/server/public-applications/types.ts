@@ -57,7 +57,15 @@ export type NormalizedPublicApplicationInput = {
   formRenderedAt: string | null;
 };
 
+// Fase 18 (Plano Tecnico, correcao final, item 2/23): `candidateApplicationId` e o resultado
+// INTERNO de `submit()`, usado exclusivamente pelo orquestrador HTTP (routes.ts) para acionar
+// `PreInterviewService.createIfConfigured(...)` em uma segunda transacao, independente. Este
+// campo nunca deve ser copiado para o DTO publico serializado ao Visitante (SPEC-020, secao
+// 25: "a resposta ao Visitante nunca retorna o Candidate completo... nunca expõe
+// CandidateApplication.id interno") -- o orquestrador constroi o DTO publico explicitamente,
+// nunca espalhando (`...result`) este objeto interno na resposta HTTP.
 export type PublicApplicationResult = {
   status: "received";
   submissionId: string;
+  candidateApplicationId: string;
 };

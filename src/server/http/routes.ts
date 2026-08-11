@@ -15,6 +15,7 @@ import type { JobOpeningService } from "../job-openings/service";
 import type { JobProfileService } from "../job-profiles/service";
 import type { InterviewService } from "../interviews/service";
 import type { OrganizationalUnitService } from "../organizational-units/service";
+import type { PreInterviewService } from "../pre-interviews/service";
 import type { PublicApplicationService } from "../public-applications/service";
 import type { QuestionService } from "../questions/service";
 
@@ -31,7 +32,11 @@ export function createApiRouter(
   interviews?: InterviewService,
   ai?: AIService,
   blueprints?: BlueprintService,
-  publicApplications?: PublicApplicationService
+  publicApplications?: PublicApplicationService,
+  // Fase 18 (SPEC-021 v1.0). Ultimo parametro posicional -- mesma convencao ja usada por todo
+  // o roteador (cada Fase acrescenta seu servico opcional ao final da assinatura, nunca no
+  // meio, para nao quebrar nenhuma chamada posicional ja existente de fases anteriores).
+  preInterviews?: PreInterviewService
 ): Router {
   const router = createRouter();
 
@@ -1499,7 +1504,217 @@ export function createApiRouter(
             ip: request.ip ?? request.socket.remoteAddress ?? "unknown"
           }
         );
-        response.status(201).json(result);
+
+        // Fase 18 (SPEC-021, secao 8.2; Plano Tecnico, correcao final, itens 1/2/24): a
+        // CandidateApplication ja esta commitada neste ponto -- `createIfConfigured` roda em
+        // uma SEGUNDA transacao, inteiramente independente, sempre concluida (sucesso ou
+        // falha) ANTES de montar a resposta HTTP. Uma falha aqui nunca reverte a candidatura
+        // ja confirmada e nunca vira falha HTTP da candidatura -- apenas fica registrada
+        // internamente, e `nextStep` permanece `null`.
+        let nextStep: { type: "pre_interview"; access: string } | null = null;
+        if (preInterviews) {
+          try {
+            const created = await preInterviews.createIfConfigured(result.candidateApplicationId);
+            if (created.status !== "not_configured") {
+              nextStep = { type: "pre_interview", access: created.rawAccessToken };
+            }
+          } catch (error) {
+            console.error("Pre-interview creation failed after public application:", error);
+          }
+        }
+
+        // DTO publico explicito -- nunca `{ ...result }` (que carregaria
+        // `candidateApplicationId`, sempre interno, SPEC-020 secao 25).
+        response
+          .status(201)
+          .json({ status: result.status, submissionId: result.submissionId, nextStep });
+      })
+    );
+  }
+
+  // Fase 18 -- Pre-Entrevista Estruturada (SPEC-021 v1.0). Sem IA. Rotas publicas sem
+  // `getActor`, resolvidas por token opaco em header dedicado -- nunca no path nem em query
+  // string (Plano Tecnico, correcao final, item 3/36).
+  if (preInterviews) {
+    router.get(
+      "/organizations/:organizationId/job-openings/:jobOpeningId/pre-interview-settings",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await preInterviews.getSettings(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.jobOpeningId)
+          )
+        );
+      })
+    );
+
+    router.put(
+      "/organizations/:organizationId/job-openings/:jobOpeningId/pre-interview-settings",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await preInterviews.updateSettings(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.jobOpeningId),
+            request.body
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/candidate-applications/:applicationId/pre-interviews",
+      asyncHandler(async (request, response) => {
+        const created = await preInterviews.createInternal(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          routeParam(request.params.applicationId)
+        );
+        response.status(201).json(created);
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/candidate-applications/:applicationId/pre-interviews",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await preInterviews.listByApplication(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.applicationId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/pre-interviews/:preInterviewId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await preInterviews.getById(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.preInterviewId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/pre-interviews/:preInterviewId/cancel",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await preInterviews.cancel(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.preInterviewId),
+            request.body
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/pre-interviews/:preInterviewId/retry",
+      asyncHandler(async (request, response) => {
+        const created = await preInterviews.retry(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          routeParam(request.params.preInterviewId)
+        );
+        response.status(201).json(created);
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/pre-interviews/:preInterviewId/rotate-access-token",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await preInterviews.rotateAccessToken(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.preInterviewId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/pre-interviews/:preInterviewId/events",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await preInterviews.timeline(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.preInterviewId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/platform/organizations/:organizationId/pre-interviews/admin-read",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await preInterviews.adminRead(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            request.body
+          )
+        );
+      })
+    );
+
+    // --- Publico (Candidate, via token opaco em header, nunca no path/query) --------------
+    router.get(
+      "/public/pre-interviews/current",
+      asyncHandler(async (request, response) => {
+        response.set("Cache-Control", "no-store");
+        response.json(
+          await preInterviews.getPublic(extractAccessToken(request), {
+            ip: request.ip ?? request.socket.remoteAddress ?? "unknown"
+          })
+        );
+      })
+    );
+
+    router.post(
+      "/public/pre-interviews/start",
+      asyncHandler(async (request, response) => {
+        response.set("Cache-Control", "no-store");
+        response.json(
+          await preInterviews.start(extractAccessToken(request), {
+            ip: request.ip ?? request.socket.remoteAddress ?? "unknown"
+          })
+        );
+      })
+    );
+
+    router.put(
+      "/public/pre-interviews/responses/:questionPublicId",
+      asyncHandler(async (request, response) => {
+        response.set("Cache-Control", "no-store");
+        response.json(
+          await preInterviews.saveResponse(
+            extractAccessToken(request),
+            routeParam(request.params.questionPublicId),
+            request.body,
+            { ip: request.ip ?? request.socket.remoteAddress ?? "unknown" }
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/public/pre-interviews/submit",
+      asyncHandler(async (request, response) => {
+        response.set("Cache-Control", "no-store");
+        response.json(
+          await preInterviews.submit(extractAccessToken(request), {
+            ip: request.ip ?? request.socket.remoteAddress ?? "unknown"
+          })
+        );
       })
     );
   }
@@ -2450,6 +2665,36 @@ export function createApiRouter(
 
 function routeParam(value: string | string[]) {
   return Array.isArray(value) ? value[0] : value;
+}
+
+// Fase 18 (SPEC-021, secao 25.1; Plano Tecnico, correcao final, item 3/36): token nunca no
+// path nem em query string -- somente em header dedicado. `PreInterviewService` trata qualquer
+// valor ausente/malformado como token invalido (resposta publica generica, sem diferenciar
+// "ausente" de "invalido").
+// Revisao destrutiva (Plano Tecnico, correcao final, item 39): a versao anterior usava
+// `header.split(" ")[1]`, que corta silenciosamente no primeiro espaco -- um cabecalho com
+// espacos duplicados ("PreInterview  abc") pegava a string vazia entre eles como token, nunca
+// "abc". A expressao regular abaixo exige exatamente "<scheme> <token-sem-espacos>" do inicio
+// ao fim do cabecalho (apos trim): multiplos espacos entre scheme/token sao aceitos
+// (`\s+`), mas qualquer conteudo alem de um unico token final (por exemplo, dois cabecalhos
+// Authorization concatenados pelo Node em "PreInterview a, PreInterview b") nunca casa, e cai
+// no mesmo caminho seguro de token vazio/invalido. O nome do scheme e comparado sem diferenciar
+// maiusculas/minusculas (mesma leniencia convencional de esquemas de autenticacao HTTP); o
+// token em si nunca tem essa leniencia aplicada.
+const PRE_INTERVIEW_AUTH_HEADER = /^PreInterview\s+(\S+)$/i;
+// Limite defensivo de tamanho -- nenhum token legitimo gerado por este modulo passa de 43
+// caracteres (32 bytes em base64url); um valor muito maior nunca e util, apenas descartado
+// antes de qualquer hash, sem custo de processamento desnecessario.
+const MAX_ACCESS_TOKEN_LENGTH = 512;
+
+function extractAccessToken(request: Request) {
+  const header = request.header("Authorization");
+  if (!header) {
+    return "";
+  }
+  const match = PRE_INTERVIEW_AUTH_HEADER.exec(header.trim());
+  const token = match?.[1] ?? "";
+  return token.length > MAX_ACCESS_TOKEN_LENGTH ? "" : token;
 }
 
 function asyncHandler(

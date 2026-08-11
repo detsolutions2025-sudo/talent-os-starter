@@ -39,7 +39,15 @@ describe("Fase 17 - Candidatura Publica - fluxo principal", () => {
 
     const payload = applicationPayload();
     const response = await submitApplication(app, fixture.slug, payload).expect(201);
-    expect(response.body).toEqual({ status: "received", submissionId: expect.any(String) });
+    // Fase 18: `nextStep` e um campo aditivo novo no DTO publico (Plano Tecnico da Fase 18,
+    // correcao final, item 1/23) -- `null` aqui porque esta suite da Fase 17 nao conecta
+    // `preInterviews` a `createApp` (tests/phase17/helpers.ts), e nunca contem
+    // `candidateApplicationId` (sempre interno, nunca serializado).
+    expect(response.body).toEqual({
+      status: "received",
+      submissionId: expect.any(String),
+      nextStep: null
+    });
 
     const candidateRow = await database.pool.query(
       "SELECT * FROM candidates WHERE organization_id = $1 AND normalized_email = $2",

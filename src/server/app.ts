@@ -12,6 +12,7 @@ import type { InterviewService } from "./interviews/service";
 import type { JobOpeningService } from "./job-openings/service";
 import type { JobProfileService } from "./job-profiles/service";
 import type { OrganizationalUnitService } from "./organizational-units/service";
+import type { PreInterviewService } from "./pre-interviews/service";
 import type { PublicApplicationService } from "./public-applications/service";
 import type { QuestionService } from "./questions/service";
 
@@ -28,7 +29,8 @@ export function createServer(
   interviews?: InterviewService,
   ai?: AIService,
   blueprints?: BlueprintService,
-  publicApplications?: PublicApplicationService
+  publicApplications?: PublicApplicationService,
+  preInterviews?: PreInterviewService
 ) {
   const app = express();
 
@@ -64,7 +66,8 @@ export function createServer(
       interviews,
       ai,
       blueprints,
-      publicApplications
+      publicApplications,
+      preInterviews
     )
   );
 
@@ -81,6 +84,28 @@ export function createServer(
           error: {
             code: error.code,
             message: error.message
+          }
+        });
+        return;
+      }
+
+      // Revisao destrutiva da Fase 18, item 40: um body maior que o limite explicito de
+      // `express.json({ limit: "256kb" })` (linha acima) e rejeitado pelo `body-parser` ANTES
+      // de qualquer rota rodar, com um erro que nunca e uma `AppError` -- sem este ramo, ele
+      // caia no 500 "internal_error" generico abaixo, escondendo que a causa real e um payload
+      // grande demais do proprio cliente (um 413 explicito, nao uma falha interna do servidor).
+      // Afeta toda a API (nao so as rotas da Fase 18), mas nunca foi verificado ponta a ponta
+      // ate esta revisao.
+      if (
+        error &&
+        typeof error === "object" &&
+        "type" in error &&
+        (error as { type?: unknown }).type === "entity.too.large"
+      ) {
+        response.status(413).json({
+          error: {
+            code: "payload_too_large",
+            message: "Request body is too large."
           }
         });
         return;
