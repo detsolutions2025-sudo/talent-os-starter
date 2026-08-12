@@ -18,6 +18,7 @@ import type { OrganizationalUnitService } from "../organizational-units/service"
 import type { PreInterviewService } from "../pre-interviews/service";
 import type { PublicApplicationService } from "../public-applications/service";
 import type { QuestionService } from "../questions/service";
+import type { BehavioralAssessmentService } from "../behavioral-assessments/service";
 
 export function createApiRouter(
   core: CoreService,
@@ -33,10 +34,11 @@ export function createApiRouter(
   ai?: AIService,
   blueprints?: BlueprintService,
   publicApplications?: PublicApplicationService,
-  // Fase 18 (SPEC-021 v1.0). Ultimo parametro posicional -- mesma convencao ja usada por todo
+  preInterviews?: PreInterviewService,
+  // Fase 19 (SPEC-022 v1.0). Ultimo parametro posicional -- mesma convencao ja usada por todo
   // o roteador (cada Fase acrescenta seu servico opcional ao final da assinatura, nunca no
   // meio, para nao quebrar nenhuma chamada posicional ja existente de fases anteriores).
-  preInterviews?: PreInterviewService
+  behavioralAssessments?: BehavioralAssessmentService
 ): Router {
   const router = createRouter();
 
@@ -1719,6 +1721,474 @@ export function createApiRouter(
     );
   }
 
+  // Fase 19 -- Perfil Comportamental (SPEC-022 v1.0). Sem DISC proprietario, sem IA, sem
+  // score global, sem ranking/matching. Rotas publicas sem `getActor`, resolvidas por token
+  // opaco em header dedicado -- nunca no path nem em query string (mesmo padrao ja usado pela
+  // Pre-Entrevista, Fase 18).
+  if (behavioralAssessments) {
+    // --- Instrumentos globais (Platform Admin) -------------------------------------------
+    router.post(
+      "/platform/behavioral-instruments",
+      asyncHandler(async (request, response) => {
+        const created = await behavioralAssessments.createGlobalInstrument(
+          getActor(request),
+          request.body
+        );
+        response.status(201).json(created);
+      })
+    );
+
+    router.get(
+      "/platform/behavioral-instruments",
+      asyncHandler(async (request, response) => {
+        response.json(await behavioralAssessments.listGlobalInstruments(getActor(request)));
+      })
+    );
+
+    router.get(
+      "/platform/behavioral-instruments/:instrumentId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await behavioralAssessments.getInstrument(
+            getActor(request),
+            null,
+            routeParam(request.params.instrumentId)
+          )
+        );
+      })
+    );
+
+    router.patch(
+      "/platform/behavioral-instruments/:instrumentId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await behavioralAssessments.updateInstrument(
+            getActor(request),
+            null,
+            routeParam(request.params.instrumentId),
+            request.body
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/platform/behavioral-instruments/:instrumentId/status",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await behavioralAssessments.setInstrumentStatus(
+            getActor(request),
+            null,
+            routeParam(request.params.instrumentId),
+            request.body?.status
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/platform/behavioral-instruments/:instrumentId/versions",
+      asyncHandler(async (request, response) => {
+        const created = await behavioralAssessments.createDraftVersion(
+          getActor(request),
+          null,
+          routeParam(request.params.instrumentId),
+          request.body
+        );
+        response.status(201).json(created);
+      })
+    );
+
+    router.get(
+      "/platform/behavioral-instruments/:instrumentId/versions",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await behavioralAssessments.listVersions(
+            getActor(request),
+            null,
+            routeParam(request.params.instrumentId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/platform/behavioral-instruments/:instrumentId/versions/:versionId/activate",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await behavioralAssessments.activateVersion(
+            getActor(request),
+            null,
+            routeParam(request.params.instrumentId),
+            routeParam(request.params.versionId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/platform/behavioral-instruments/:instrumentId/versions/:versionId/archive",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await behavioralAssessments.archiveVersion(
+            getActor(request),
+            null,
+            routeParam(request.params.instrumentId),
+            routeParam(request.params.versionId)
+          )
+        );
+      })
+    );
+
+    // --- Instrumentos proprios da Organization --------------------------------------------
+    router.post(
+      "/organizations/:organizationId/behavioral-instruments",
+      asyncHandler(async (request, response) => {
+        const created = await behavioralAssessments.createPrivateInstrument(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          request.body
+        );
+        response.status(201).json(created);
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/behavioral-instruments",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await behavioralAssessments.listAvailableInstruments(
+            getActor(request),
+            routeParam(request.params.organizationId)
+          )
+        );
+      })
+    );
+
+    // Rota literal ("platform-catalog") registrada ANTES da rota parametrizada
+    // (":instrumentId") de proposito -- o Express casa rotas na ordem de registro, nunca por
+    // especificidade; se viesse depois, toda chamada a este caminho seria capturada como se
+    // "platform-catalog" fosse um instrumentId.
+    router.get(
+      "/organizations/:organizationId/behavioral-instruments/platform-catalog",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await behavioralAssessments.listGlobalCatalog(
+            getActor(request),
+            routeParam(request.params.organizationId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/behavioral-instruments/:instrumentId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await behavioralAssessments.getInstrument(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.instrumentId)
+          )
+        );
+      })
+    );
+
+    router.patch(
+      "/organizations/:organizationId/behavioral-instruments/:instrumentId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await behavioralAssessments.updateInstrument(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.instrumentId),
+            request.body
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/behavioral-instruments/:instrumentId/status",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await behavioralAssessments.setInstrumentStatus(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.instrumentId),
+            request.body?.status
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/behavioral-instruments/:instrumentId/versions",
+      asyncHandler(async (request, response) => {
+        const created = await behavioralAssessments.createDraftVersion(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          routeParam(request.params.instrumentId),
+          request.body
+        );
+        response.status(201).json(created);
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/behavioral-instruments/:instrumentId/versions",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await behavioralAssessments.listVersions(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.instrumentId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/behavioral-instruments/:instrumentId/versions/:versionId/activate",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await behavioralAssessments.activateVersion(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.instrumentId),
+            routeParam(request.params.versionId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/behavioral-instruments/:instrumentId/versions/:versionId/archive",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await behavioralAssessments.archiveVersion(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.instrumentId),
+            routeParam(request.params.versionId)
+          )
+        );
+      })
+    );
+
+    // --- Disponibilidade de instrumento global por Organization ---------------------------
+    router.get(
+      "/organizations/:organizationId/behavioral-instrument-settings",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await behavioralAssessments.listOrganizationInstrumentSettings(
+            getActor(request),
+            routeParam(request.params.organizationId)
+          )
+        );
+      })
+    );
+
+    router.put(
+      "/organizations/:organizationId/behavioral-instrument-settings/:instrumentId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await behavioralAssessments.setOrganizationInstrumentEnabled(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.instrumentId),
+            request.body
+          )
+        );
+      })
+    );
+
+    // --- Preferencia da vaga (nunca dispara aplicacao sozinha) -----------------------------
+    router.get(
+      "/organizations/:organizationId/job-openings/:jobOpeningId/behavioral-assessment-settings",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await behavioralAssessments.getJobOpeningSettings(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.jobOpeningId)
+          )
+        );
+      })
+    );
+
+    router.put(
+      "/organizations/:organizationId/job-openings/:jobOpeningId/behavioral-assessment-settings",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await behavioralAssessments.updateJobOpeningSettings(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.jobOpeningId),
+            request.body
+          )
+        );
+      })
+    );
+
+    // --- Aplicacoes (sempre ato administrativo explicito, SPEC-022 secao 9.1) --------------
+    router.post(
+      "/organizations/:organizationId/candidate-applications/:applicationId/behavioral-assessments",
+      asyncHandler(async (request, response) => {
+        const created = await behavioralAssessments.createAssessment(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          routeParam(request.params.applicationId),
+          request.body
+        );
+        response.status(201).json(created);
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/candidate-applications/:applicationId/behavioral-assessments/external-import",
+      asyncHandler(async (request, response) => {
+        const created = await behavioralAssessments.registerExternalImport(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          routeParam(request.params.applicationId),
+          request.body
+        );
+        response.status(201).json(created);
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/candidate-applications/:applicationId/behavioral-assessments",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await behavioralAssessments.listByApplication(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.applicationId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/behavioral-assessments/:assessmentId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await behavioralAssessments.getById(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.assessmentId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/behavioral-assessments/:assessmentId/cancel",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await behavioralAssessments.cancel(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.assessmentId),
+            request.body
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/behavioral-assessments/:assessmentId/retry",
+      asyncHandler(async (request, response) => {
+        const created = await behavioralAssessments.retry(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          routeParam(request.params.assessmentId)
+        );
+        response.status(201).json(created);
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/behavioral-assessments/:assessmentId/events",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await behavioralAssessments.timeline(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.assessmentId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/platform/organizations/:organizationId/behavioral-assessments/admin-read",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await behavioralAssessments.adminRead(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            request.body
+          )
+        );
+      })
+    );
+
+    // --- Publico (Candidate, via token opaco em header, nunca no path/query) --------------
+    router.get(
+      "/public/behavioral-assessments/current",
+      asyncHandler(async (request, response) => {
+        response.set("Cache-Control", "no-store");
+        response.json(
+          await behavioralAssessments.getPublic(extractBehavioralAssessmentAccessToken(request), {
+            ip: request.ip ?? request.socket.remoteAddress ?? "unknown"
+          })
+        );
+      })
+    );
+
+    router.post(
+      "/public/behavioral-assessments/start",
+      asyncHandler(async (request, response) => {
+        response.set("Cache-Control", "no-store");
+        response.json(
+          await behavioralAssessments.start(extractBehavioralAssessmentAccessToken(request), {
+            ip: request.ip ?? request.socket.remoteAddress ?? "unknown"
+          })
+        );
+      })
+    );
+
+    router.put(
+      "/public/behavioral-assessments/responses/:itemPublicId",
+      asyncHandler(async (request, response) => {
+        response.set("Cache-Control", "no-store");
+        response.json(
+          await behavioralAssessments.saveResponse(
+            extractBehavioralAssessmentAccessToken(request),
+            routeParam(request.params.itemPublicId),
+            request.body,
+            { ip: request.ip ?? request.socket.remoteAddress ?? "unknown" }
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/public/behavioral-assessments/submit",
+      asyncHandler(async (request, response) => {
+        response.set("Cache-Control", "no-store");
+        response.json(
+          await behavioralAssessments.submit(extractBehavioralAssessmentAccessToken(request), {
+            ip: request.ip ?? request.socket.remoteAddress ?? "unknown"
+          })
+        );
+      })
+    );
+  }
+
   if (candidates) {
     router.post(
       "/organizations/:organizationId/candidates",
@@ -2693,6 +3163,21 @@ function extractAccessToken(request: Request) {
     return "";
   }
   const match = PRE_INTERVIEW_AUTH_HEADER.exec(header.trim());
+  const token = match?.[1] ?? "";
+  return token.length > MAX_ACCESS_TOKEN_LENGTH ? "" : token;
+}
+
+// Fase 19 (SPEC-022, secao 25.1): mesmo padrao de extracao da Pre-Entrevista (Fase 18), com
+// scheme dedicado -- nunca compartilha o mesmo scheme HTTP de outro modulo de token opaco,
+// para nao permitir que um token de uma finalidade seja aceito por engano na rota de outra.
+const BEHAVIORAL_ASSESSMENT_AUTH_HEADER = /^BehavioralAssessment\s+(\S+)$/i;
+
+function extractBehavioralAssessmentAccessToken(request: Request) {
+  const header = request.header("Authorization");
+  if (!header) {
+    return "";
+  }
+  const match = BEHAVIORAL_ASSESSMENT_AUTH_HEADER.exec(header.trim());
   const token = match?.[1] ?? "";
   return token.length > MAX_ACCESS_TOKEN_LENGTH ? "" : token;
 }

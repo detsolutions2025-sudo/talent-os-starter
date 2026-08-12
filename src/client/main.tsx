@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { App } from "./App";
 import { PublicApplicationForm } from "./PublicApplicationForm";
 import { PublicPreInterviewForm } from "./PublicPreInterviewForm";
+import { PublicBehavioralAssessmentForm } from "./PublicBehavioralAssessmentForm";
 
 // Fase 17 (SPEC-020 v1.1): a candidatura publica precisa ser acessivel por um Visitante nao
 // autenticado, sem passar pelo App interno (que sempre exige contexto de dev-auth). Nao ha
@@ -14,6 +15,10 @@ const publicApplicationMatch = window.location.pathname.match(/^\/vagas\/([^/]+)
 // fixa e o token chega exclusivamente pelo fragment (`#access=...`), lido dentro do proprio
 // componente, nunca pelo roteamento.
 const publicPreInterviewMatch = window.location.pathname.match(/^\/pre-interview\/?$/);
+// Fase 19 (SPEC-022, secao 25.1): mesmo padrao -- token nunca no path, so no fragment.
+const publicBehavioralAssessmentMatch = window.location.pathname.match(
+  /^\/behavioral-assessment\/?$/
+);
 
 const root = (
   <React.StrictMode>
@@ -21,6 +26,8 @@ const root = (
       <PublicApplicationForm slug={decodeURIComponent(publicApplicationMatch[1])} />
     ) : publicPreInterviewMatch ? (
       <PublicPreInterviewForm />
+    ) : publicBehavioralAssessmentMatch ? (
+      <PublicBehavioralAssessmentForm />
     ) : (
       <App />
     )}

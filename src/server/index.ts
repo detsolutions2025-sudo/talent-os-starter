@@ -18,6 +18,7 @@ import { createPostgresPreInterviewService } from "./pre-interviews/service";
 import { createPostgresPool, requirePostgresDatabaseUrl } from "./postgres";
 import { createPostgresPublicApplicationService } from "./public-applications/service";
 import { createPostgresQuestionService } from "./questions/service";
+import { createPostgresBehavioralAssessmentService } from "./behavioral-assessments/service";
 
 const port = Number(process.env.PORT ?? 3001);
 const connectionString = requirePostgresDatabaseUrl();
@@ -72,7 +73,9 @@ const app = createServer(
   aiService,
   createPostgresBlueprintService(pool),
   createPostgresPublicApplicationService(pool, candidateService, candidateApplicationService),
-  createPostgresPreInterviewService(pool)
+  createPostgresPreInterviewService(pool),
+  // Fase 19 (SPEC-022 v1.0). Sem DISC proprietario, sem IA, sem score global/ranking/matching.
+  createPostgresBehavioralAssessmentService(pool)
 );
 
 app.listen(port, () => {

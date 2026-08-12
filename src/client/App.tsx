@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { BlueprintPanel } from "./BlueprintPanel";
 import { PreInterviewPanel } from "./PreInterviewPanel";
+import { BehavioralInstrumentPanel } from "./BehavioralInstrumentPanel";
+import { BehavioralAssessmentPanel } from "./BehavioralAssessmentPanel";
 import "./styles.css";
 
 type Organization = {
@@ -2189,6 +2191,22 @@ export function App() {
 
         {selectedOrganization && (
           <PreInterviewPanel
+            organizationId={selectedOrganization.id}
+            role={currentMembership?.role}
+            headers={devHeaders}
+          />
+        )}
+
+        {selectedOrganization && (
+          <BehavioralInstrumentPanel
+            organizationId={selectedOrganization.id}
+            role={currentMembership?.role}
+            headers={devHeaders}
+          />
+        )}
+
+        {selectedOrganization && (
+          <BehavioralAssessmentPanel
             organizationId={selectedOrganization.id}
             role={currentMembership?.role}
             headers={devHeaders}

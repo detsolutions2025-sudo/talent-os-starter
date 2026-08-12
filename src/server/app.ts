@@ -15,6 +15,7 @@ import type { OrganizationalUnitService } from "./organizational-units/service";
 import type { PreInterviewService } from "./pre-interviews/service";
 import type { PublicApplicationService } from "./public-applications/service";
 import type { QuestionService } from "./questions/service";
+import type { BehavioralAssessmentService } from "./behavioral-assessments/service";
 
 export function createServer(
   core: CoreService,
@@ -30,7 +31,8 @@ export function createServer(
   ai?: AIService,
   blueprints?: BlueprintService,
   publicApplications?: PublicApplicationService,
-  preInterviews?: PreInterviewService
+  preInterviews?: PreInterviewService,
+  behavioralAssessments?: BehavioralAssessmentService
 ) {
   const app = express();
 
@@ -67,7 +69,8 @@ export function createServer(
       ai,
       blueprints,
       publicApplications,
-      preInterviews
+      preInterviews,
+      behavioralAssessments
     )
   );
 
