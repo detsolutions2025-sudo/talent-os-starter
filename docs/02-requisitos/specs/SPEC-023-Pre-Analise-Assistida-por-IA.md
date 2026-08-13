@@ -1,10 +1,10 @@
 # SPEC-023 - Pré-Análise Assistida por IA
 
 **Status:** Aprovada
-**Versão:** 1.0
+**Versão:** 1.1
 **Fase:** 20
 **Responsável de negócio:** Thiago Sousa
-**Última atualização:** 2026-08-11
+**Última atualização:** 2026-08-12
 **Dependências:** SPEC-009 - Banco de Perguntas, SPEC-010 - Vagas, SPEC-011 - Candidatos (v1.2), SPEC-012 - Processo Seletivo (v1.1), SPEC-014 - Infraestrutura de IA, SPEC-018 - Blueprint Organizacional / Implantação Guiada, SPEC-021 - Pré-Entrevista Estruturada, SPEC-022 - Perfil Comportamental, ADR-0013, ADR-0014, ADR-0015, ADR-0016, ADR-0017, ADR-0018, ADR-0019, ADR-0020, ADR-0021, ADR-0022, ADR-0023
 
 **Nota de revisão (v1.0 — revisão destrutiva):** a versão 0.1 (Rascunho)
@@ -37,6 +37,23 @@ ausência de garantia de que uma execução nunca fica presa em `running`
 acesso automático a conteúdo funcional (seção 24.3, seção 24.4). O
 detalhamento completo de cada decisão está na seção 40. Nenhum conflito
 crítico ou importante permanece em aberto após esta revisão (seção 43).
+
+**Nota de revisão (v1.1 — correção normativa mínima de provenance):** a
+revisão destrutiva do Plano Técnico de implementação desta Fase identificou
+que dois dos cinco `source_type` autorizados pela seção 10.1
+(`job_opening_version`, `blueprint_version`) não tinham `origin_kind`
+correspondente na taxonomia de cinco tipos herdada da ADR-0023, porque a
+definição original de `declared_data` (seção 12) estava redigida como
+exclusiva do candidato. Esta versão fecha esse bloqueio, sem criar nenhum
+valor novo de `origin_kind` e sem alterar nenhuma outra seção desta SPEC:
+a definição de `declared_data` (seção 12) é precisada para cobrir também
+conteúdo declarado/publicado pela própria Organization, mantendo os cinco
+valores canônicos e mantendo `source_type` como o campo que sempre
+identifica a fonte técnica exata — os dois nunca se confundem. `ADR-0023`
+recebeu a mesma nota de precisão, sem reabrir sua decisão nem alterar seu
+`Status` (`Aceita`). Nenhum outro achado, estado, permissão, regra de
+consentimento, fail-safe, schema de saída ou critério de aceite desta SPEC
+é alterado por esta revisão.
 
 ## 1. Objetivo
 
@@ -1010,13 +1027,24 @@ de dados; envia somente os dados necessários"). Isso permite, no mínimo:
 
 ## 12. Distinção entre Tipos de Origem
 
-Esta SPEC aplica, sem nenhuma alteração, a taxonomia de cinco tipos já
-formalizada pela ADR-0023 (seção "Evidências e Rastreabilidade") a todo
-`PreAnalysisEvidence.origin_kind`:
+Esta SPEC aplica a taxonomia de cinco tipos já formalizada pela ADR-0023
+(seção "Evidências e Rastreabilidade") a todo `PreAnalysisEvidence.origin_kind`
+— com a mesma precisão de `declared_data` já incorporada pela ADR-0023 (nota
+de precisão normativa, seção "Evidências e Rastreabilidade"): a taxonomia
+continua com cinco valores, nenhum novo tipo é criado, e apenas a autoria
+possível de `declared_data` é esclarecida:
 
 - `declared_data` (**dado declarado**) — informação fornecida diretamente
-  pelo candidato (por exemplo, campos do `Candidate`, respostas da
-  Pré-Entrevista);
+  pela parte com autoridade sobre o próprio conteúdo: pelo candidato, para
+  informação de sua própria autoria (por exemplo, campos permitidos do
+  `Candidate`, respostas submetidas da Pré-Entrevista); ou pela própria
+  Organization, para conteúdo que ela mesma publica e mantém (por exemplo,
+  `job_opening_version`, `blueprint_version`). Em ambos os casos, o
+  `source_type` (seção 10.1) da evidência identifica precisamente qual
+  entidade técnica originou o conteúdo — `origin_kind` classifica a
+  natureza/proveniência conceitual da evidência, `source_type` identifica a
+  origem técnica específica; os dois nunca são a mesma coisa, e um nunca
+  substitui o outro;
 - `observed_evidence` (**evidência observada**) — informação registrada por
   um humano durante entrevista ou avaliação (nunca utilizada por esta
   Feature — decisão definitiva, seção 10.2 — mantida na taxonomia apenas

@@ -19,6 +19,7 @@ import type { PreInterviewService } from "../pre-interviews/service";
 import type { PublicApplicationService } from "../public-applications/service";
 import type { QuestionService } from "../questions/service";
 import type { BehavioralAssessmentService } from "../behavioral-assessments/service";
+import type { PreAnalysisService } from "../pre-analyses/service";
 
 export function createApiRouter(
   core: CoreService,
@@ -35,10 +36,11 @@ export function createApiRouter(
   blueprints?: BlueprintService,
   publicApplications?: PublicApplicationService,
   preInterviews?: PreInterviewService,
-  // Fase 19 (SPEC-022 v1.0). Ultimo parametro posicional -- mesma convencao ja usada por todo
+  behavioralAssessments?: BehavioralAssessmentService,
+  // Fase 20 (SPEC-023 v1.1). Ultimo parametro posicional -- mesma convencao ja usada por todo
   // o roteador (cada Fase acrescenta seu servico opcional ao final da assinatura, nunca no
   // meio, para nao quebrar nenhuma chamada posicional ja existente de fases anteriores).
-  behavioralAssessments?: BehavioralAssessmentService
+  preAnalyses?: PreAnalysisService
 ): Router {
   const router = createRouter();
 
@@ -3124,6 +3126,129 @@ export function createApiRouter(
             getActor(request),
             routeParam(request.params.organizationId),
             typeof featureKey === "string" ? featureKey : undefined
+          )
+        );
+      })
+    );
+  }
+
+  // --- Fase 20 (SPEC-023 v1.1) - Pre-Analise Assistida por IA -----------------------------
+  // Sem rota publica -- o Candidate nunca e ator desta SPEC (Sec 3, Sec 24.1, Sec 26).
+  if (preAnalyses) {
+    router.post(
+      "/organizations/:organizationId/candidate-applications/:applicationId/pre-analyses",
+      asyncHandler(async (request, response) => {
+        const created = await preAnalyses.requestPreAnalysis(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          { candidateApplicationId: routeParam(request.params.applicationId) }
+        );
+        response.status(201).json(created);
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/candidate-applications/:applicationId/pre-analyses",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await preAnalyses.listByApplication(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.applicationId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/pre-analyses/:preAnalysisId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await preAnalyses.getForOwner(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.preAnalysisId)
+          )
+        );
+      })
+    );
+
+    // `member` recebe exclusivamente id+status (SPEC-023 Sec 24.2) -- este endpoint delega ao
+    // service, que decide o DTO pelo role real da Membership, nunca pelo que o cliente pede.
+    router.get(
+      "/organizations/:organizationId/pre-analyses/:preAnalysisId/status",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await preAnalyses.getForMember(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.preAnalysisId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/pre-analyses/:preAnalysisId/result",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await preAnalyses.getResult(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.preAnalysisId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/pre-analyses/:preAnalysisId/evidences",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await preAnalyses.getEvidences(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.preAnalysisId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/pre-analyses/:preAnalysisId/events",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await preAnalyses.listEvents(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.preAnalysisId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/pre-analyses/:preAnalysisId/cancel",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await preAnalyses.cancel(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.preAnalysisId),
+            request.body
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/platform/organizations/:organizationId/pre-analyses/admin-read",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await preAnalyses.adminRead(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            request.body
           )
         );
       })

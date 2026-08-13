@@ -506,7 +506,11 @@ ficar sem origem identificavel.
 O Dossie Inteligente, e qualquer relatorio equivalente produzido por esta
 jornada, deve distinguir conceitualmente:
 
-- `dado declarado` — informacao fornecida diretamente pelo candidato;
+- `dado declarado` — informacao fornecida diretamente pela parte com
+  autoridade sobre o proprio conteudo: pelo candidato, quando a informacao
+  e de sua propria autoria; ou pela propria Organization, quando o
+  conteudo e algo que ela mesma publica e mantem (por exemplo, a versao da
+  Vaga, o Blueprint Organizacional);
 - `evidencia observada` — informacao registrada por um humano durante
   entrevista ou avaliacao;
 - `resultado de instrumento` — saida de um instrumento formal aplicado (por
@@ -520,6 +524,20 @@ jornada, deve distinguir conceitualmente:
 Esses cinco tipos de origem nunca sao apresentados de forma indistinta. Uma
 conclusao sem origem identificavel nao deve ser exibida como informacao
 valida do Dossie.
+
+**Nota de precisao normativa (posterior a esta ADR, sem reabrir sua
+decisao):** `dado declarado` sempre se definiu pela autoria do conteudo,
+nunca pela identidade fixa de quem declara — esta nota apenas remove uma
+leitura possivel, mas nunca pretendida, que restringia esse tipo ao
+candidato. Nenhum tipo novo e criado por esta nota; a taxonomia permanece
+com cinco valores. A fonte tecnica exata de cada evidencia dentro de
+`dado declarado` (por exemplo, campo do `Candidate`, resposta de
+Pre-Entrevista, versao da Vaga, Blueprint Version) e sempre identificada
+por um campo tecnico proprio da SPEC consumidora (`source_type`, na
+SPEC-023), nunca pelo proprio tipo de origem — os dois nunca sao a mesma
+coisa: o tipo de origem classifica a natureza/proveniencia conceitual da
+evidencia; o campo tecnico identifica precisamente de qual entidade ela
+veio.
 
 ## Aderencia
 
