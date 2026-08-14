@@ -20,6 +20,7 @@ import { createPostgresPublicApplicationService } from "./public-applications/se
 import { createPostgresQuestionService } from "./questions/service";
 import { createPostgresBehavioralAssessmentService } from "./behavioral-assessments/service";
 import { createPostgresPreAnalysisService } from "./pre-analyses/service";
+import { createPostgresCandidateDossierService } from "./candidate-dossiers/service";
 
 const port = Number(process.env.PORT ?? 3001);
 const connectionString = requirePostgresDatabaseUrl();
@@ -80,7 +81,9 @@ const app = createServer(
   // Fase 20 (SPEC-023 v1.1). Sem score/ranking/matching/decisao automatica (ADR-0023 "Scores").
   // Reutiliza a mesma instancia de AIService do resto da plataforma -- toda execucao passa
   // exclusivamente por `aiService.gateway.execute()`, nunca um caminho alternativo.
-  createPostgresPreAnalysisService(pool, aiService)
+  createPostgresPreAnalysisService(pool, aiService),
+  // Fase 21 (SPEC-024 v1.1). Dossie materializado sem criar nova AI Execution.
+  createPostgresCandidateDossierService(pool)
 );
 
 app.listen(port, () => {

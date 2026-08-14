@@ -17,6 +17,7 @@ import type { PublicApplicationService } from "./public-applications/service";
 import type { QuestionService } from "./questions/service";
 import type { BehavioralAssessmentService } from "./behavioral-assessments/service";
 import type { PreAnalysisService } from "./pre-analyses/service";
+import type { CandidateDossierService } from "./candidate-dossiers/service";
 
 export function createServer(
   core: CoreService,
@@ -34,7 +35,8 @@ export function createServer(
   publicApplications?: PublicApplicationService,
   preInterviews?: PreInterviewService,
   behavioralAssessments?: BehavioralAssessmentService,
-  preAnalyses?: PreAnalysisService
+  preAnalyses?: PreAnalysisService,
+  candidateDossiers?: CandidateDossierService
 ) {
   const app = express();
 
@@ -73,7 +75,8 @@ export function createServer(
       publicApplications,
       preInterviews,
       behavioralAssessments,
-      preAnalyses
+      preAnalyses,
+      candidateDossiers
     )
   );
 

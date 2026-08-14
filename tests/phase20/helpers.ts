@@ -23,6 +23,10 @@ import {
   type PreAnalysisTestingHooks
 } from "../../src/server/pre-analyses/service";
 import {
+  createPostgresCandidateDossierService,
+  type CandidateDossierTestingHooks
+} from "../../src/server/candidate-dossiers/service";
+import {
   preAnalysisFeatureKey,
   preAnalysisConsentPurpose
 } from "../../src/server/pre-analyses/types";
@@ -44,6 +48,7 @@ export function createAppWithServices(
   options: {
     aiOptions?: CreateAIServiceOptions;
     preAnalysisTestingHooks?: PreAnalysisTestingHooks;
+    candidateDossierTestingHooks?: CandidateDossierTestingHooks;
     reconciliationThresholdsMs?: { requested: number; running: number };
   } = {}
 ) {
@@ -79,7 +84,8 @@ export function createAppWithServices(
     ),
     createPostgresPreInterviewService(database.pool),
     createPostgresBehavioralAssessmentService(database.pool),
-    preAnalysisService
+    preAnalysisService,
+    createPostgresCandidateDossierService(database.pool, options.candidateDossierTestingHooks ?? {})
   );
   return { app, aiService, preAnalysisService };
 }

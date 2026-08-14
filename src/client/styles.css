@@ -156,7 +156,8 @@ h1 {
 .dna-panel,
 .org-units-panel,
 .competencies-panel,
-.job-profiles-panel {
+.job-profiles-panel,
+.pre-analysis-panel {
   grid-column: 1 / -1;
 }
 
@@ -184,10 +185,55 @@ h1 {
 }
 
 .job-profile-form textarea,
-.competency-form textarea {
+.competency-form textarea,
+.pre-analysis-panel textarea {
   min-height: 96px;
   padding: 10px 12px;
   resize: vertical;
+}
+
+.pre-analysis-panel {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.pre-analysis-panel label {
+  display: grid;
+  gap: 6px;
+  color: #485158;
+}
+
+.pre-analysis-panel input,
+.pre-analysis-panel textarea {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #c8cec2;
+  border-radius: 6px;
+  padding: 0 12px;
+  background: #ffffff;
+  color: #182026;
+  font: inherit;
+}
+
+.pre-analysis-panel ul {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pre-analysis-panel li {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid #eef0ea;
+  padding-top: 10px;
+}
+
+.pre-analysis-panel code {
+  overflow-wrap: anywhere;
+  color: #667078;
 }
 
 .member-form input,

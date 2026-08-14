@@ -20,6 +20,7 @@ import type { PublicApplicationService } from "../public-applications/service";
 import type { QuestionService } from "../questions/service";
 import type { BehavioralAssessmentService } from "../behavioral-assessments/service";
 import type { PreAnalysisService } from "../pre-analyses/service";
+import type { CandidateDossierService } from "../candidate-dossiers/service";
 
 export function createApiRouter(
   core: CoreService,
@@ -40,7 +41,9 @@ export function createApiRouter(
   // Fase 20 (SPEC-023 v1.1). Ultimo parametro posicional -- mesma convencao ja usada por todo
   // o roteador (cada Fase acrescenta seu servico opcional ao final da assinatura, nunca no
   // meio, para nao quebrar nenhuma chamada posicional ja existente de fases anteriores).
-  preAnalyses?: PreAnalysisService
+  preAnalyses?: PreAnalysisService,
+  // Fase 21 (SPEC-024 v1.1). Mantido no fim da assinatura posicional.
+  candidateDossiers?: CandidateDossierService
 ): Router {
   const router = createRouter();
 
@@ -3246,6 +3249,91 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await preAnalyses.adminRead(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            request.body
+          )
+        );
+      })
+    );
+  }
+
+  // --- Fase 21 (SPEC-024 v1.1) - Dossie Inteligente do Candidato -------------------------
+  // Sem rota publica e sem chamada a AIService: materializa fontes ja existentes.
+  if (candidateDossiers) {
+    router.post(
+      "/organizations/:organizationId/candidate-applications/:applicationId/candidate-dossiers",
+      asyncHandler(async (request, response) => {
+        const created = await candidateDossiers.generate(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          {
+            ...request.body,
+            candidateApplicationId: routeParam(request.params.applicationId)
+          },
+          request.header("Idempotency-Key")
+        );
+        response.status(201).json(created);
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/candidate-applications/:applicationId/candidate-dossiers",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await candidateDossiers.listByApplication(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.applicationId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/candidate-dossiers/:candidateDossierId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await candidateDossiers.getForOwner(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.candidateDossierId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/candidate-dossiers/:candidateDossierId/status",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await candidateDossiers.getForMember(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.candidateDossierId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/candidate-dossiers/:candidateDossierId/sources",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await candidateDossiers.getSources(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.candidateDossierId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/platform/organizations/:organizationId/candidate-dossiers/admin-read",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await candidateDossiers.adminRead(
             getActor(request),
             routeParam(request.params.organizationId),
             request.body
