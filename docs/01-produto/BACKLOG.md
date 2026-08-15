@@ -33,20 +33,20 @@
 | SPEC-012 | Processo Seletivo                               |    9 | —       | Concluída |
 | SPEC-013 | Entrevistas                                     |   10 | —       | Concluída |
 | SPEC-014 | Infraestrutura de IA                            |   11 | v1.0    | Concluída |
-| SPEC-015 | Propostas                                       |   12 | —       | Rascunho   |
-| SPEC-016 | Onboarding                                      |   13 | —       | Rascunho   |
-| SPEC-017 | Desenvolvimento e Retenção                      |   14 | —       | Rascunho   |
-| SPEC-018 | Blueprint Organizacional / Implantação Guiada   |   15 | —       | Rascunho   |
-| SPEC-019 | Portal Público de Vagas                         |   16 | —       | Rascunho   |
-| SPEC-020 | Candidatura Pública                             |   17 | —       | Rascunho   |
-| SPEC-021 | Pré-Entrevista Estruturada                      |   18 | —       | Rascunho   |
-| SPEC-022 | Perfil Comportamental                           |   19 | —       | Rascunho   |
-| SPEC-023 | Pré-Análise Assistida por IA                    |   20 | —       | Rascunho   |
-| SPEC-024 | Dossiê Inteligente do Candidato                 |   21 | —       | Rascunho   |
+| SPEC-015 | Propostas                                       |   22 | —       | Rascunho   |
+| SPEC-016 | Onboarding                                      |   23 | —       | Rascunho   |
+| SPEC-017 | Desenvolvimento e Retenção                      |   24 | —       | Rascunho   |
+| SPEC-018 | Blueprint Organizacional / Implantação Guiada   |   15 | 1.0     | Aprovada   |
+| SPEC-019 | Portal Público de Vagas                         |   16 | 0.1     | Em revisão |
+| SPEC-020 | Candidatura Pública                             |   17 | 1.1     | Aprovada   |
+| SPEC-021 | Pré-Entrevista Estruturada                      |   18 | 1.0     | Aprovada   |
+| SPEC-022 | Perfil Comportamental                           |   19 | 1.0     | Aprovada   |
+| SPEC-023 | Pré-Análise Assistida por IA                    |   20 | 1.1     | Aprovada   |
+| SPEC-024 | Dossiê Inteligente do Candidato                 |   21 | 1.1     | Aprovada   |
 
 > **Nota sobre SPEC-014:** o item foi corrigido nominalmente para "Infraestrutura de IA" e a Versão para `v1.0`, para corresponder ao documento aprovado (`docs/02-requisitos/specs/SPEC-014-Infraestrutura-de-IA.md`, Status: Aprovada, Versao: 1.0). Status (Concluída) e Fase (11) foram mantidos — não há inconsistência documental nesses dois campos.
 
-> **Nota sobre Fases 15 a 21 (SPEC-018 a SPEC-024):** seguem a mesma sequência estrita de uma Fase por SPEC já usada de SPEC-001 (Fase 1) a SPEC-017 (Fase 14). É uma numeração proposta, não uma alocação de cronograma real — o agrupamento efetivo de fases de implementação pode ser revisto quando essas SPECs forem de fato detalhadas.
+> **Nota sobre SPEC ID e Fase:** o número da SPEC identifica o documento/requisito; o número da Fase representa a ordem de implementação e não precisa coincidir com o número da SPEC. As Fases 12 a 14 permaneceram posições de planejamento originalmente reservadas e não executadas nessa cronologia histórica. As capacidades preservadas como SPEC-015, SPEC-016 e SPEC-017 foram reposicionadas para as Fases 22, 23 e 24. Fases já executadas não devem ser renumeradas retroativamente.
 
 ### Dependências conceituais (SPEC-018 a SPEC-024)
 

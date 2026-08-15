@@ -31,6 +31,11 @@ export interface CandidateApplicationRepository {
   ): Promise<CandidateApplication | null>;
   listApplications(organizationId: string): Promise<CandidateApplication[]>;
   addEvent(event: CandidateApplicationEvent): Promise<void>;
+  findAcceptedProposalVersionForApplication(
+    organizationId: string,
+    candidateApplicationId: string,
+    proposalVersionId: string
+  ): Promise<{ id: string } | null>;
   listEvents(applicationId: string): Promise<CandidateApplicationEvent[]>;
   addNote(note: CandidateApplicationNote): Promise<void>;
   listNotes(applicationId: string): Promise<CandidateApplicationNote[]>;

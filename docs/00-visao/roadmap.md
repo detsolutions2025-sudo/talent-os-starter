@@ -78,3 +78,16 @@ Critério de conclusão:
 - tempo por etapa;
 - relatório do candidato;
 - auditoria.
+
+## Planejamento detalhado pós-Fase 21
+
+A sequência detalhada oficial é controlada pelo `docs/01-produto/BACKLOG.md`.
+Depois da Fase 21 — Dossiê Inteligente do Candidato —, as próximas
+capacidades planejadas são:
+
+- Fase 22 — Propostas;
+- Fase 23 — Onboarding;
+- Fase 24 — Desenvolvimento e Retenção.
+
+As antigas posições de planejamento Fase 12, Fase 13 e Fase 14 não foram
+executadas nessa ordem e não devem ser preenchidas retroativamente.

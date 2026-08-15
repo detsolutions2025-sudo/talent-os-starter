@@ -51,6 +51,7 @@ export type CandidateApplicationEvent = {
   statusAfter: ApplicationStatus | null;
   actorUserId: string | null;
   reason: string | null;
+  proposalVersionId: string | null;
   createdAt: string;
 };
 
@@ -148,6 +149,8 @@ export type CandidateApplicationFinalizationInput = {
   reason?: unknown;
   finalizationReason?: unknown;
   finalization_reason?: unknown;
+  proposalVersionId?: unknown;
+  proposal_version_id?: unknown;
 };
 
 export type CandidateApplicationNoteInput = {

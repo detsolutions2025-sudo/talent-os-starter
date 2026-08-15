@@ -48,11 +48,17 @@ export function validateStageInput(input: CandidateApplicationStageInput) {
 }
 
 export function validateFinalizationInput(input: CandidateApplicationFinalizationInput) {
-  return validateText(
-    input.reason ?? input.finalizationReason ?? input.finalization_reason,
-    1000,
-    "finalization_reason"
-  );
+  return {
+    reason: validateText(
+      input.reason ?? input.finalizationReason ?? input.finalization_reason,
+      1000,
+      "finalization_reason"
+    ),
+    proposalVersionId: validateOptionalText(
+      input.proposalVersionId ?? input.proposal_version_id,
+      120
+    )
+  };
 }
 
 export function validateNoteInput(input: CandidateApplicationNoteInput) {

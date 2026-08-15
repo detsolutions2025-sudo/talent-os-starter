@@ -21,6 +21,7 @@ import { createPostgresQuestionService } from "./questions/service";
 import { createPostgresBehavioralAssessmentService } from "./behavioral-assessments/service";
 import { createPostgresPreAnalysisService } from "./pre-analyses/service";
 import { createPostgresCandidateDossierService } from "./candidate-dossiers/service";
+import { createPostgresProposalService } from "./proposals/service";
 
 const port = Number(process.env.PORT ?? 3001);
 const connectionString = requirePostgresDatabaseUrl();
@@ -83,7 +84,8 @@ const app = createServer(
   // exclusivamente por `aiService.gateway.execute()`, nunca um caminho alternativo.
   createPostgresPreAnalysisService(pool, aiService),
   // Fase 21 (SPEC-024 v1.1). Dossie materializado sem criar nova AI Execution.
-  createPostgresCandidateDossierService(pool)
+  createPostgresCandidateDossierService(pool),
+  createPostgresProposalService(pool)
 );
 
 app.listen(port, () => {

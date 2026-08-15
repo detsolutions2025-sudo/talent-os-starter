@@ -276,6 +276,7 @@ export class CandidateApplicationService {
       statusAfter: "active",
       actorUserId: null,
       reason: null,
+      proposalVersionId: null,
       createdAt: transaction.applications.now()
     });
     return application;
@@ -548,14 +549,28 @@ export class CandidateApplicationService {
       if (status === "hired") {
         await service.ensureOperationalUseAllowed(actor, application, false);
       }
-      const reason = validateFinalizationInput(input);
+      const finalization = validateFinalizationInput(input);
+      if (status === "hired" && finalization.proposalVersionId) {
+        const proposalVersion =
+          await transaction.applications.findAcceptedProposalVersionForApplication(
+            organizationId,
+            application.id,
+            finalization.proposalVersionId
+          );
+        if (!proposalVersion) {
+          throw conflict(
+            "candidate_application_proposal_version_invalid",
+            "Proposal version must be accepted for this application."
+          );
+        }
+      }
       const now = transaction.applications.now();
       const updated: CandidateApplication = {
         ...application,
         applicationStatus: status,
         finalizedAt: now,
         finalizedByUserId: requireUserActorId(actor),
-        finalizationReason: reason,
+        finalizationReason: finalization.reason,
         updatedAt: now,
         updatedByUserId: requireUserActorId(actor)
       };
@@ -567,14 +582,16 @@ export class CandidateApplicationService {
         updated.currentStage,
         application.applicationStatus,
         updated.applicationStatus,
-        reason,
-        requireUserActorId(actor)
+        finalization.reason,
+        requireUserActorId(actor),
+        status === "hired" ? finalization.proposalVersionId : null
       );
       await service.audit(actor, organizationId, `candidate_application.${status}`, {
         candidateApplicationId: application.id,
         statusBefore: application.applicationStatus,
         statusAfter: updated.applicationStatus,
-        reasonProvided: "true"
+        reasonProvided: "true",
+        proposalVersionId: status === "hired" ? (finalization.proposalVersionId ?? "") : ""
       });
       return service.serializeOwnerAdmin(updated);
     });
@@ -892,7 +909,8 @@ export class CandidateApplicationService {
     statusBefore: CandidateApplicationEvent["statusBefore"],
     statusAfter: CandidateApplicationEvent["statusAfter"],
     reason: string | null,
-    actorUserId: string | null
+    actorUserId: string | null,
+    proposalVersionId: string | null = null
   ) {
     await this.applications.addEvent({
       id: this.applications.nextId("caevt"),
@@ -905,6 +923,7 @@ export class CandidateApplicationService {
       statusAfter,
       actorUserId,
       reason,
+      proposalVersionId,
       createdAt: this.applications.now()
     });
   }

@@ -143,9 +143,9 @@ export class PostgresCandidateApplicationRepository implements CandidateApplicat
       `
         INSERT INTO candidate_application_events (
           id, organization_id, candidate_application_id, event_type, stage_before, stage_after,
-          status_before, status_after, actor_user_id, reason, created_at
+          status_before, status_after, actor_user_id, reason, proposal_version_id, created_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       `,
       [
         event.id,
@@ -158,9 +158,30 @@ export class PostgresCandidateApplicationRepository implements CandidateApplicat
         event.statusAfter,
         event.actorUserId,
         event.reason,
+        event.proposalVersionId,
         event.createdAt
       ]
     );
+  }
+
+  async findAcceptedProposalVersionForApplication(
+    organizationId: string,
+    candidateApplicationId: string,
+    proposalVersionId: string
+  ) {
+    const result = await this.connection.query(
+      `
+        SELECT id
+        FROM proposal_versions
+        WHERE organization_id = $1
+          AND candidate_application_id = $2
+          AND id = $3
+          AND status = 'accepted'
+        LIMIT 1
+      `,
+      [organizationId, candidateApplicationId, proposalVersionId]
+    );
+    return result.rows[0] ? { id: String(result.rows[0].id) } : null;
   }
 
   async listEvents(applicationId: string) {
@@ -329,6 +350,7 @@ function mapEvent(row: Record<string, unknown>): CandidateApplicationEvent {
     statusAfter: nullableString(row.status_after) as CandidateApplicationEvent["statusAfter"],
     actorUserId: nullableString(row.actor_user_id),
     reason: nullableString(row.reason),
+    proposalVersionId: nullableString(row.proposal_version_id),
     createdAt: toIso(row.created_at)
   };
 }

@@ -4,6 +4,7 @@ import { App } from "./App";
 import { PublicApplicationForm } from "./PublicApplicationForm";
 import { PublicPreInterviewForm } from "./PublicPreInterviewForm";
 import { PublicBehavioralAssessmentForm } from "./PublicBehavioralAssessmentForm";
+import { PublicProposalForm } from "./PublicProposalForm";
 
 // Fase 17 (SPEC-020 v1.1): a candidatura publica precisa ser acessivel por um Visitante nao
 // autenticado, sem passar pelo App interno (que sempre exige contexto de dev-auth). Nao ha
@@ -19,6 +20,7 @@ const publicPreInterviewMatch = window.location.pathname.match(/^\/pre-interview
 const publicBehavioralAssessmentMatch = window.location.pathname.match(
   /^\/behavioral-assessment\/?$/
 );
+const publicProposalMatch = window.location.pathname.match(/^\/proposal\/?$/);
 
 const root = (
   <React.StrictMode>
@@ -28,6 +30,8 @@ const root = (
       <PublicPreInterviewForm />
     ) : publicBehavioralAssessmentMatch ? (
       <PublicBehavioralAssessmentForm />
+    ) : publicProposalMatch ? (
+      <PublicProposalForm />
     ) : (
       <App />
     )}

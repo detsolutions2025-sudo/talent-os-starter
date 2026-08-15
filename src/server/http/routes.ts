@@ -20,6 +20,7 @@ import type { PublicApplicationService } from "../public-applications/service";
 import type { QuestionService } from "../questions/service";
 import type { BehavioralAssessmentService } from "../behavioral-assessments/service";
 import type { PreAnalysisService } from "../pre-analyses/service";
+import type { ProposalService } from "../proposals/service";
 import type { CandidateDossierService } from "../candidate-dossiers/service";
 
 export function createApiRouter(
@@ -43,7 +44,8 @@ export function createApiRouter(
   // meio, para nao quebrar nenhuma chamada posicional ja existente de fases anteriores).
   preAnalyses?: PreAnalysisService,
   // Fase 21 (SPEC-024 v1.1). Mantido no fim da assinatura posicional.
-  candidateDossiers?: CandidateDossierService
+  candidateDossiers?: CandidateDossierService,
+  proposals?: ProposalService
 ): Router {
   const router = createRouter();
 
@@ -2501,6 +2503,198 @@ export function createApiRouter(
     );
   }
 
+  if (proposals) {
+    router.post(
+      "/organizations/:organizationId/candidate-applications/:applicationId/proposals/draft",
+      asyncHandler(async (request, response) => {
+        const draft = await proposals.createDraft(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          routeParam(request.params.applicationId),
+          request.body
+        );
+        response.status(201).json(draft);
+      })
+    );
+
+    router.patch(
+      "/organizations/:organizationId/candidate-applications/:applicationId/proposals/draft",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await proposals.createDraft(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.applicationId),
+            request.body
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/candidate-applications/:applicationId/proposals/issue",
+      asyncHandler(async (request, response) => {
+        const result = await proposals.issue(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          routeParam(request.params.applicationId),
+          request.body,
+          request.header("Idempotency-Key")
+        );
+        response.status(result.idempotentReplay ? 200 : 201).json(result);
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/candidate-applications/:applicationId/proposals/supersede",
+      asyncHandler(async (request, response) => {
+        const result = await proposals.supersede(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          routeParam(request.params.applicationId),
+          request.body,
+          request.header("Idempotency-Key")
+        );
+        response.status(result.idempotentReplay ? 200 : 201).json(result);
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/candidate-applications/:applicationId/proposals/cancel",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await proposals.cancel(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.applicationId),
+            request.body,
+            request.header("Idempotency-Key")
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/candidate-applications/:applicationId/proposals/discard-draft",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await proposals.discardDraft(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.applicationId),
+            request.body
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/candidate-applications/:applicationId/proposals/rotate-grant",
+      asyncHandler(async (request, response) => {
+        const result = await proposals.rotateGrant(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          routeParam(request.params.applicationId),
+          request.header("Idempotency-Key")
+        );
+        response.status(result.idempotentReplay ? 200 : 201).json(result);
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/candidate-applications/:applicationId/proposals",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await proposals.getProposal(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.applicationId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/candidate-applications/:applicationId/proposals/versions",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await proposals.listVersions(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.applicationId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/candidate-applications/:applicationId/proposals/events",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await proposals.listEvents(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.applicationId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/proposals/admin-read",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await proposals.adminRead(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            request.body
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/public/proposals/current",
+      asyncHandler(async (request, response) => {
+        response.setHeader("Cache-Control", "no-store");
+        response.json(
+          await proposals.getPublic(extractProposalAccessToken(request), {
+            ip: request.ip ?? "",
+            userAgent: request.header("User-Agent") ?? null
+          })
+        );
+      })
+    );
+
+    router.post(
+      "/public/proposals/accept",
+      asyncHandler(async (request, response) => {
+        response.setHeader("Cache-Control", "no-store");
+        response.json(
+          await proposals.accept(extractProposalAccessToken(request), request.body, {
+            ip: request.ip ?? "",
+            userAgent: request.header("User-Agent") ?? null,
+            idempotencyKey: request.header("Idempotency-Key")
+          })
+        );
+      })
+    );
+
+    router.post(
+      "/public/proposals/decline",
+      asyncHandler(async (request, response) => {
+        response.setHeader("Cache-Control", "no-store");
+        response.json(
+          await proposals.decline(extractProposalAccessToken(request), request.body, {
+            ip: request.ip ?? "",
+            userAgent: request.header("User-Agent") ?? null,
+            idempotencyKey: request.header("Idempotency-Key")
+          })
+        );
+      })
+    );
+  }
+
   if (interviews) {
     router.post(
       "/organizations/:organizationId/interviews",
@@ -3384,6 +3578,7 @@ function extractAccessToken(request: Request) {
 // scheme dedicado -- nunca compartilha o mesmo scheme HTTP de outro modulo de token opaco,
 // para nao permitir que um token de uma finalidade seja aceito por engano na rota de outra.
 const BEHAVIORAL_ASSESSMENT_AUTH_HEADER = /^BehavioralAssessment\s+(\S+)$/i;
+const PROPOSAL_AUTH_HEADER = /^Proposal\s+(\S+)$/i;
 
 function extractBehavioralAssessmentAccessToken(request: Request) {
   const header = request.header("Authorization");
@@ -3391,6 +3586,16 @@ function extractBehavioralAssessmentAccessToken(request: Request) {
     return "";
   }
   const match = BEHAVIORAL_ASSESSMENT_AUTH_HEADER.exec(header.trim());
+  const token = match?.[1] ?? "";
+  return token.length > MAX_ACCESS_TOKEN_LENGTH ? "" : token;
+}
+
+function extractProposalAccessToken(request: Request) {
+  const header = request.header("Authorization");
+  if (!header) {
+    return "";
+  }
+  const match = PROPOSAL_AUTH_HEADER.exec(header.trim());
   const token = match?.[1] ?? "";
   return token.length > MAX_ACCESS_TOKEN_LENGTH ? "" : token;
 }
