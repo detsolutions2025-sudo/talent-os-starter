@@ -5,6 +5,7 @@ import { BehavioralInstrumentPanel } from "./BehavioralInstrumentPanel";
 import { BehavioralAssessmentPanel } from "./BehavioralAssessmentPanel";
 import { PreAnalysisPanel } from "./PreAnalysisPanel";
 import { CandidateDossierPanel } from "./CandidateDossierPanel";
+import { OnboardingPanel } from "./OnboardingPanel";
 import { ProposalPanel } from "./ProposalPanel";
 import "./styles.css";
 
@@ -2238,6 +2239,16 @@ export function App() {
             role={currentMembership?.role}
             headers={devHeaders}
             applications={candidateApplications}
+          />
+        )}
+
+        {selectedOrganization && (
+          <OnboardingPanel
+            organizationId={selectedOrganization.id}
+            role={currentMembership?.role}
+            headers={devHeaders}
+            applications={candidateApplications}
+            memberships={memberships}
           />
         )}
 

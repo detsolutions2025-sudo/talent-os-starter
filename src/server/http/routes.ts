@@ -15,6 +15,7 @@ import type { JobOpeningService } from "../job-openings/service";
 import type { JobProfileService } from "../job-profiles/service";
 import type { InterviewService } from "../interviews/service";
 import type { OrganizationalUnitService } from "../organizational-units/service";
+import type { OnboardingService } from "../onboardings/service";
 import type { PreInterviewService } from "../pre-interviews/service";
 import type { PublicApplicationService } from "../public-applications/service";
 import type { QuestionService } from "../questions/service";
@@ -45,7 +46,8 @@ export function createApiRouter(
   preAnalyses?: PreAnalysisService,
   // Fase 21 (SPEC-024 v1.1). Mantido no fim da assinatura posicional.
   candidateDossiers?: CandidateDossierService,
-  proposals?: ProposalService
+  proposals?: ProposalService,
+  onboardings?: OnboardingService
 ): Router {
   const router = createRouter();
 
@@ -3528,6 +3530,185 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await candidateDossiers.adminRead(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            request.body
+          )
+        );
+      })
+    );
+  }
+
+  // --- Fase 23 (SPEC-016 v1.0) - Onboarding interno -------------------------------
+  // Sem rota publica: a pessoa onboardada nao recebe User, Membership, token ou portal.
+  if (onboardings) {
+    router.post(
+      "/organizations/:organizationId/candidate-applications/:applicationId/onboarding",
+      asyncHandler(async (request, response) => {
+        const created = await onboardings.create(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          routeParam(request.params.applicationId),
+          request.body,
+          request.header("Idempotency-Key")
+        );
+        response.status(201).json(created);
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/candidate-applications/:applicationId/onboarding",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await onboardings.getByApplication(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.applicationId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/onboardings/:onboardingId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await onboardings.get(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.onboardingId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/onboardings/:onboardingId/tasks",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await onboardings.listTasks(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.onboardingId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/onboarding-tasks/mine",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await onboardings.listMyTasks(
+            getActor(request),
+            routeParam(request.params.organizationId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/onboardings/:onboardingId/start",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await onboardings.start(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.onboardingId),
+            request.header("Idempotency-Key")
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/onboardings/:onboardingId/tasks",
+      asyncHandler(async (request, response) => {
+        const task = await onboardings.addTask(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          routeParam(request.params.onboardingId),
+          request.body
+        );
+        response.status(201).json(task);
+      })
+    );
+
+    router.patch(
+      "/organizations/:organizationId/onboarding-tasks/:taskId/assignment",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await onboardings.assignTask(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.taskId),
+            request.body
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/onboarding-tasks/:taskId/complete",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await onboardings.completeTask(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.taskId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/onboarding-tasks/:taskId/cancel",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await onboardings.cancelTask(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.taskId),
+            request.body
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/onboardings/:onboardingId/complete",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await onboardings.complete(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.onboardingId),
+            request.header("Idempotency-Key")
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/onboardings/:onboardingId/cancel",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await onboardings.cancel(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.onboardingId),
+            request.body,
+            request.header("Idempotency-Key")
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/platform/organizations/:organizationId/onboardings/admin-read",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await onboardings.adminRead(
             getActor(request),
             routeParam(request.params.organizationId),
             request.body

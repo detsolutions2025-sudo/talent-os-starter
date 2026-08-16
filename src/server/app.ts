@@ -12,6 +12,7 @@ import type { InterviewService } from "./interviews/service";
 import type { JobOpeningService } from "./job-openings/service";
 import type { JobProfileService } from "./job-profiles/service";
 import type { OrganizationalUnitService } from "./organizational-units/service";
+import type { OnboardingService } from "./onboardings/service";
 import type { PreInterviewService } from "./pre-interviews/service";
 import type { PublicApplicationService } from "./public-applications/service";
 import type { QuestionService } from "./questions/service";
@@ -38,7 +39,8 @@ export function createServer(
   behavioralAssessments?: BehavioralAssessmentService,
   preAnalyses?: PreAnalysisService,
   candidateDossiers?: CandidateDossierService,
-  proposals?: ProposalService
+  proposals?: ProposalService,
+  onboardings?: OnboardingService
 ) {
   const app = express();
 
@@ -79,7 +81,8 @@ export function createServer(
       behavioralAssessments,
       preAnalyses,
       candidateDossiers,
-      proposals
+      proposals,
+      onboardings
     )
   );
 

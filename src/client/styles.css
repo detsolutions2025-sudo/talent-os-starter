@@ -106,6 +106,9 @@ h1 {
 .competency-form input,
 .competency-form select,
 .competency-form textarea,
+.onboarding-panel input,
+.onboarding-panel select,
+.onboarding-panel textarea,
 .job-profile-form input,
 .job-profile-form select,
 .job-profile-form textarea {
@@ -156,6 +159,7 @@ h1 {
 .dna-panel,
 .org-units-panel,
 .competencies-panel,
+.onboarding-panel,
 .job-profiles-panel,
 .pre-analysis-panel {
   grid-column: 1 / -1;
@@ -186,6 +190,7 @@ h1 {
 
 .job-profile-form textarea,
 .competency-form textarea,
+.onboarding-panel textarea,
 .pre-analysis-panel textarea {
   min-height: 96px;
   padding: 10px 12px;
