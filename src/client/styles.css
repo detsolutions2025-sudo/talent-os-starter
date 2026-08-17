@@ -109,6 +109,9 @@ h1 {
 .onboarding-panel input,
 .onboarding-panel select,
 .onboarding-panel textarea,
+.employment-panel input,
+.employment-panel select,
+.employment-panel textarea,
 .job-profile-form input,
 .job-profile-form select,
 .job-profile-form textarea {
@@ -160,6 +163,7 @@ h1 {
 .org-units-panel,
 .competencies-panel,
 .onboarding-panel,
+.employment-panel,
 .job-profiles-panel,
 .pre-analysis-panel {
   grid-column: 1 / -1;
@@ -301,6 +305,13 @@ input:disabled {
   margin-top: 16px;
 }
 
+.employment-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
 .job-profile-editor {
   display: grid;
   align-content: start;
@@ -369,6 +380,7 @@ input:disabled {
 
   .org-units-layout,
   .competency-layout,
+  .employment-layout,
   .job-profile-layout {
     grid-template-columns: 1fr;
   }

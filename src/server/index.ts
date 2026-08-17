@@ -14,6 +14,7 @@ import { createPostgresJobOpeningService } from "./job-openings/service";
 import { createPostgresJobProfileService } from "./job-profiles/service";
 import { createPostgresOrganizationalUnitService } from "./organizational-units/service";
 import { createPostgresOnboardingService } from "./onboardings/service";
+import { createPostgresEmploymentService } from "./employments/service";
 import { PostgresCoreRepository } from "./persistence/postgres-core-repository";
 import { createPostgresPreInterviewService } from "./pre-interviews/service";
 import { createPostgresPool, requirePostgresDatabaseUrl } from "./postgres";
@@ -87,7 +88,8 @@ const app = createServer(
   // Fase 21 (SPEC-024 v1.1). Dossie materializado sem criar nova AI Execution.
   createPostgresCandidateDossierService(pool),
   createPostgresProposalService(pool),
-  createPostgresOnboardingService(pool)
+  createPostgresOnboardingService(pool),
+  createPostgresEmploymentService(pool)
 );
 
 app.listen(port, () => {

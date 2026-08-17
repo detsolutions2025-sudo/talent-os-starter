@@ -13,6 +13,7 @@ import type { JobOpeningService } from "./job-openings/service";
 import type { JobProfileService } from "./job-profiles/service";
 import type { OrganizationalUnitService } from "./organizational-units/service";
 import type { OnboardingService } from "./onboardings/service";
+import type { EmploymentService } from "./employments/service";
 import type { PreInterviewService } from "./pre-interviews/service";
 import type { PublicApplicationService } from "./public-applications/service";
 import type { QuestionService } from "./questions/service";
@@ -40,7 +41,8 @@ export function createServer(
   preAnalyses?: PreAnalysisService,
   candidateDossiers?: CandidateDossierService,
   proposals?: ProposalService,
-  onboardings?: OnboardingService
+  onboardings?: OnboardingService,
+  employments?: EmploymentService
 ) {
   const app = express();
 
@@ -82,7 +84,8 @@ export function createServer(
       preAnalyses,
       candidateDossiers,
       proposals,
-      onboardings
+      onboardings,
+      employments
     )
   );
 

@@ -87,7 +87,13 @@ capacidades planejadas são:
 
 - Fase 22 — Propostas;
 - Fase 23 — Onboarding;
-- Fase 24 — Desenvolvimento e Retenção.
+- Fase 24 — OrganizationPerson e Employment;
+- Fase 25 — Desenvolvimento e Retenção.
+
+A fundação de OrganizationPerson e Employment foi inserida para resolver a
+lacuna pós-contratação identificada durante a especificação de Desenvolvimento
+e Retenção, preservando Employment como aggregate root antes da evolução desse
+domínio.
 
 As antigas posições de planejamento Fase 12, Fase 13 e Fase 14 não foram
 executadas nessa ordem e não devem ser preenchidas retroativamente.

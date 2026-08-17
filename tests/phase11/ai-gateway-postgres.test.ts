@@ -382,24 +382,65 @@ describe("phase 11 AIGateway (execution flow, policies, retry, fallback, rate li
   it("rejects a second concurrent call with the same idempotency key while the first is still in flight", async () => {
     const org = await fixture();
     const setup = await setupExecutableFeature(app, org);
-    adapter.setScenario({ outcome: "success", structuredOutput: { ok: true }, latencyMs: 100 });
+    adapter.setScenario({ outcome: "success", structuredOutput: { ok: true } });
 
-    const [firstOutcome, secondOutcome] = await Promise.allSettled([
-      aiService.gateway.execute(ownerActor(org), org.organizationId, {
-        featureKey: setup.featureKey,
-        input: { text: "hello" },
-        idempotencyKey: "concurrent-key"
-      }),
-      aiService.gateway.execute(ownerActor(org), org.organizationId, {
-        featureKey: setup.featureKey,
-        input: { text: "hello" },
-        idempotencyKey: "concurrent-key"
-      })
-    ]);
+    // Deterministic barrier instead of a wall-clock race: the first call is held open exactly
+    // at the point where it has already inserted its `pending` execution row (begin()) and
+    // called the provider -- i.e. genuinely "in flight" -- and only then is the second call
+    // fired. This removes any dependency on scheduling luck (Promise.allSettled with a fixed
+    // latencyMs cannot guarantee the two calls actually overlap) while still exercising the
+    // real concurrency guard: the second call's idempotency check runs against the database
+    // exactly as it would under real overlapping requests.
+    let releaseFirstCall!: () => void;
+    const firstCallGate = new Promise<void>((resolve) => {
+      releaseFirstCall = resolve;
+    });
+    let signalProviderCalled!: () => void;
+    const providerCalledSignal = new Promise<void>((resolve) => {
+      signalProviderCalled = resolve;
+    });
+    const originalExecute = adapter.execute.bind(adapter);
+    adapter.execute = async (request, credential, signal) => {
+      signalProviderCalled();
+      await firstCallGate;
+      return originalExecute(request, credential, signal);
+    };
 
-    const statuses = [firstOutcome.status, secondOutcome.status];
-    expect(statuses).toContain("fulfilled");
-    expect(statuses).toContain("rejected");
+    const firstPromise = aiService.gateway.execute(ownerActor(org), org.organizationId, {
+      featureKey: setup.featureKey,
+      input: { text: "hello" },
+      idempotencyKey: "concurrent-key"
+    });
+
+    await providerCalledSignal;
+
+    let secondOutcome: { status: "fulfilled" } | { status: "rejected"; reason: unknown };
+    try {
+      await aiService.gateway.execute(ownerActor(org), org.organizationId, {
+        featureKey: setup.featureKey,
+        input: { text: "hello, again" },
+        idempotencyKey: "concurrent-key"
+      });
+      secondOutcome = { status: "fulfilled" };
+    } catch (reason) {
+      secondOutcome = { status: "rejected", reason };
+    }
+
+    releaseFirstCall();
+    const firstResult = await firstPromise;
+
+    expect(firstResult.kind).toBe("executed");
+    expect(secondOutcome.status).toBe("rejected");
+    if (secondOutcome.status === "rejected") {
+      expect((secondOutcome.reason as { code?: string }).code).toMatch(
+        /^ai_execution_(in_progress|idempotency_conflict)$/
+      );
+    }
+    // Physical proof there was exactly one real business execution, never two -- the invariant
+    // that actually matters (SPEC-014 "Idempotencia": never persistencia duplicada de AI
+    // Execution equivalente), independent of which of the two valid rejection code paths
+    // (pre-existing SELECT check vs. unique-index conflict on insert) the second call hit.
+    expect(adapter.executeCallCount).toBe(1);
   });
 
   it("enforces isolation: an execution can only use routing/credentials that belong to its own Organization", async () => {

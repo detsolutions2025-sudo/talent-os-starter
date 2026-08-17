@@ -35,7 +35,8 @@
 | SPEC-014 | Infraestrutura de IA                            |   11 | v1.0    | Concluída |
 | SPEC-015 | Propostas                                       |   22 | —       | Rascunho   |
 | SPEC-016 | Onboarding                                      |   23 | —       | Rascunho   |
-| SPEC-017 | Desenvolvimento e Retenção                      |   24 | —       | Rascunho   |
+| SPEC-025 | OrganizationPerson e Employment                 |   24 | 0.2     | Em revisão |
+| SPEC-017 | Desenvolvimento e Retenção                      |   25 | —       | Rascunho   |
 | SPEC-018 | Blueprint Organizacional / Implantação Guiada   |   15 | 1.0     | Aprovada   |
 | SPEC-019 | Portal Público de Vagas                         |   16 | 0.1     | Em revisão |
 | SPEC-020 | Candidatura Pública                             |   17 | 1.1     | Aprovada   |
@@ -46,12 +47,14 @@
 
 > **Nota sobre SPEC-014:** o item foi corrigido nominalmente para "Infraestrutura de IA" e a Versão para `v1.0`, para corresponder ao documento aprovado (`docs/02-requisitos/specs/SPEC-014-Infraestrutura-de-IA.md`, Status: Aprovada, Versao: 1.0). Status (Concluída) e Fase (11) foram mantidos — não há inconsistência documental nesses dois campos.
 
-> **Nota sobre SPEC ID e Fase:** o número da SPEC identifica o documento/requisito; o número da Fase representa a ordem de implementação e não precisa coincidir com o número da SPEC. As Fases 12 a 14 permaneceram posições de planejamento originalmente reservadas e não executadas nessa cronologia histórica. As capacidades preservadas como SPEC-015, SPEC-016 e SPEC-017 foram reposicionadas para as Fases 22, 23 e 24. Fases já executadas não devem ser renumeradas retroativamente.
+> **Nota sobre SPEC ID e Fase:** o número da SPEC identifica o documento/requisito; o número da Fase representa a ordem de implementação e não precisa coincidir com o número da SPEC. As Fases 12 a 14 permaneceram posições de planejamento originalmente reservadas e não executadas nessa cronologia histórica. As capacidades preservadas como SPEC-015, SPEC-016, SPEC-025 e SPEC-017 foram reposicionadas para as Fases 22, 23, 24 e 25. Fases já executadas não devem ser renumeradas retroativamente.
 
-### Dependências conceituais (SPEC-018 a SPEC-024)
+### Dependências conceituais
 
 A tabela acima não possui coluna de dependências (diferente da tabela "Núcleo da plataforma"); para não alterar sua estrutura estabelecida, as dependências conceituais das próximas SPECs são registradas aqui, como referência para o detalhamento futuro de cada documento:
 
+- **SPEC-025 — OrganizationPerson e Employment:** ADR-0024, Organization, Candidate e CandidateApplication como proveniência opcional, Proposal como proveniência opcional, Onboarding apenas como integração futura aditiva.
+- **SPEC-017 — Desenvolvimento e Retenção:** SPEC-025, Employment como aggregate root, ADR-0024, SPEC-003, SPEC-011, SPEC-012, SPEC-015, SPEC-016.
 - **SPEC-018 — Blueprint Organizacional / Implantação Guiada:** Organization, DNA Organizacional (SPEC-005), Estrutura Organizacional (SPEC-006), Catálogo de Competências (SPEC-007), Cargos (SPEC-008), Banco de Perguntas (SPEC-009), ADR-0020, ADR-0021, ADR-0022.
 - **SPEC-019 — Portal Público de Vagas:** Vagas (SPEC-010), Organization, Blueprint Organizacional (SPEC-018).
 - **SPEC-020 — Candidatura Pública:** Portal Público (SPEC-019), Candidatos (SPEC-011), Vagas (SPEC-010), Processo Seletivo (SPEC-012).

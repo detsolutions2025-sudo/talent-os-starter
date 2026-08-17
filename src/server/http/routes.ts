@@ -16,6 +16,7 @@ import type { JobProfileService } from "../job-profiles/service";
 import type { InterviewService } from "../interviews/service";
 import type { OrganizationalUnitService } from "../organizational-units/service";
 import type { OnboardingService } from "../onboardings/service";
+import type { EmploymentService } from "../employments/service";
 import type { PreInterviewService } from "../pre-interviews/service";
 import type { PublicApplicationService } from "../public-applications/service";
 import type { QuestionService } from "../questions/service";
@@ -47,7 +48,8 @@ export function createApiRouter(
   // Fase 21 (SPEC-024 v1.1). Mantido no fim da assinatura posicional.
   candidateDossiers?: CandidateDossierService,
   proposals?: ProposalService,
-  onboardings?: OnboardingService
+  onboardings?: OnboardingService,
+  employments?: EmploymentService
 ): Router {
   const router = createRouter();
 
@@ -3709,6 +3711,134 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await onboardings.adminRead(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            request.body
+          )
+        );
+      })
+    );
+  }
+
+  // --- Fase 24 (SPEC-025 v1.0) - OrganizationPerson e Employment -------------------------
+  // Sem rota publica e sem automacao: contratar, ativar, encerrar e cancelar sao atos internos
+  // explicitos, idempotentes e auditados. User/Membership continuam separados do Employment.
+  if (employments) {
+    router.post(
+      "/organizations/:organizationId/organization-people",
+      asyncHandler(async (request, response) => {
+        const created = await employments.createPerson(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          request.body,
+          request.header("Idempotency-Key")
+        );
+        response.status(201).json(created);
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/organization-people",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await employments.listPeople(getActor(request), routeParam(request.params.organizationId))
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/organization-people/:personId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await employments.getPerson(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.personId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/employments",
+      asyncHandler(async (request, response) => {
+        const created = await employments.createEmployment(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          request.body,
+          request.header("Idempotency-Key")
+        );
+        response.status(201).json(created);
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/employments",
+      asyncHandler(async (request, response) => {
+        const organizationPersonId =
+          typeof request.query.organizationPersonId === "string"
+            ? request.query.organizationPersonId
+            : undefined;
+        response.json(
+          await employments.listEmployments(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            organizationPersonId
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/employments/:employmentId/activate",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await employments.activate(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.employmentId),
+            request.body,
+            request.header("Idempotency-Key")
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/employments/:employmentId/cancel",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await employments.cancel(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.employmentId),
+            request.body,
+            request.header("Idempotency-Key")
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/employments/:employmentId/end",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await employments.end(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.employmentId),
+            request.body,
+            request.header("Idempotency-Key")
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/platform/organizations/:organizationId/employments/admin-read",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await employments.adminRead(
             getActor(request),
             routeParam(request.params.organizationId),
             request.body
