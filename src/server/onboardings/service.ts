@@ -18,6 +18,7 @@ import type {
   OnboardingApplicationContext,
   OnboardingAssignInput,
   OnboardingCreateInput,
+  OnboardingEmploymentLinkInput,
   OnboardingIdempotencyOperation,
   OnboardingReasonInput,
   OnboardingTask,
@@ -28,6 +29,7 @@ import {
   validateAdminReason,
   validateAssignmentInput,
   validateCreateInput,
+  validateEmploymentLinkInput,
   validateIdempotencyKey,
   validateReasonInput,
   validateTaskInput
@@ -78,6 +80,7 @@ export class OnboardingService {
             candidateId: application.candidateId,
             status: "draft",
             expectedPersonStartDate: normalized.expectedPersonStartDate,
+            employmentId: null,
             createdByUserId: userId,
             startedAt: null,
             startedByUserId: null,
@@ -202,6 +205,112 @@ export class OnboardingService {
           await tx.onboardings.updateOnboarding(updated);
           await service.audit(actor, organizationId, "onboarding.started", {
             onboardingId: updated.id
+          });
+          return service.serializeOwnerAdmin(updated);
+        })
+    );
+  }
+
+  // Fase 26 (SPEC-016 v1.1 s43-s51): vinculo tardio, explicito e imutavel a
+  // Employment. Nunca aceito no payload de create (s47.1); nunca cria, ativa,
+  // encerra ou cancela Employment (s54); Employment nunca conhece Onboarding.
+  async linkEmployment(
+    actor: Actor,
+    organizationId: string,
+    onboardingId: string,
+    input: OnboardingEmploymentLinkInput,
+    idempotencyKeyRaw: unknown
+  ) {
+    const normalized = validateEmploymentLinkInput(input);
+    await this.authorizeUser(actor, organizationId, ["owner", "admin"]);
+    return this.withIdempotency(
+      organizationId,
+      "link_employment",
+      onboardingId,
+      idempotencyKeyRaw,
+      { onboardingId, employmentId: normalized.employmentId },
+      async () =>
+        this.runTransaction(async (tx) => {
+          const service = this.scoped(tx);
+          const onboarding = await service.lockOnboarding(actor, organizationId, onboardingId);
+          if (!["draft", "in_progress"].includes(onboarding.status)) {
+            throw conflict("onboarding_final", "Final onboarding cannot be linked to Employment.");
+          }
+          if (onboarding.employmentId === normalized.employmentId) {
+            // Fase 26 (SPEC-016 v1.1 s47.2): mesmo employment_id -> no-op
+            // idempotente; nunca executa UPDATE, nunca duplica auditoria.
+            return service.serializeOwnerAdmin(onboarding);
+          }
+          if (onboarding.employmentId) {
+            // Fase 26: auditoria de negacao usa `this` (conexao fora da
+            // transacao), nunca `service` (tx-scoped) -- do contrario o
+            // proprio ROLLBACK que a excecao dispara apagaria a auditoria
+            // da tentativa negada junto com a mutacao abortada.
+            await this.auditDenied(
+              actor,
+              organizationId,
+              "onboarding.employment_link_conflict",
+              "onboarding_employment_link_immutable",
+              { onboardingId }
+            );
+            throw conflict(
+              "onboarding_employment_link_immutable",
+              "Onboarding is already linked to a different Employment."
+            );
+          }
+          const employment = await tx.onboardings.findEmploymentForLink(
+            organizationId,
+            normalized.employmentId
+          );
+          if (!employment) {
+            await this.auditDenied(
+              actor,
+              organizationId,
+              "onboarding.employment_link_denied_cross_organization",
+              "employment_not_found",
+              { onboardingId }
+            );
+            throw notFound("employment_not_found", "Employment not found.");
+          }
+          if (!["pending", "active"].includes(employment.status)) {
+            await this.auditDenied(
+              actor,
+              organizationId,
+              "onboarding.employment_link_denied_incompatible",
+              "employment_not_eligible",
+              { onboardingId, employmentId: employment.id }
+            );
+            throw conflict(
+              "onboarding_employment_not_eligible",
+              "Employment is not eligible for linking."
+            );
+          }
+          const coherent =
+            employment.originCandidateApplicationId === onboarding.candidateApplicationId ||
+            employment.organizationPersonOriginCandidateId === onboarding.candidateId;
+          if (!coherent) {
+            await this.auditDenied(
+              actor,
+              organizationId,
+              "onboarding.employment_link_denied_incompatible",
+              "employment_incompatible_provenance",
+              { onboardingId, employmentId: employment.id }
+            );
+            throw conflict(
+              "onboarding_employment_incompatible_provenance",
+              "Employment provenance is incompatible with this Onboarding."
+            );
+          }
+          const now = tx.onboardings.now();
+          const updated = {
+            ...onboarding,
+            employmentId: employment.id,
+            updatedAt: now
+          };
+          await tx.onboardings.updateOnboarding(updated);
+          await service.audit(actor, organizationId, "onboarding.employment_linked", {
+            onboardingId: updated.id,
+            employmentId: employment.id
           });
           return service.serializeOwnerAdmin(updated);
         })

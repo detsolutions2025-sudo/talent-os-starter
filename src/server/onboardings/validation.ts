@@ -2,6 +2,7 @@ import { badRequest } from "../core/errors";
 import type {
   OnboardingAssignInput,
   OnboardingCreateInput,
+  OnboardingEmploymentLinkInput,
   OnboardingReasonInput,
   OnboardingTaskInput
 } from "./types";
@@ -67,6 +68,13 @@ export function validateTaskInput(input: unknown, requireInProgressReason: boole
     dueAt: optionalDateTime(value.dueAt ?? value.due_at, "due_at"),
     displayOrder: optionalInteger(value.displayOrder ?? value.display_order, "display_order"),
     creationReason
+  };
+}
+
+export function validateEmploymentLinkInput(input: OnboardingEmploymentLinkInput) {
+  ensureAllowedKeys(input, ["employmentId", "employment_id"]);
+  return {
+    employmentId: requiredText(input.employmentId ?? input.employment_id, "employment_id", 200)
   };
 }
 

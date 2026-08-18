@@ -33,10 +33,10 @@
 | SPEC-012 | Processo Seletivo                               |    9 | —       | Concluída |
 | SPEC-013 | Entrevistas                                     |   10 | —       | Concluída |
 | SPEC-014 | Infraestrutura de IA                            |   11 | v1.0    | Concluída |
-| SPEC-015 | Propostas                                       |   22 | —       | Rascunho   |
-| SPEC-016 | Onboarding                                      |   23 | —       | Rascunho   |
-| SPEC-025 | OrganizationPerson e Employment                 |   24 | 0.2     | Em revisão |
-| SPEC-017 | Desenvolvimento e Retenção                      |   25 | —       | Rascunho   |
+| SPEC-015 | Propostas                                       |   22 | v1.0    | Concluída |
+| SPEC-016 | Onboarding                                      |   23 | v1.0    | Concluída |
+| SPEC-025 | OrganizationPerson e Employment                 |   24 | 1.0     | Concluída |
+| SPEC-017 | Desenvolvimento e Retenção                      |   25 | v1.0    | Concluída |
 | SPEC-018 | Blueprint Organizacional / Implantação Guiada   |   15 | 1.0     | Aprovada   |
 | SPEC-019 | Portal Público de Vagas                         |   16 | 0.1     | Em revisão |
 | SPEC-020 | Candidatura Pública                             |   17 | 1.1     | Aprovada   |
@@ -48,6 +48,8 @@
 > **Nota sobre SPEC-014:** o item foi corrigido nominalmente para "Infraestrutura de IA" e a Versão para `v1.0`, para corresponder ao documento aprovado (`docs/02-requisitos/specs/SPEC-014-Infraestrutura-de-IA.md`, Status: Aprovada, Versao: 1.0). Status (Concluída) e Fase (11) foram mantidos — não há inconsistência documental nesses dois campos.
 
 > **Nota sobre SPEC ID e Fase:** o número da SPEC identifica o documento/requisito; o número da Fase representa a ordem de implementação e não precisa coincidir com o número da SPEC. As Fases 12 a 14 permaneceram posições de planejamento originalmente reservadas e não executadas nessa cronologia histórica. As capacidades preservadas como SPEC-015, SPEC-016, SPEC-025 e SPEC-017 foram reposicionadas para as Fases 22, 23, 24 e 25. Fases já executadas não devem ser renumeradas retroativamente.
+
+> **Nota de reconciliação pós-Fase 25 (2026-08-18):** SPEC-015, SPEC-016, SPEC-025 e SPEC-017 estavam registradas nesta tabela como `Rascunho`/`Em revisão`, divergindo do status `Aprovada` já gravado nos próprios documentos de SPEC e da implementação de código já commitada (Fases 22 a 25, `git log`). Corrigido para `Concluída` nesta tabela, sem alterar conteúdo normativo de nenhuma SPEC — apenas o rastreamento de status estava desatualizado, contrariando a "Regra de atualização" no rodapé deste arquivo.
 
 ### Dependências conceituais
 

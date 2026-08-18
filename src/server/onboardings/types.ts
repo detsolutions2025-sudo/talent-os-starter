@@ -1,6 +1,7 @@
 export type OnboardingStatus = "draft" | "in_progress" | "completed" | "cancelled";
 export type OnboardingTaskStatus = "open" | "completed" | "cancelled";
-export type OnboardingIdempotencyOperation = "create" | "start" | "cancel" | "complete";
+export type OnboardingIdempotencyOperation =
+  "create" | "start" | "cancel" | "complete" | "link_employment";
 
 export type Onboarding = {
   id: string;
@@ -9,6 +10,7 @@ export type Onboarding = {
   candidateId: string;
   status: OnboardingStatus;
   expectedPersonStartDate: string | null;
+  employmentId: string | null;
   createdByUserId: string;
   startedAt: string | null;
   startedByUserId: string | null;
@@ -113,4 +115,22 @@ export type OnboardingReasonInput = {
 
 export type OnboardingAdminReadInput = {
   reason?: unknown;
+};
+
+export type OnboardingEmploymentLinkInput = {
+  employmentId?: unknown;
+  employment_id?: unknown;
+};
+
+// Fase 26 (SPEC-016 v1.1 s44): contexto minimo lido de `employments` +
+// `organization_people` para validar elegibilidade e coerencia de
+// proveniencia antes de gravar o vinculo. Nunca inclui PII (nome, e-mail,
+// origin_reason) -- somente identificadores e o `origin_candidate_id` da
+// OrganizationPerson, necessario para o caminho B da regra de coerencia.
+export type OnboardingEmploymentLinkContext = {
+  id: string;
+  organizationId: string;
+  status: "pending" | "active" | "ended" | "cancelled";
+  organizationPersonOriginCandidateId: string | null;
+  originCandidateApplicationId: string | null;
 };

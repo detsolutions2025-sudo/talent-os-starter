@@ -43,5 +43,14 @@ export function createOnboardingTransactionRunner(pool: pg.Pool): OnboardingTran
 function isPostgresTransientConflict(error: unknown) {
   if (!error || typeof error !== "object" || !("code" in error)) return false;
   const code = (error as { code?: unknown }).code;
-  return code === "40P01" || code === "40001" || code === "55P03";
+  const constraint = String((error as { constraint?: unknown }).constraint ?? "");
+  return (
+    code === "40P01" ||
+    code === "40001" ||
+    code === "55P03" ||
+    // Fase 26 (SPEC-016 v1.1 s46, s50): dois Onboardings disputando o mesmo
+    // Employment colidem no indice unico parcial -- conflito seguro, nunca
+    // erro generico 500.
+    (code === "23505" && constraint === "idx_onboardings_employment_link")
+  );
 }

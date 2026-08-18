@@ -10,6 +10,7 @@ import type {
   Onboarding,
   OnboardingApplicationContext,
   OnboardingCandidateContext,
+  OnboardingEmploymentLinkContext,
   OnboardingIdempotencyKey,
   OnboardingTask
 } from "../onboardings/types";
@@ -180,9 +181,9 @@ export class PostgresOnboardingRepository implements OnboardingRepository {
           id, organization_id, candidate_application_id, candidate_id, status,
           expected_person_start_date, created_by_user_id, started_at, started_by_user_id,
           completed_at, completed_by_user_id, cancelled_at, cancelled_by_user_id,
-          cancellation_reason, created_at, updated_at
+          cancellation_reason, created_at, updated_at, employment_id
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
       `,
       onboardingParams(onboarding)
     );
@@ -201,7 +202,8 @@ export class PostgresOnboardingRepository implements OnboardingRepository {
             cancelled_at = $12,
             cancelled_by_user_id = $13,
             cancellation_reason = $14,
-            updated_at = $16
+            updated_at = $16,
+            employment_id = $17
         WHERE id = $1
           AND organization_id = $2
           AND candidate_application_id = $3
@@ -211,6 +213,34 @@ export class PostgresOnboardingRepository implements OnboardingRepository {
       `,
       onboardingParams(onboarding)
     );
+  }
+
+  // Fase 26 (SPEC-016 v1.1 s44-s45): leitura minima e tenant-safe, com
+  // `FOR SHARE` -- nunca `FOR UPDATE`, porque este modulo nunca escreve em
+  // `employments`. O JOIN com `organization_people` traz apenas
+  // `origin_candidate_id`, unico dado necessario para o caminho B da regra
+  // de coerencia de proveniencia (SPEC-016 v1.1 s44.1). Nunca seleciona
+  // `display_name`, `preferred_name` ou `primary_email`.
+  async findEmploymentForLink(organizationId: string, employmentId: string) {
+    const result = await this.connection.query(
+      `
+        SELECT
+          e.id,
+          e.organization_id,
+          e.status,
+          e.origin_candidate_application_id,
+          p.origin_candidate_id AS person_origin_candidate_id
+        FROM employments e
+        JOIN organization_people p
+          ON p.organization_id = e.organization_id
+         AND p.id = e.organization_person_id
+        WHERE e.organization_id = $1
+          AND e.id = $2
+        FOR SHARE OF e
+      `,
+      [organizationId, employmentId]
+    );
+    return result.rows[0] ? mapEmploymentLinkContext(result.rows[0]) : null;
   }
 
   async createTask(task: OnboardingTask) {
@@ -347,7 +377,8 @@ function onboardingParams(onboarding: Onboarding) {
     onboarding.cancelledByUserId,
     onboarding.cancellationReason,
     onboarding.createdAt,
-    onboarding.updatedAt
+    onboarding.updatedAt,
+    onboarding.employmentId
   ];
 }
 
@@ -384,6 +415,7 @@ function mapOnboarding(row: Record<string, unknown>): Onboarding {
     candidateId: String(row.candidate_id),
     status: row.status as Onboarding["status"],
     expectedPersonStartDate: nullableDate(row.expected_person_start_date),
+    employmentId: nullableString(row.employment_id),
     createdByUserId: String(row.created_by_user_id),
     startedAt: nullableIso(row.started_at),
     startedByUserId: nullableString(row.started_by_user_id),
@@ -454,6 +486,16 @@ function mapCandidate(row: Record<string, unknown>): OnboardingCandidateContext 
     id: String(row.id),
     organizationId: String(row.organization_id),
     status: row.status as OnboardingCandidateContext["status"]
+  };
+}
+
+function mapEmploymentLinkContext(row: Record<string, unknown>): OnboardingEmploymentLinkContext {
+  return {
+    id: String(row.id),
+    organizationId: String(row.organization_id),
+    status: row.status as OnboardingEmploymentLinkContext["status"],
+    organizationPersonOriginCandidateId: nullableString(row.person_origin_candidate_id),
+    originCandidateApplicationId: nullableString(row.origin_candidate_application_id)
   };
 }
 

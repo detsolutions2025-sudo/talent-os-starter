@@ -4,6 +4,7 @@ import type {
   Onboarding,
   OnboardingApplicationContext,
   OnboardingCandidateContext,
+  OnboardingEmploymentLinkContext,
   OnboardingIdempotencyKey,
   OnboardingIdempotencyOperation,
   OnboardingTask
@@ -53,4 +54,13 @@ export interface OnboardingRepository {
   listTasksForMembership(organizationId: string, membershipId: string): Promise<OnboardingTask[]>;
   findMembershipForUpdate(membershipId: string): Promise<Membership | null>;
   listOnboardings(organizationId: string): Promise<Onboarding[]>;
+  // Fase 26 (SPEC-016 v1.1 s44-s45): leitura minima e tenant-safe de
+  // `employments` + `organization_people`, com `FOR SHARE` -- Onboarding
+  // nunca escreve em Employment, apenas trava a linha para impedir que o
+  // estado mude por baixo do vinculo sendo criado (mesmo padrao ja usado por
+  // `findEmploymentForEligibility` em `development-retention`).
+  findEmploymentForLink(
+    organizationId: string,
+    employmentId: string
+  ): Promise<OnboardingEmploymentLinkContext | null>;
 }

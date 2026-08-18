@@ -20,8 +20,17 @@ type OnboardingView = {
   candidateApplicationId: string;
   status: "draft" | "in_progress" | "completed" | "cancelled";
   expectedPersonStartDate: string | null;
+  employmentId?: string | null;
   progress: { numerator: number; denominator: number; percent: number };
   tasks: OnboardingTaskView[];
+};
+
+// Fase 26 (SPEC-016 v1.1 s45.1): somente `pending`/`active` sao elegiveis
+// para vinculo. Somente identificadores minimos -- nunca nome, e-mail ou
+// qualquer dado da OrganizationPerson.
+type EmploymentOption = {
+  id: string;
+  status: "pending" | "active" | "ended" | "cancelled";
 };
 
 type OnboardingTaskView = {
@@ -69,6 +78,8 @@ export function OnboardingPanel({
   const [taskReason, setTaskReason] = useState("");
   const [reason, setReason] = useState("");
   const [message, setMessage] = useState("");
+  const [employmentOptions, setEmploymentOptions] = useState<EmploymentOption[]>([]);
+  const [selectedEmploymentId, setSelectedEmploymentId] = useState("");
 
   function load(nextApplicationId = applicationId) {
     if (!nextApplicationId) return;
@@ -184,6 +195,44 @@ export function OnboardingPanel({
       .catch((error: Error) => setMessage(error.message));
   }
 
+  // Fase 26 (SPEC-016 v1.1 s45.1, s48): reaproveita o endpoint ja existente
+  // de listagem de Employments (owner/admin), sem criar rota nova, e filtra
+  // client-side apenas os estados elegiveis para vinculo (pending/active).
+  // Employment nao sabe se ja esta vinculado a outro Onboarding -- um
+  // conflito de cardinalidade, se ocorrer, e recusado no submit (secao 5).
+  function loadEligibleEmployments() {
+    fetch(`/api/organizations/${organizationId}/employments`, { headers })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Nao foi possivel listar Employments.");
+        const all = (await response.json()) as EmploymentOption[];
+        setEmploymentOptions(
+          all.filter(
+            (employment) => employment.status === "pending" || employment.status === "active"
+          )
+        );
+      })
+      .catch((error: Error) => setMessage(error.message));
+  }
+
+  function linkEmployment() {
+    if (!onboarding || !selectedEmploymentId) return;
+    fetch(`/api/organizations/${organizationId}/onboardings/${onboarding.id}/employment-link`, {
+      method: "POST",
+      headers: {
+        ...headers,
+        "content-type": "application/json",
+        "Idempotency-Key": `onboarding-employment-link-${onboarding.id}-${Date.now()}`
+      },
+      body: JSON.stringify({ employmentId: selectedEmploymentId })
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Nao foi possivel vincular Employment.");
+        setOnboarding((await response.json()) as OnboardingView);
+        setMessage("Employment vinculado.");
+      })
+      .catch((error: Error) => setMessage(error.message));
+  }
+
   return (
     <section className="panel onboarding-panel">
       <span>Onboarding</span>
@@ -249,6 +298,33 @@ export function OnboardingPanel({
               </button>
             </div>
           )}
+
+          {onboarding.employmentId && <p>Employment vinculado: {onboarding.employmentId}</p>}
+
+          {canManage &&
+            !onboarding.employmentId &&
+            (onboarding.status === "draft" || onboarding.status === "in_progress") && (
+              <div className="form-grid">
+                <button type="button" onClick={loadEligibleEmployments}>
+                  Carregar Employments elegiveis
+                </button>
+                <select
+                  aria-label="Employment para vincular"
+                  value={selectedEmploymentId}
+                  onChange={(event) => setSelectedEmploymentId(event.target.value)}
+                >
+                  <option value="">Selecione um Employment</option>
+                  {employmentOptions.map((employment) => (
+                    <option key={employment.id} value={employment.id}>
+                      {employment.id} - {employment.status}
+                    </option>
+                  ))}
+                </select>
+                <button type="button" onClick={linkEmployment} disabled={!selectedEmploymentId}>
+                  Vincular Employment
+                </button>
+              </div>
+            )}
 
           {canManage && (
             <div className="form-grid">

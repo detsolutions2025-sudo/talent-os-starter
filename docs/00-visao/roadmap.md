@@ -97,3 +97,36 @@ domínio.
 
 As antigas posições de planejamento Fase 12, Fase 13 e Fase 14 não foram
 executadas nessa ordem e não devem ser preenchidas retroativamente.
+
+## Planejamento pós-Fase 25 (saneamento em 2026-08-18)
+
+Após a conclusão da Fase 24 (SPEC-025 — OrganizationPerson e Employment) e da
+Fase 25 (SPEC-017 — Desenvolvimento e Retenção), o planejamento foi
+reconciliado contra `CONSTITUICAO_DO_PROJETO.md`, `AGENTS.md`, todas as SPECs
+e ADRs existentes, o `git log` e o estado físico das migrations.
+
+- **Fase 26 — Integração Onboarding → Employment.** Único candidato com
+  suporte documental suficiente para ser definido sem inventar decisão de
+  produto nova: o caminho já está determinado por ADR-0024 (seção
+  "Onboarding") e por SPEC-025 v1.0, seção 33 ("Impacto Futuro na SPEC-016"),
+  que descrevem explicitamente uma revisão aditiva de SPEC-016 adicionando
+  `employment_id` nullable a Onboarding, preservando onboardings existentes e
+  sem criar ou ativar `Employment` automaticamente. Confirmado por inspeção
+  física: as migrations 0025/0026 (Fase 23 — Onboarding) não possuem
+  `employment_id`; a lacuna é real, não apenas documental.
+  Pré-requisito antes de qualquer código: revisão aditiva formal de
+  `docs/02-requisitos/specs/SPEC-016-Onboarding.md` (v1.1), seguida do
+  processo obrigatório da Constituição (especificação → revisão → plano →
+  desenvolvimento → testes → revisão de segurança → documentação → aprovação
+  → commit). Este documento não cria essa revisão; apenas reconhece o alvo.
+
+- **Demais capacidades pós-contratação levantadas na reconciliação**
+  (Performance, Offboarding, cargo/função pós-contratação, múltiplos vínculos
+  ativos simultâneos, contractor/freelancer, autosserviço do colaborador,
+  LMS/desenvolvimento ampliado, remuneração, sucessão, analytics/indicadores)
+  permanecem sem SPEC ou ADR aprovada. SPEC-017 v1.0 (seção 2) e SPEC-025 v1.0
+  (seção 37) as listam explicitamente como fora do escopo atual ou como
+  ambiguidade não resolvida, e determinam que nenhuma delas seja resolvida
+  por analogia durante implementação. Qualquer uma delas exige etapa própria
+  de definição de produto (ADR e/ou SPEC dedicada) antes de virar Fase
+  numerada.

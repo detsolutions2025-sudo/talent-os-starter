@@ -1,11 +1,26 @@
 # SPEC-016 - Onboarding
 
 **Status:** Aprovada  
-**Versao:** 1.0  
+**Versao:** 1.1  
 **Fase:** 23  
 **Responsavel de negocio:** Thiago Sousa  
-**Ultima atualizacao:** 2026-08-15  
-**Dependencias:** SPEC-001 - Organization, SPEC-003 - Membership, SPEC-004 - Roles & Permissions, SPEC-010 - Vagas, SPEC-011 - Candidatos, SPEC-012 - Processo Seletivo, SPEC-015 - Propostas, SPEC-018 - Blueprint Organizacional / Implantacao Guiada, SPEC-020 - Candidatura Publica, SPEC-021 - Pre-Entrevista Estruturada, SPEC-022 - Perfil Comportamental, SPEC-023 - Pre-Analise Assistida por IA, SPEC-024 - Dossie Inteligente do Candidato, ADR-0013, ADR-0014, ADR-0015, ADR-0020, ADR-0021, ADR-0022, ADR-0023
+**Ultima atualizacao:** 2026-08-18  
+**Dependencias:** SPEC-001 - Organization, SPEC-003 - Membership, SPEC-004 - Roles & Permissions, SPEC-010 - Vagas, SPEC-011 - Candidatos, SPEC-012 - Processo Seletivo, SPEC-015 - Propostas, SPEC-018 - Blueprint Organizacional / Implantacao Guiada, SPEC-020 - Candidatura Publica, SPEC-021 - Pre-Entrevista Estruturada, SPEC-022 - Perfil Comportamental, SPEC-023 - Pre-Analise Assistida por IA, SPEC-024 - Dossie Inteligente do Candidato, SPEC-025 - OrganizationPerson e Employment, ADR-0013, ADR-0014, ADR-0015, ADR-0020, ADR-0021, ADR-0022, ADR-0023, ADR-0024 - Identidade e Vinculo Pos-Contratacao
+
+**Nota de revisao (v1.1 - integracao aditiva com Employment, Fase 26):** esta
+revisao altera exclusivamente a integracao com `Employment`, formalizando o
+que ADR-0024 e SPEC-025 v1.0 (secao 33, "Impacto Futuro na SPEC-016") ja
+determinavam textualmente. Nenhuma decisao da v1.0 abaixo foi removida,
+enfraquecida ou reinterpretada: o sujeito de criacao do Onboarding continua
+sendo `CandidateApplication hired`; a cardinalidade de 1 Onboarding por
+`CandidateApplication` continua valendo; os estados canonicos, RBAC,
+auditoria, privacidade e regras de negocio RN-001 a RN-030 e criterios de
+aceite CA-001 a CA-067 permanecem integralmente em vigor. A v1.1 apenas
+adiciona uma referencia opcional, tardia, explicita e imutavel a
+`Employment`, detalhada nas secoes 43 a 57. Esta revisao nao implementa
+codigo, migration ou banco; a implementacao pertence a Fase 26, tecnicamente
+distinta da Fase 23 historica desta SPEC. Ver secao 43 para a justificativa
+completa de nao renumerar a Fase de origem.
 
 **Nota de revisao (v1.0 - revisao destrutiva documental):** esta revisao
 atacou a v0.1 como se ela estivesse errada. A principal fragilidade encontrada
@@ -974,3 +989,614 @@ Para a implementacao futura desta SPEC:
   assinatura, documento admissional, Employee/Collaborator ou IA implementado
   antecipadamente;
 - commit realizado somente na fase de implementacao/documentacao aprovada.
+
+---
+
+# Adendo v1.1 - Integracao com Employment
+
+As secoes 43 a 57 sao aditivas. Nenhuma delas altera, remove ou reinterpreta
+qualquer regra das secoes 1 a 42. Onde houver aparente sobreposicao, a secao
+1 a 42 permanece a fonte de verdade para tudo que nao for a associacao com
+`Employment`.
+
+## 43. Contexto e Objetivo da Integracao
+
+A Fase 24 (SPEC-025 v1.0) criou `OrganizationPerson` e `Employment` como o
+vinculo pos-contratacao canonico do Talent OS, formalizado por ADR-0024.
+`Employment` nasceu depois de Onboarding (Fase 23) e, por isso, os
+Onboardings existentes nao possuem nenhuma referencia tecnica a ele. ADR-0024
+("Onboarding") e SPEC-025 v1.0 secao 33 ("Impacto Futuro na SPEC-016") ja
+descreviam esse caminho: adicionar `employment_id` nullable a Onboarding, de
+forma aditiva, preservando todo o historico existente.
+
+Esta revisao formaliza exatamente esse caminho, sem inventar decisao de
+produto nova. Confirmado por inspecao fisica das migrations 0025 e 0026
+(Fase 23): nenhuma delas possui `employment_id`; a lacuna e real, nao apenas
+documental.
+
+**Formalizacao central desta v1.1:** `Employment` e o vinculo pos-contratacao
+canonico da pessoa dentro da Organization (ADR-0024; SPEC-025 secao 3.2).
+Onboarding v1.1 reconhece esse fato sem substituir `Candidate` e
+`CandidateApplication` como origem historica e aggregate root de criacao do
+Onboarding (secoes 4.4, 5 e RN-001 a RN-010, inalteradas). `Employment` e
+tratado nesta SPEC exclusivamente como referencia opcional tardia, nunca como
+novo sujeito de criacao, novo gatilho de estado, ou substituto de
+`CandidateApplication hired`.
+
+**Fase de implementacao:** a implementacao tecnica desta integracao pertence
+a **Fase 26** do roadmap (`docs/00-visao/roadmap.md`, secao "Planejamento
+pos-Fase 25"). O campo `Fase: 23` no cabecalho desta SPEC identifica a
+origem historica do documento (quando o Onboarding em si foi especificado e
+implementado), nao a fase em que a integracao com Employment sera
+implementada. Nenhuma fase ja executada e renumerada retroativamente,
+consistente com a nota ja registrada em `docs/01-produto/BACKLOG.md`
+("Fases ja executadas nao devem ser renumeradas retroativamente").
+
+## 44. Associacao e Coerencia de Proveniencia
+
+`Onboarding.employment_id` e um campo opcional, nullable, que referencia um
+`Employment` da mesma Organization.
+
+Regras gerais:
+
+- a associacao nunca e automatica; e sempre um ato explicito de owner/admin
+  (secao 48);
+- a associacao e tenant-safe: `Employment` referenciado deve pertencer a
+  mesma `organization_id` do Onboarding; associacao cross-Organization e
+  proibida, mesmo que o `Employment` exista e esteja em estado elegivel
+  (secao 45);
+- a associacao exige coerencia de proveniencia entre `Onboarding` e
+  `Employment`. Um `Employment` que nao satisfaz a coerencia abaixo e
+  **Employment incompativel** e a associacao deve ser recusada, mesmo dentro
+  da mesma Organization.
+
+### 44.1 Regra de Coerencia de Proveniencia
+
+A associacao e permitida somente quando pelo menos uma das duas condicoes
+abaixo for satisfeita:
+
+- **(a) Mesma linhagem de recrutamento:** `Employment.origin_type =
+  'recruitment'` e `Employment.origin_candidate_application_id =
+  Onboarding.candidate_application_id`; ou
+- **(b) Mesma pessoa de origem, vinculo administrativo:**
+  `Employment.organization_person_id` referencia uma `OrganizationPerson`
+  cujo `origin_candidate_id = Onboarding.candidate_id` (mesma pessoa,
+  mesmo quando o `Employment` foi criado pelo fluxo administrativo da
+  SPEC-025, sem `CandidateApplication` propria).
+
+Se nenhuma das duas condicoes for satisfeita, a associacao e recusada como
+**Employment incompativel** (CA-070). Isso inclui, deliberadamente, o caso em
+que a `OrganizationPerson` do `Employment` nao possui `origin_candidate_id`
+algum: como todo Onboarding exige `CandidateApplication hired` (RN-001), nao
+existe base de coerencia possivel para vincula-lo a uma pessoa sem nenhuma
+linhagem de Candidate, e a associacao deve ser recusada nesse caso.
+
+Esta regra nao deduz nem infere a associacao; ela apenas valida uma
+associacao ja informada explicitamente por owner/admin (secao 47). Consistente
+com SPEC-025 secao 5.2: e-mail, nome, telefone ou similaridade nunca
+fundamentam a validacao de coerencia desta secao.
+
+## 45. Estados Elegiveis
+
+### 45.1 Estados de Employment elegiveis para nova associacao
+
+| Estado de Employment | Elegivel para nova associacao | Motivo |
+| --- | --- | --- |
+| `pending` | Sim | Onboarding tipicamente prepara a entrada antes do inicio efetivo; `pending` e o estado natural de um vinculo aprovado ainda nao iniciado (SPEC-025 secao 7). |
+| `active` | Sim | Onboarding pode continuar em execucao apos o inicio efetivo do vinculo. |
+| `ended` | Nao | Vinculo ja encerrado; associar retroativamente nao tem valor operacional e arrisca representar um vinculo finalizado como se ainda estivesse em preparacao. |
+| `cancelled` | Nao | Vinculo nunca chegou a existir operacionalmente (SPEC-025 secao 15); nunca deve fundamentar Onboarding. |
+
+Uma associacao ja existente **nao e desfeita** se o `Employment` associado
+transicionar posteriormente para `ended` (progressao natural de lifecycle).
+A restricao desta tabela vale apenas para o momento da **nova** associacao,
+nao para o historico ja registrado (secao 47, imutabilidade).
+
+### 45.2 Estados de Onboarding que permitem associacao
+
+| Estado de Onboarding | Permite operacao de associacao | Motivo |
+| --- | --- | --- |
+| `draft` | Sim | Ainda em preparacao interna; nenhuma regra da secao 7 restringe edicoes nesse estado. |
+| `in_progress` | Sim | Checklist em execucao; a associacao nao interfere em tarefas nem em progresso. |
+| `completed` | Nao | Estado final; a trigger fisica ja existente `enforce_onboarding_update_rules` (migration 0025/0026) bloqueia qualquer UPDATE quando `status IN ('completed', 'cancelled')`, incluindo `employment_id`. |
+| `cancelled` | Nao | Mesmo motivo acima. |
+
+## 46. Cardinalidade
+
+- Um `Employment` pode estar vinculado a **no maximo um** Onboarding
+  (`0..1`). Cada `Employment` representa um unico periodo de vinculo
+  (SPEC-025 secao 3.2); faz sentido, no maximo, um checklist de entrada para
+  aquele periodo.
+- Um Onboarding pode estar vinculado a **no maximo um** `Employment`
+  (`0..1`), pela propria natureza de coluna unica `employment_id`.
+- A relacao e, portanto, **opcional 1:1** entre Onboarding e Employment,
+  nunca 1:N em nenhuma direcao.
+- Um Onboarding **nao pode trocar** de Employment depois de associado (secao
+  47, imutabilidade).
+- **Recontratacao:** cada novo ciclo de contratacao que passar pelo
+  recrutamento produz uma nova `CandidateApplication` e, portanto, um novo
+  Onboarding (RN-016 ja impede reaproveitar um Onboarding `completed` ou
+  `cancelled` para a mesma candidatura). O novo Onboarding pode, de forma
+  independente, ser associado ao novo `Employment` criado para essa
+  recontratacao (SPEC-025 secao 8, "recontratacao cria novo Employment").
+  Associacoes anteriores permanecem historicas e nunca sao reescritas
+  (secao 52).
+- **Employment ended/cancelled:** ja coberto pela secao 45 — nao elegivel
+  para nova associacao; associacao preexistente permanece historica quando o
+  Employment associado se torna `ended` depois.
+- **Onboarding completed/cancelled:** ja coberto pela secao 45.2 e pela
+  imutabilidade fisica existente — nenhuma associacao nova, alteracao ou
+  remocao e possivel apos a finalizacao.
+
+## 47. Momento da Associacao e Imutabilidade
+
+### 47.1 Quando `employment_id` pode ser definido
+
+Avaliadas tres alternativas:
+
+- **A. Somente na criacao do Onboarding:** rejeitada. Forcaria o operador a
+  ja conhecer o `Employment` no exato momento em que cria o checklist,
+  logo apos `hired` — mas a criacao de `Employment` e um ato independente e
+  posterior, por decisao explicita de owner/admin (SPEC-025 secao 9), que
+  pode nem ainda ter ocorrido. Acoplar os dois momentos violaria a
+  independencia de tempo que a propria SPEC-025 exige entre os dois
+  processos.
+- **B. Somente por operacao explicita posterior:** adotada. Uma operacao
+  dedicada ("vincular Employment"), distinta da criacao, mantem o fluxo de
+  criacao do Onboarding (secao 8) inalterado e reduz a superficie de mudanca
+  desta revisao ao minimo necessario.
+- **C. Em ambos os momentos:** rejeitada por adicionar dois caminhos de
+  codigo para o mesmo efeito, sem beneficio normativo adicional, e por
+  criar ambiguidade sobre qual caminho e canonico em caso de payload
+  divergente.
+
+**Regra normativa unica adotada: alternativa B.** `employment_id` nunca e
+aceito no payload de criacao do Onboarding (secao 8 permanece inalterada).
+A associacao ocorre exclusivamente por uma operacao explicita e dedicada,
+disponivel enquanto o Onboarding estiver em `draft` ou `in_progress` (secao
+45.2).
+
+### 47.2 Imutabilidade
+
+- `employment_id` nasce sempre `NULL` na criacao do Onboarding (reforca a
+  secao 47.1);
+- pode ser definido **exatamente uma vez**, de `NULL` para um valor
+  concreto (semantica de escrita unica / write-once);
+- uma vez definido, **nunca pode ser removido** (nunca volta a `NULL`);
+- uma vez definido, **nunca pode ser substituido** por outro `Employment`
+  (nenhuma troca de vinculo em v1.1);
+- apos o Onboarding atingir `completed` ou `cancelled`, `employment_id`
+  torna-se imutavel pela mesma regra fisica ja existente que imutabiliza
+  todo o registro nesses estados (secao 45.2);
+- uma correcao de vinculo definido incorretamente fica **fora do escopo da
+  v1.1** e exige revisao normativa propria futura (mesmo padrao ja usado
+  pela secao 41, "Limitacoes conhecidas", para outras correcoes
+  administrativas).
+
+## 48. RBAC do Vinculo
+
+| Acao | owner | admin | member | pessoa onboardada | Platform Admin |
+| --- | :---: | :---: | :---: | :---: | :---: |
+| Vincular Employment a Onboarding | Sim | Sim | Nao | Nao | Nao |
+| Consultar `employment_id` vinculado | Sim | Sim | Nao por padrao | Nao | Nao funcional |
+| Leitura administrativa do vinculo | Nao | Nao | Nao | Nao | Sim, com motivo |
+
+Regras adicionais, consistentes com as secoes 3 e 30:
+
+- a operacao de vinculo segue exatamente a mesma matriz ja aplicada a
+  "Adicionar tarefa" e "Atribuir responsavel" (secao 30): apenas owner e
+  admin;
+- member nunca vincula, mesmo quando autorizado a concluir tarefa propria;
+- Platform Admin nunca vincula funcionalmente; leitura administrativa do
+  vinculo segue a mesma regra ja definida na secao 30 (motivo obrigatorio,
+  auditoria, nunca substitui a decisao de owner/admin);
+- Organization `archived` bloqueia a operacao de vinculo como mutacao
+  funcional, consistente com a secao 23; leitura historica do vinculo ja
+  existente permanece possivel pelos canais ja autorizados.
+
+## 49. Auditoria do Vinculo
+
+Eventos obrigatorios, adicionais aos ja listados na secao 34:
+
+- `onboarding.employment_linked` — vinculo bem-sucedido; registra
+  `organization_id`, `onboarding_id`, `employment_id`, ator (`user_id`
+  e/ou `membership_id`), timestamp;
+- `onboarding.employment_link_denied_cross_organization` — tentativa de
+  vincular `Employment` de outra Organization;
+- `onboarding.employment_link_denied_incompatible` — tentativa de vincular
+  `Employment` que falha a regra de coerencia de proveniencia (secao 44.1);
+- `onboarding.employment_link_conflict` — tentativa de redefinir ou
+  substituir um `employment_id` ja definido, ou conflito de concorrencia
+  (secao 50).
+
+Leitura administrativa do vinculo por Platform Admin reaproveita o evento ja
+existente `onboarding.administrative_read` (secao 34); nenhum evento novo e
+necessario para esse caso.
+
+Auditoria nunca registra: nome, e-mail ou qualquer PII da pessoa; conteudo
+do `Employment` alem do seu identificador interno; motivo de origem do
+`Employment` (`origin_reason`). Apenas identificadores internos, tipo de
+evento, ator, Organization, timestamp e resultado, consistente com a secao
+34.
+
+## 50. Idempotencia e Concorrencia do Vinculo
+
+A operacao de vinculo exige `Idempotency-Key`, seguindo o mesmo padrao ja
+exigido pela secao 32 para criacao, inicio, cancelamento e conclusao de
+Onboarding.
+
+Cenarios obrigatorios:
+
+- **link x link (mesmo Employment):** primeira operacao confirmada grava
+  `employment_id`; retry com a mesma `Idempotency-Key` e mesmo
+  `employment_id` retorna o mesmo resultado (idempotente);
+- **link x link (Employment diferente):** a segunda tentativa, com
+  `employment_id` diferente da ja gravada, e sempre recusada como conflito
+  seguro (write-once, secao 47.2) — independente de chave de idempotencia;
+- **link x start:** operacoes independentes; `start` (secao 8) nao depende
+  do vinculo. A operacao de vinculo deve revalidar, na mesma transacao, que
+  o Onboarding ainda esta em `draft` ou `in_progress` antes de confirmar;
+- **link x cancel:** se o cancelamento confirmar primeiro, a operacao de
+  vinculo subsequente falha (Onboarding final, secao 45.2); se o vinculo
+  confirmar primeiro, o cancelamento prossegue normalmente e o vinculo
+  permanece como historico (secao 46);
+- **link x Employment activate/end/cancel:** a operacao de vinculo deve
+  revalidar o estado atual do `Employment` dentro da mesma transacao
+  (bloqueio transacional equivalente a `SELECT ... FOR UPDATE`, consistente
+  com ADR-0020 "Isolamento Multiempresa" e SPEC-025 secao 22) antes de
+  confirmar. Se o `Employment` transicionar para `ended` ou `cancelled`
+  entre a leitura e a escrita, o vinculo deve falhar com conflito, nunca
+  persistir associacao a um `Employment` que se tornou inelegivel durante a
+  propria operacao;
+- **retries com mesma Idempotency-Key:** mesma chave + mesmo fingerprint em
+  estado `completed` retornam o mesmo resultado; mesma chave + fingerprint
+  divergente gera conflito seguro, nunca duplica nem sobrescreve efeito
+  (mesmo padrao da secao 32);
+- **lock order:** para evitar deadlock entre modulos, a operacao de vinculo
+  sempre adquire o bloqueio da linha de `onboardings` antes da linha de
+  `employments`, nessa ordem fixa.
+
+## 51. Integridade Fisica Futura (conceitual, sem SQL nesta tarefa)
+
+Para avaliacao na Fase 26 (nenhum SQL e criado por esta revisao):
+
+- `employment_id TEXT NULL` em `onboardings`;
+- FK composta tenant-safe: `(organization_id, employment_id) REFERENCES
+  employments (organization_id, id)`, nullable;
+- indice parcial `UNIQUE (organization_id, employment_id) WHERE
+  employment_id IS NOT NULL`, para impor a cardinalidade `0..1` do lado do
+  Employment (secao 46);
+- indice de apoio `(organization_id, employment_id) WHERE employment_id IS
+  NOT NULL` para consulta reversa (Employment -> Onboarding), se distinto do
+  indice de unicidade acima;
+- extensao da trigger fisica ja existente `enforce_onboarding_update_rules`
+  (migrations 0025/0026) para bloquear:
+  - `employment_id` sendo definido fora da transicao `NULL -> valor`;
+  - qualquer tentativa de alterar um `employment_id` ja nao-nulo;
+  - a imutabilidade em `completed`/`cancelled` ja e coberta pela regra
+    geral existente (`onboarding_final_immutable`), sem necessidade de
+    logica nova para esse caso.
+
+## 52. Compatibilidade Retroativa
+
+- todo Onboarding historico com `employment_id NULL` continua
+  integralmente valido; nenhuma obrigatoriedade retroativa e criada;
+- a migration futura da Fase 26 deve ser estritamente aditiva
+  (`ADD COLUMN ... NULL`, sem reescrever linhas existentes);
+- `employment_id` nasce `NULL` para todo Onboarding, historico ou novo;
+- **zero backfill inferido automaticamente**: nenhuma migration ou rotina
+  administrativa pode preencher `employment_id` adivinhando por
+  `Candidate`, e-mail, nome ou `Membership` — apenas a operacao explicita da
+  secao 47 grava o campo;
+- consistente com SPEC-025 secao 5.2 (evidencias sugestivas nunca fazem
+  merge automatico), aplicada aqui por decisao explicita desta SPEC, nunca
+  por analogia implicita;
+- nenhuma provenance historica e reescrita: `candidate_application_id` e
+  `candidate_id` do Onboarding permanecem exatamente como estao hoje,
+  nunca substituidos ou complementados retroativamente pelo `employment_id`.
+
+## 53. Impacto sobre Outras Entidades
+
+- **Candidate:** nenhum impacto. Continua referencia transitoria do
+  Onboarding (secao 4.2), inalterada.
+- **CandidateApplication:** nenhum impacto. Continua origem historica e
+  aggregate root de criacao do Onboarding (secao 4.4, RN-001 a RN-010),
+  inalterada. Onboarding continua nunca alterando `application_status` ou
+  `current_stage` (CA-042, CA-043).
+- **ProposalVersion:** nenhum impacto.
+- **OrganizationPerson:** nenhuma alteracao de schema ou regra propria;
+  usada somente como leitura, para a checagem de coerencia de proveniencia
+  da secao 44.1.
+- **Employment:** nenhuma alteracao de schema, lifecycle ou regra propria
+  em `employments`; recebe apenas uma referencia opcional externa vinda de
+  `onboardings`. Confirma-se explicitamente (secao 54, zero automacao):
+  criacao ou ativacao de `Employment` nunca cria, inicia ou conclui
+  Onboarding.
+- **User / Membership:** nenhum impacto; nenhuma associacao nova a acesso e
+  criada por esta revisao.
+- **Development/Retention (SPEC-017):** nenhum impacto direto. SPEC-017 ja
+  usa `Employment` como aggregate root proprio e independente; esta secao
+  nao cria, autoriza nem antecipa qualquer leitura cruzada entre Onboarding
+  e SPEC-017. Qualquer uso futuro de contexto de Onboarding por SPEC-017
+  exigiria revisao normativa propria daquela SPEC, nao desta.
+
+## 54. Zero Automacao (reforco explicito desta v1.1)
+
+Reforcando o pedido de nao automacao implicita:
+
+- `hired` **nao** cria `Employment` (ja regido por SPEC-025 secao 27; esta
+  SPEC nao cria excecao);
+- `ProposalVersion accepted` **nao** cria `Employment` (idem);
+- criacao de Onboarding **nao** cria `Employment`;
+- inicio (`start`) de Onboarding **nao** cria nem ativa `Employment`;
+- conclusao de Onboarding **nao** cria nem ativa `Employment` (reforca a
+  secao 28, ja vigente desde a v1.0);
+- criacao ou ativacao de `Employment` **nao** cria, inicia ou conclui
+  Onboarding.
+
+Toda associacao entre as duas entidades e, sempre e somente, o ato explicito
+descrito na secao 47.
+
+## 55. Criterios de Aceite da v1.1
+
+- CA-068: `employment_id` e opcional e nasce `NULL` em todo Onboarding.
+- CA-069: Onboardings historicos com `employment_id NULL` permanecem
+  validos.
+- CA-070: associacao a `Employment` incompativel (secao 44.1) e recusada.
+- CA-071: associacao a `Employment` de outra Organization e recusada.
+- CA-072: associacao a `Employment` `ended` e recusada.
+- CA-073: associacao a `Employment` `cancelled` e recusada.
+- CA-074: associacao a `Employment` `pending` e permitida.
+- CA-075: associacao a `Employment` `active` e permitida.
+- CA-076: `employment_id` nao pode ser informado na criacao do Onboarding.
+- CA-077: associacao e permitida em Onboarding `draft`.
+- CA-078: associacao e permitida em Onboarding `in_progress`.
+- CA-079: associacao e recusada em Onboarding `completed`.
+- CA-080: associacao e recusada em Onboarding `cancelled`.
+- CA-081: `employment_id` definido nao pode ser removido.
+- CA-082: `employment_id` definido nao pode ser substituido por outro
+  Employment.
+- CA-083: um Employment esta vinculado a no maximo um Onboarding.
+- CA-084: `hired` nao cria Employment.
+- CA-085: `ProposalVersion accepted` nao cria Employment.
+- CA-086: criacao de Onboarding nao cria Employment.
+- CA-087: inicio de Onboarding nao cria nem ativa Employment.
+- CA-088: conclusao de Onboarding nao cria nem ativa Employment.
+- CA-089: criacao/ativacao de Employment nao cria, inicia ou conclui
+  Onboarding.
+- CA-090: apenas owner/admin vinculam Employment a Onboarding.
+- CA-091: member nao vincula Employment a Onboarding.
+- CA-092: Platform Admin nao vincula funcionalmente; leitura administrativa
+  exige motivo.
+- CA-093: Organization archived bloqueia a operacao de vinculo.
+- CA-094: vinculo bem-sucedido gera auditoria
+  `onboarding.employment_linked`.
+- CA-095: tentativa cross-Organization gera auditoria
+  `onboarding.employment_link_denied_cross_organization`.
+- CA-096: tentativa de Employment incompativel gera auditoria
+  `onboarding.employment_link_denied_incompatible`.
+- CA-097: conflito de vinculo gera auditoria
+  `onboarding.employment_link_conflict`.
+- CA-098: auditoria do vinculo nao registra PII.
+- CA-099: operacao de vinculo exige Idempotency-Key.
+- CA-100: retry idempotente do vinculo retorna o mesmo resultado.
+- CA-101: mesma chave com fingerprint divergente gera conflito seguro.
+- CA-102: link x cancel produz resultado deterministico.
+- CA-103: link x Employment end/cancel concorrente produz resultado
+  deterministico, nunca persiste vinculo a Employment inelegivel.
+- CA-104: nenhuma migration de backfill infere `employment_id`
+  automaticamente por Candidate, e-mail, nome ou Membership.
+- CA-105: `candidate_application_id` e `candidate_id` historicos do
+  Onboarding nunca sao reescritos por esta integracao.
+
+## 56. Testes Obrigatorios Futuros da v1.1 (Fase 26)
+
+Quando esta integracao for implementada, os testes devem comprovar:
+
+### Historico e compatibilidade
+
+1. Onboarding historico com `employment_id NULL` permanece valido e
+   consultavel;
+2. migration aditiva nao altera nenhuma linha existente;
+3. nenhum backfill automatico ocorre para Onboardings pre-existentes.
+
+### Vinculo valido
+
+4. vincular Employment `pending` da mesma Organization;
+5. vincular Employment `active` da mesma Organization;
+6. vinculo bem-sucedido preserva `candidate_application_id` e
+   `candidate_id` inalterados.
+
+### Cross-tenant e incompatibilidade
+
+7. bloquear vinculo a Employment de outra Organization;
+8. bloquear vinculo a Employment `ended`;
+9. bloquear vinculo a Employment `cancelled`;
+10. bloquear vinculo quando `origin_candidate_application_id` do Employment
+    diverge de `candidate_application_id` do Onboarding e a
+    `OrganizationPerson` nao possui o mesmo `origin_candidate_id`;
+11. permitir vinculo administrativo quando `OrganizationPerson.origin_candidate_id`
+    coincide com `Onboarding.candidate_id`, mesmo sem
+    `CandidateApplication` propria no Employment;
+12. bloquear vinculo quando a OrganizationPerson do Employment nao possui
+    nenhum `origin_candidate_id`.
+
+### Cardinalidade
+
+13. um Employment vinculado a um segundo Onboarding e recusado;
+14. um Onboarding vinculado a um segundo Employment (troca) e recusado.
+
+### Lifecycle e imutabilidade
+
+15. bloquear definicao de `employment_id` no payload de criacao do
+    Onboarding;
+16. permitir vinculo em Onboarding `draft`;
+17. permitir vinculo em Onboarding `in_progress`;
+18. bloquear vinculo em Onboarding `completed`;
+19. bloquear vinculo em Onboarding `cancelled`;
+20. bloquear remocao de `employment_id` ja definido;
+21. bloquear substituicao de `employment_id` ja definido.
+
+### RBAC
+
+22. owner vincula Employment;
+23. admin vincula Employment;
+24. member nao vincula Employment;
+25. Platform Admin nao vincula funcionalmente;
+26. Platform Admin le vinculo com motivo;
+27. Platform Admin sem motivo e recusado;
+28. Organization archived bloqueia vinculo.
+
+### Idempotencia e concorrencia
+
+29. retry idempotente do vinculo retorna mesmo resultado;
+30. mesma chave com fingerprint divergente gera conflito;
+31. duas tentativas de vinculo concorrentes com o mesmo Employment nao
+    duplicam efeito;
+32. tentativa de vinculo com Employment diferente apos vinculo ja
+    confirmado e recusada;
+33. link x start concorrente e deterministico;
+34. link x cancel concorrente e deterministico;
+35. link x Employment activate concorrente e deterministico;
+36. link x Employment end concorrente nunca persiste vinculo a Employment
+    que terminou durante a operacao;
+37. link x Employment cancel concorrente nunca persiste vinculo a Employment
+    cancelado durante a operacao.
+
+### No-delete e imutabilidade geral
+
+38. nenhuma exclusao fisica de Onboarding ou Employment ocorre por esta
+    integracao;
+39. vinculo persiste como historico apos Employment associado se tornar
+    `ended`.
+
+### Zero automacao
+
+40. `hired` nao cria Employment;
+41. `ProposalVersion accepted` nao cria Employment;
+42. criacao de Onboarding nao cria Employment;
+43. inicio de Onboarding nao cria nem ativa Employment;
+44. conclusao de Onboarding nao cria nem ativa Employment;
+45. criacao de Employment nao cria Onboarding;
+46. ativacao de Employment nao inicia nem conclui Onboarding.
+
+### Privacidade e auditoria
+
+47. auditoria de vinculo bem-sucedido nao contem PII;
+48. auditoria de tentativa cross-Organization nao revela existencia do
+    registro de outra Organization;
+49. auditoria de Employment incompativel nao expoe dados do Employment
+    alem do identificador.
+
+### Regressao
+
+50. regressao completa de Phase23 (Onboarding v1.0) permanece verde;
+51. regressao completa de Phase24 (Employment v1.0) permanece verde;
+52. regressao completa de Phase25 (Desenvolvimento e Retencao) permanece
+    verde, confirmando que a integracao nao afeta o aggregate root que
+    SPEC-017 ja usa.
+
+## 57. Revisao Destrutiva do Delta v1.0 -> v1.1
+
+Verificacao explicita de contradicoes com ADR-0024, SPEC-025 e o
+comportamento fisico ja implementado na Fase 23:
+
+- **ADR-0024, secao "Onboarding":** exige integracao aditiva, explicita, sem
+  invalidar historicos existentes. Atendido integralmente pelas secoes 43,
+  47 e 52.
+- **ADR-0024, secao "User e Membership":** exige que associacoes futuras de
+  `Employment` com acesso sejam "explicita, auditavel e revogavel". Esta
+  ADR trata association a `User`/`Membership` (acesso ao sistema), nao a
+  associacao Onboarding-Employment desta SPEC. A v1.1 adota explicita e
+  auditavel (secoes 47 e 49), mas **nao** revogavel (imutavel apos definida,
+  secao 47.2). Isso nao contradiz a ADR: revogabilidade foi exigida por
+  ADR-0024 especificamente para concessao de acesso, que e uma decisao de
+  seguranca de maior risco; a referencia historica desta SPEC nao concede
+  acesso a ninguem, e uma regra mais restritiva (imutavel) e um subconjunto
+  seguro de "auditavel", nunca um enfraquecimento.
+- **SPEC-025, secao 33 ("Impacto Futuro na SPEC-016"):** todos os cinco
+  pontos listados sao atendidos: `employment_id` nullable (secao 51);
+  onboardings existentes preservados (secao 52); `candidate_application_id`
+  e `candidate_id` historicos mantidos (secao 52); associacao explicita e
+  auditada (secoes 47 e 49); Onboarding nunca cria nem ativa Employment
+  automaticamente (secao 54).
+- **SPEC-025, secao 17 ("Onboarding"):** "Onboarding futuro pode referenciar
+  Employment explicitamente, sem apagar `candidate_application_id` e
+  `candidate_id` historicos" — atendido pela secao 52.
+- **Comportamento fisico ja implementado na Fase 23 (migrations 0025 e
+  0026):** a trigger `enforce_onboarding_update_rules` ja bloqueia qualquer
+  `UPDATE` em Onboarding `completed`/`cancelled`. A imutabilidade de
+  `employment_id` apos finalizacao (secao 45.2) e coberta de graca por essa
+  regra ja existente, sem necessidade de logica nova para esse caso — apenas
+  o caso "trocar um `employment_id` ja definido enquanto ainda `draft`/
+  `in_progress`" exige extensao futura da trigger (secao 51), que e aditiva
+  e nao contradiz nenhuma regra fisica ja aplicada.
+- **SPEC-012 e SPEC-015:** nenhuma regra dessas SPECs e tocada; a
+  integracao nao acessa nem altera `CandidateApplication` ou `Proposal`.
+- **SPEC-017:** nenhuma regra e tocada; SPEC-017 continua usando `Employment`
+  como aggregate root proprio e independente (secao 53).
+
+**Conclusao da revisao destrutiva: nenhum conflito bloqueante foi
+encontrado.**
+
+### Conflitos restantes
+
+Nenhum.
+
+### Ambiguidades restantes (nao bloqueantes, fora do escopo da v1.1)
+
+- correcao de um `employment_id` definido incorretamente (secao 47.2) fica
+  para revisao normativa futura;
+- coerencia entre `Onboarding.expected_person_start_date` e
+  `Employment.effective_start_date` nao e normativamente exigida nesta
+  revisao; divergencias entre as duas datas sao esperadas na pratica (por
+  exemplo, mudanca de data apos a proposta) e nao bloqueiam a associacao;
+- leitura futura de contexto de Onboarding por SPEC-017 (Desenvolvimento e
+  Retencao) nao e definida aqui e exigiria revisao propria daquela SPEC;
+- forma fisica final de indice de consulta reversa (Employment ->
+  Onboarding), alem da unicidade parcial ja definida na secao 51, fica para
+  o plano tecnico da Fase 26.
+
+## 58. Definicao de Concluido da Integracao (v1.1)
+
+Para esta tarefa documental (revisao da SPEC-016):
+
+- SPEC-016 v1.0 lida integralmente antes da revisao;
+- SPEC-025 v1.0 e ADR-0024 lidas integralmente antes da revisao;
+- migrations 0025, 0026 e 0027 inspecionadas fisicamente;
+- implementacao atual de onboardings e employments inspecionada;
+- nenhuma decisao valida da SPEC-016 v1.0 foi alterada, enfraquecida ou
+  removida;
+- `Employment` formalizado como vinculo pos-contratacao canonico, sem
+  substituir `Candidate`/`CandidateApplication` como provenance do
+  Onboarding;
+- associacao definida: nullable, explicita, tenant-safe, coerente por
+  proveniencia, write-once, sem automacao implicita;
+- cardinalidade definida: `0..1` em ambas as direcoes;
+- estados elegiveis de Employment e de Onboarding definidos e justificados;
+- RBAC, auditoria, idempotencia e concorrencia do vinculo definidos;
+- integridade fisica futura avaliada conceitualmente, sem SQL criado nesta
+  tarefa;
+- compatibilidade retroativa garantida, com zero backfill inferido;
+- impacto sobre Candidate, CandidateApplication, ProposalVersion,
+  OrganizationPerson, Employment, User, Membership e SPEC-017 revisado;
+- criterios de aceite (CA-068 a CA-105) e testes obrigatorios futuros
+  (1 a 52 desta secao) definidos;
+- revisao destrutiva do delta v1.0 -> v1.1 concluida sem conflito
+  bloqueante;
+- nenhum codigo, migration, banco ou teste executavel foi criado ou
+  alterado por esta revisao;
+- nenhum commit foi realizado por esta revisao.
+
+Para a implementacao futura (Fase 26):
+
+- este adendo mantido aprovado antes do desenvolvimento;
+- plano tecnico da Fase 26 elaborado a partir das secoes 43 a 57;
+- migration aditiva reproduzivel quando implementada;
+- criterios de aceite CA-068 a CA-105 implementados;
+- testes obrigatorios 1 a 52 desta secao implementados e passando;
+- regressao completa de Phase23, Phase24 e Phase25 verde;
+- seguranca, privacidade, multiempresa, idempotencia e concorrencia
+  revisadas;
+- documentacao dependente atualizada;
+- commit realizado somente na fase de implementacao aprovada.

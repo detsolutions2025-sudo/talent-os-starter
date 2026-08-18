@@ -3625,6 +3625,23 @@ export function createApiRouter(
       })
     );
 
+    // Fase 26 (SPEC-016 v1.1 s43-s51): vinculo tardio, explicito e imutavel
+    // entre Onboarding e Employment. employmentId nunca e aceito no create.
+    router.post(
+      "/organizations/:organizationId/onboardings/:onboardingId/employment-link",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await onboardings.linkEmployment(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.onboardingId),
+            request.body,
+            request.header("Idempotency-Key")
+          )
+        );
+      })
+    );
+
     router.post(
       "/organizations/:organizationId/onboardings/:onboardingId/tasks",
       asyncHandler(async (request, response) => {
