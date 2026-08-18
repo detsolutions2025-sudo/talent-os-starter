@@ -7,6 +7,7 @@ import { PreAnalysisPanel } from "./PreAnalysisPanel";
 import { CandidateDossierPanel } from "./CandidateDossierPanel";
 import { OnboardingPanel } from "./OnboardingPanel";
 import { EmploymentPanel } from "./EmploymentPanel";
+import { DevelopmentRetentionPanel } from "./DevelopmentRetentionPanel";
 import { ProposalPanel } from "./ProposalPanel";
 import "./styles.css";
 
@@ -2259,6 +2260,14 @@ export function App() {
             role={currentMembership?.role}
             headers={devHeaders}
             applications={candidateApplications}
+          />
+        )}
+
+        {selectedOrganization && (
+          <DevelopmentRetentionPanel
+            organizationId={selectedOrganization.id}
+            role={currentMembership?.role}
+            headers={devHeaders}
           />
         )}
 

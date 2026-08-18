@@ -48,4 +48,14 @@ export interface EmploymentRepository {
     proposalVersionId: string
   ): Promise<EmploymentProposalVersionContext | null>;
   findMembershipForUpdate(membershipId: string): Promise<Membership | null>;
+  // Fase 25 (SPEC-017 s20/s28): quando end() transiciona Employment para `ended`, a trigger de
+  // banco instalada pela migration da Fase 25 (`trg_reconcile_development_plans_on_employment_end`)
+  // fecha reativamente, na MESMA transacao, qualquer DevelopmentPlan nao final como
+  // `closed_due_to_employment_end`. Employment nunca decide nem controla essa transicao -- so
+  // observa o efeito fisico ja concluido para poder auditar (evento obrigatorio da SPEC-017),
+  // porque uma trigger de banco nao pode chamar codigo de aplicacao.
+  findPlanIdsClosedDueToEmploymentEnd(
+    organizationId: string,
+    employmentId: string
+  ): Promise<string[]>;
 }

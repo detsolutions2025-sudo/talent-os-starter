@@ -287,6 +287,18 @@ export class PostgresEmploymentRepository implements EmploymentRepository {
     );
     return result.rows[0] ? mapMembership(result.rows[0]) : null;
   }
+
+  async findPlanIdsClosedDueToEmploymentEnd(organizationId: string, employmentId: string) {
+    const result = await this.connection.query(
+      `
+        SELECT id FROM development_plans
+        WHERE organization_id = $1 AND employment_id = $2
+          AND status = 'closed_due_to_employment_end'
+      `,
+      [organizationId, employmentId]
+    );
+    return result.rows.map((row) => String(row.id));
+  }
 }
 
 function personParams(person: OrganizationPerson) {

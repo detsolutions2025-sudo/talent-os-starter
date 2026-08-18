@@ -385,9 +385,36 @@ export class EmploymentService {
             employmentId: updated.id,
             organizationPersonId: updated.organizationPersonId
           });
+          if (operation === "end") {
+            await service.auditPlansClosedDueToEmploymentEnd(actor, organizationId, tx, updated);
+          }
           return service.serializeEmployment(updated);
         })
     );
+  }
+
+  // Fase 25 (SPEC-017 s20/s28): `end()` acima ja concluiu a transicao de Employment; a trigger
+  // de banco da Fase 25 ja fechou reativamente, na mesma transacao, qualquer DevelopmentPlan
+  // nao final. Este metodo apenas observa esse efeito fisico ja consumado e o audita -- nunca
+  // decide, nunca controla, nunca importa codigo da Fase 25.
+  private async auditPlansClosedDueToEmploymentEnd(
+    actor: Actor,
+    organizationId: string,
+    tx: EmploymentTransaction,
+    employment: Employment
+  ) {
+    const planIds = await tx.employments.findPlanIdsClosedDueToEmploymentEnd(
+      organizationId,
+      employment.id
+    );
+    for (const planId of planIds) {
+      await this.scoped(tx).audit(
+        actor,
+        organizationId,
+        "development_plan.closed_due_to_employment_end",
+        { developmentPlanId: planId, employmentId: employment.id }
+      );
+    }
   }
 
   private async resolveCreationContext(

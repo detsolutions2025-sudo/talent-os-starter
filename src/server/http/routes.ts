@@ -17,6 +17,7 @@ import type { InterviewService } from "../interviews/service";
 import type { OrganizationalUnitService } from "../organizational-units/service";
 import type { OnboardingService } from "../onboardings/service";
 import type { EmploymentService } from "../employments/service";
+import type { DevelopmentRetentionService } from "../development-retention/service";
 import type { PreInterviewService } from "../pre-interviews/service";
 import type { PublicApplicationService } from "../public-applications/service";
 import type { QuestionService } from "../questions/service";
@@ -49,7 +50,8 @@ export function createApiRouter(
   candidateDossiers?: CandidateDossierService,
   proposals?: ProposalService,
   onboardings?: OnboardingService,
-  employments?: EmploymentService
+  employments?: EmploymentService,
+  developmentRetention?: DevelopmentRetentionService
 ): Router {
   const router = createRouter();
 
@@ -3839,6 +3841,277 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await employments.adminRead(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            request.body
+          )
+        );
+      })
+    );
+  }
+
+  // --- Fase 25 (SPEC-017 v1.0) - Desenvolvimento e Retencao -------------------------------
+  // Employment e o aggregate root obrigatorio: toda rota vive aninhada sob um Employment.
+  // Sem rota publica, sem autosservico, sem endpoint generico de mutacao.
+  if (developmentRetention) {
+    router.post(
+      "/organizations/:organizationId/employments/:employmentId/development-plans",
+      asyncHandler(async (request, response) => {
+        const created = await developmentRetention.createPlan(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          routeParam(request.params.employmentId),
+          request.body,
+          request.header("Idempotency-Key")
+        );
+        response.status(201).json(created);
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/employments/:employmentId/development-plans",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await developmentRetention.listPlans(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.employmentId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/development-plans/:planId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await developmentRetention.getPlan(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.planId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/development-plans/:planId/activate",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await developmentRetention.activatePlan(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.planId),
+            request.header("Idempotency-Key")
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/development-plans/:planId/complete",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await developmentRetention.completePlan(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.planId),
+            request.header("Idempotency-Key")
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/development-plans/:planId/cancel",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await developmentRetention.cancelPlan(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.planId),
+            request.body,
+            request.header("Idempotency-Key")
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/development-plans/:planId/goals",
+      asyncHandler(async (request, response) => {
+        const created = await developmentRetention.createGoal(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          routeParam(request.params.planId),
+          request.body,
+          request.header("Idempotency-Key")
+        );
+        response.status(201).json(created);
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/development-goals/:goalId/complete",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await developmentRetention.completeGoal(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.goalId),
+            request.header("Idempotency-Key")
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/development-goals/:goalId/cancel",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await developmentRetention.cancelGoal(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.goalId),
+            request.body,
+            request.header("Idempotency-Key")
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/development-plans/:planId/check-ins",
+      asyncHandler(async (request, response) => {
+        const created = await developmentRetention.createCheckIn(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          routeParam(request.params.planId),
+          request.body,
+          request.header("Idempotency-Key")
+        );
+        response.status(201).json(created);
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/employments/:employmentId/retention-concerns",
+      asyncHandler(async (request, response) => {
+        const created = await developmentRetention.createConcern(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          routeParam(request.params.employmentId),
+          request.body,
+          request.header("Idempotency-Key")
+        );
+        response.status(201).json(created);
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/employments/:employmentId/retention-concerns",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await developmentRetention.listConcerns(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.employmentId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/retention-concerns/:concernId/resolve",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await developmentRetention.resolveConcern(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.concernId),
+            request.body,
+            request.header("Idempotency-Key")
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/retention-concerns/:concernId/cancel",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await developmentRetention.cancelConcern(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.concernId),
+            request.body,
+            request.header("Idempotency-Key")
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/employments/:employmentId/retention-actions",
+      asyncHandler(async (request, response) => {
+        const created = await developmentRetention.createAction(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          routeParam(request.params.employmentId),
+          request.body,
+          request.header("Idempotency-Key")
+        );
+        response.status(201).json(created);
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/employments/:employmentId/retention-actions",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await developmentRetention.listActions(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.employmentId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/retention-actions/:actionId/complete",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await developmentRetention.completeAction(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.actionId),
+            request.header("Idempotency-Key")
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/retention-actions/:actionId/cancel",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await developmentRetention.cancelAction(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.actionId),
+            request.body,
+            request.header("Idempotency-Key")
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/platform/organizations/:organizationId/development-retention/admin-read",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await developmentRetention.adminRead(
             getActor(request),
             routeParam(request.params.organizationId),
             request.body
