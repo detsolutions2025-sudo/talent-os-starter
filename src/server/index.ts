@@ -16,6 +16,7 @@ import { createPostgresOrganizationalUnitService } from "./organizational-units/
 import { createPostgresOnboardingService } from "./onboardings/service";
 import { createPostgresEmploymentService } from "./employments/service";
 import { createPostgresDevelopmentRetentionService } from "./development-retention/service";
+import { createPostgresOffboardingService } from "./offboardings/service";
 import { PostgresCoreRepository } from "./persistence/postgres-core-repository";
 import { createPostgresPreInterviewService } from "./pre-interviews/service";
 import { createPostgresPool, requirePostgresDatabaseUrl } from "./postgres";
@@ -91,7 +92,8 @@ const app = createServer(
   createPostgresProposalService(pool),
   createPostgresOnboardingService(pool),
   createPostgresEmploymentService(pool),
-  createPostgresDevelopmentRetentionService(pool)
+  createPostgresDevelopmentRetentionService(pool),
+  createPostgresOffboardingService(pool)
 );
 
 app.listen(port, () => {

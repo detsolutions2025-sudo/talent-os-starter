@@ -37,6 +37,7 @@
 | SPEC-016 | Onboarding                                      |   23 | v1.0    | Concluída |
 | SPEC-025 | OrganizationPerson e Employment                 |   24 | 1.0     | Concluída |
 | SPEC-017 | Desenvolvimento e Retenção                      |   25 | v1.0    | Concluída |
+| SPEC-026 | Offboarding                                     |   27 | 1.0     | Aprovada   |
 | SPEC-018 | Blueprint Organizacional / Implantação Guiada   |   15 | 1.0     | Aprovada   |
 | SPEC-019 | Portal Público de Vagas                         |   16 | 0.1     | Em revisão |
 | SPEC-020 | Candidatura Pública                             |   17 | 1.1     | Aprovada   |
@@ -51,12 +52,15 @@
 
 > **Nota de reconciliação pós-Fase 25 (2026-08-18):** SPEC-015, SPEC-016, SPEC-025 e SPEC-017 estavam registradas nesta tabela como `Rascunho`/`Em revisão`, divergindo do status `Aprovada` já gravado nos próprios documentos de SPEC e da implementação de código já commitada (Fases 22 a 25, `git log`). Corrigido para `Concluída` nesta tabela, sem alterar conteúdo normativo de nenhuma SPEC — apenas o rastreamento de status estava desatualizado, contrariando a "Regra de atualização" no rodapé deste arquivo.
 
+> **Nota de saneamento — Fase 27 (2026-08-19):** `docs/00-visao/roadmap.md` listava Offboarding apenas como capacidade pós-contratação "sem SPEC ou ADR aprovada", exigindo "SPEC dedicada" antes de virar fase numerada. A SPEC-026 — Offboarding (v1.0, Status: Aprovada, `docs/02-requisitos/specs/SPEC-026-Offboarding.md`) já foi redigida e passou por revisão destrutiva na própria tarefa que a criou, fechando esse pré-requisito. Este saneamento apenas formaliza a Fase 27 nesta tabela e no roadmap; não implementa código, migration, banco, testes executáveis nem faz commit. Status registrado como `Aprovada` (não `Concluída`) porque a implementação (Fase 27 propriamente dita) ainda não começou.
+
 ### Dependências conceituais
 
 A tabela acima não possui coluna de dependências (diferente da tabela "Núcleo da plataforma"); para não alterar sua estrutura estabelecida, as dependências conceituais das próximas SPECs são registradas aqui, como referência para o detalhamento futuro de cada documento:
 
 - **SPEC-025 — OrganizationPerson e Employment:** ADR-0024, Organization, Candidate e CandidateApplication como proveniência opcional, Proposal como proveniência opcional, Onboarding apenas como integração futura aditiva.
 - **SPEC-017 — Desenvolvimento e Retenção:** SPEC-025, Employment como aggregate root, ADR-0024, SPEC-003, SPEC-011, SPEC-012, SPEC-015, SPEC-016.
+- **SPEC-026 — Offboarding:** ADR-0024, SPEC-025 (Employment como aggregate root operacional externo; SPEC-025 permanece autoridade exclusiva do lifecycle de Employment), SPEC-016 (padrão operacional de checklist reutilizado para tasks), SPEC-003 e SPEC-004 (fronteira de acesso e RBAC). Não gerencia revogação automática de acesso; automação real de acesso fica fora da v1 e exige SPEC/ADR própria futura.
 - **SPEC-018 — Blueprint Organizacional / Implantação Guiada:** Organization, DNA Organizacional (SPEC-005), Estrutura Organizacional (SPEC-006), Catálogo de Competências (SPEC-007), Cargos (SPEC-008), Banco de Perguntas (SPEC-009), ADR-0020, ADR-0021, ADR-0022.
 - **SPEC-019 — Portal Público de Vagas:** Vagas (SPEC-010), Organization, Blueprint Organizacional (SPEC-018).
 - **SPEC-020 — Candidatura Pública:** Portal Público (SPEC-019), Candidatos (SPEC-011), Vagas (SPEC-010), Processo Seletivo (SPEC-012).

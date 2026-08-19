@@ -121,12 +121,42 @@ e ADRs existentes, o `git log` e o estado físico das migrations.
   → commit). Este documento não cria essa revisão; apenas reconhece o alvo.
 
 - **Demais capacidades pós-contratação levantadas na reconciliação**
-  (Performance, Offboarding, cargo/função pós-contratação, múltiplos vínculos
-  ativos simultâneos, contractor/freelancer, autosserviço do colaborador,
+  (Performance, cargo/função pós-contratação, múltiplos vínculos ativos
+  simultâneos, contractor/freelancer, autosserviço do colaborador,
   LMS/desenvolvimento ampliado, remuneração, sucessão, analytics/indicadores)
   permanecem sem SPEC ou ADR aprovada. SPEC-017 v1.0 (seção 2) e SPEC-025 v1.0
   (seção 37) as listam explicitamente como fora do escopo atual ou como
   ambiguidade não resolvida, e determinam que nenhuma delas seja resolvida
   por analogia durante implementação. Qualquer uma delas exige etapa própria
   de definição de produto (ADR e/ou SPEC dedicada) antes de virar Fase
-  numerada.
+  numerada. Offboarding, que também estava nesta lista, foi removido dela
+  pelo saneamento abaixo.
+
+## Planejamento pós-Fase 26 (saneamento em 2026-08-19) — Fase 27, Offboarding
+
+A etapa própria de definição de produto exigida pela nota acima foi cumprida
+para Offboarding: `docs/02-requisitos/specs/SPEC-026-Offboarding.md` (v1.0,
+Status: Aprovada) foi redigida e passou por revisão destrutiva na mesma
+tarefa que a criou, fechando aggregate root, momento de criação, lifecycle,
+cardinalidade com `Employment`, fronteira de acesso a `User`/`Membership`,
+RBAC, privacidade, idempotência, concorrência, atomicidade, auditoria,
+multiempresa e histórico, sem alterar ADR-0024, SPEC-025, SPEC-016, SPEC-003
+ou SPEC-004.
+
+- **Fase 27 — Offboarding.** Apoiada em `Employment` como aggregate root
+  operacional externo (SPEC-025 permanece autoridade exclusiva do seu
+  lifecycle); `Offboarding` é aggregate próprio, seguindo o padrão já
+  aprovado para `DevelopmentPlan` (SPEC-017). Não gerencia revogação
+  automática de acesso: `Employment.end()` continua sem desativar `User` ou
+  `Membership` (SPEC-025 seção 14), e a SPEC-026 apenas registra tarefas
+  humanas de revogação, nunca as executa. Automação real de acesso fica
+  explicitamente fora da v1 e exigirá SPEC/ADR própria futura (SPEC-026
+  seção 15).
+  Pré-requisito antes de qualquer código: nenhum adicional — a SPEC-026 já
+  está aprovada. O processo obrigatório da Constituição (especificação →
+  revisão → plano → desenvolvimento → testes → revisão de segurança →
+  documentação → aprovação → commit) segue valendo a partir do plano
+  técnico, que ainda não foi elaborado por este saneamento.
+  Este saneamento formaliza apenas o registro em planejamento (este arquivo
+  e `docs/01-produto/BACKLOG.md`); não implementa código, migration, banco
+  ou testes executáveis, e não realiza commit.

@@ -96,6 +96,27 @@ describe("Fase 23 - Onboarding fluxo, permissoes e idempotencia", () => {
     await startOnboarding(fixture, created.body.id).expect(409);
   });
 
+  // Revisao final da Fase 27 (gate destrutivo pre-aplicacao da 0030): defeito real encontrado
+  // por analogia com Offboarding e comprovado por teste executavel contra o comportamento
+  // atual. SPEC-016 s9 diz que tarefa obrigatoria cancelada "deixa de ser elegivel para
+  // progresso/CONCLUSAO" -- start() nao deve mais exigir assignee de uma task que ja foi
+  // cancelada, pois ela nunca sera concluida.
+  it("permite start quando a unica tarefa obrigatoria ja foi cancelada antes de ter responsavel", async () => {
+    const fixture = await createHiredFixture(database, "start-cancelled-required-no-assignee");
+    const created = await createOnboarding(fixture, crypto.randomUUID(), {
+      initialTasks: [{ title: "Obrigatoria sem responsavel", isRequired: true }]
+    }).expect(201);
+    const task = created.body.tasks[0].id as string;
+
+    await request(fixture.app)
+      .post(`/api/organizations/${fixture.organizationId}/onboarding-tasks/${task}/cancel`)
+      .set(userHeaders(fixture.ownerId))
+      .send({ reason: "Nao se aplica a este caso." })
+      .expect(200);
+
+    await startOnboarding(fixture, created.body.id).expect(200);
+  });
+
   it("bloqueia lifecycle fisico incoerente por SQL direto", async () => {
     const fixture = await createHiredFixture(database, "physical-lifecycle");
     const created = await createOnboarding(fixture).expect(201);

@@ -18,6 +18,7 @@ import type { OrganizationalUnitService } from "../organizational-units/service"
 import type { OnboardingService } from "../onboardings/service";
 import type { EmploymentService } from "../employments/service";
 import type { DevelopmentRetentionService } from "../development-retention/service";
+import type { OffboardingService } from "../offboardings/service";
 import type { PreInterviewService } from "../pre-interviews/service";
 import type { PublicApplicationService } from "../public-applications/service";
 import type { QuestionService } from "../questions/service";
@@ -51,7 +52,10 @@ export function createApiRouter(
   proposals?: ProposalService,
   onboardings?: OnboardingService,
   employments?: EmploymentService,
-  developmentRetention?: DevelopmentRetentionService
+  developmentRetention?: DevelopmentRetentionService,
+  // Fase 27 (SPEC-026 v1.0). Mantido no fim da assinatura posicional, mesma convencao ja usada
+  // por todo o roteador.
+  offboardings?: OffboardingService
 ): Router {
   const router = createRouter();
 
@@ -4129,6 +4133,189 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await developmentRetention.adminRead(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            request.body
+          )
+        );
+      })
+    );
+  }
+
+  // Fase 27 (SPEC-026 v1.0). Offboarding e aggregate proprio pendurado em Employment;
+  // EmploymentService nunca e importado nem chamado a partir daqui.
+  if (offboardings) {
+    router.post(
+      "/organizations/:organizationId/employments/:employmentId/offboardings",
+      asyncHandler(async (request, response) => {
+        const created = await offboardings.create(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          routeParam(request.params.employmentId),
+          request.body,
+          request.header("Idempotency-Key")
+        );
+        response.status(201).json(created);
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/employments/:employmentId/offboardings",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await offboardings.listForEmployment(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.employmentId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/offboardings/:offboardingId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await offboardings.get(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.offboardingId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/offboardings/:offboardingId/start",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await offboardings.start(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.offboardingId),
+            request.header("Idempotency-Key")
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/offboardings/:offboardingId/tasks",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await offboardings.listTasks(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.offboardingId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/offboarding-tasks/mine",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await offboardings.listMyTasks(
+            getActor(request),
+            routeParam(request.params.organizationId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/offboardings/:offboardingId/tasks",
+      asyncHandler(async (request, response) => {
+        const task = await offboardings.addTask(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          routeParam(request.params.offboardingId),
+          request.body,
+          request.header("Idempotency-Key")
+        );
+        response.status(201).json(task);
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/offboarding-tasks/:taskId/assign",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await offboardings.assignTask(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.taskId),
+            request.body,
+            request.header("Idempotency-Key")
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/offboarding-tasks/:taskId/complete",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await offboardings.completeTask(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.taskId),
+            request.header("Idempotency-Key")
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/offboarding-tasks/:taskId/cancel",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await offboardings.cancelTask(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.taskId),
+            request.body,
+            request.header("Idempotency-Key")
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/offboardings/:offboardingId/complete",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await offboardings.complete(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.offboardingId),
+            request.header("Idempotency-Key")
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/offboardings/:offboardingId/cancel",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await offboardings.cancel(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.offboardingId),
+            request.body,
+            request.header("Idempotency-Key")
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/platform/organizations/:organizationId/offboardings/admin-read",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await offboardings.adminRead(
             getActor(request),
             routeParam(request.params.organizationId),
             request.body

@@ -8,6 +8,7 @@ import { CandidateDossierPanel } from "./CandidateDossierPanel";
 import { OnboardingPanel } from "./OnboardingPanel";
 import { EmploymentPanel } from "./EmploymentPanel";
 import { DevelopmentRetentionPanel } from "./DevelopmentRetentionPanel";
+import { OffboardingPanel } from "./OffboardingPanel";
 import { ProposalPanel } from "./ProposalPanel";
 import "./styles.css";
 
@@ -2268,6 +2269,15 @@ export function App() {
             organizationId={selectedOrganization.id}
             role={currentMembership?.role}
             headers={devHeaders}
+          />
+        )}
+
+        {selectedOrganization && (
+          <OffboardingPanel
+            organizationId={selectedOrganization.id}
+            role={currentMembership?.role}
+            headers={devHeaders}
+            memberships={memberships}
           />
         )}
 

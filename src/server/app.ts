@@ -15,6 +15,7 @@ import type { OrganizationalUnitService } from "./organizational-units/service";
 import type { OnboardingService } from "./onboardings/service";
 import type { EmploymentService } from "./employments/service";
 import type { DevelopmentRetentionService } from "./development-retention/service";
+import type { OffboardingService } from "./offboardings/service";
 import type { PreInterviewService } from "./pre-interviews/service";
 import type { PublicApplicationService } from "./public-applications/service";
 import type { QuestionService } from "./questions/service";
@@ -44,7 +45,9 @@ export function createServer(
   proposals?: ProposalService,
   onboardings?: OnboardingService,
   employments?: EmploymentService,
-  developmentRetention?: DevelopmentRetentionService
+  developmentRetention?: DevelopmentRetentionService,
+  // Fase 27 (SPEC-026 v1.0). Mantido no fim da assinatura posicional.
+  offboardings?: OffboardingService
 ) {
   const app = express();
 
@@ -88,7 +91,8 @@ export function createServer(
       proposals,
       onboardings,
       employments,
-      developmentRetention
+      developmentRetention,
+      offboardings
     )
   );
 

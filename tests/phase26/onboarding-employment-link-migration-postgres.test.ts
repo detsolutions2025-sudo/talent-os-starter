@@ -19,15 +19,23 @@ describe("Fase 26 - migration 0029 (schema fisico)", () => {
     await database.cleanup();
   });
 
-  it("0029 foi aplicada e nenhuma 0030+ existe", async () => {
-    const result = await database.pool.query(
-      "SELECT id FROM schema_migrations ORDER BY id DESC LIMIT 3"
+  // Revisao final da Fase 27 (gate destrutivo pre-aplicacao da 0030): a asserção original desta
+  // suite ("0029 foi aplicada e nenhuma 0030+ existe") media uma propriedade temporal, nao uma
+  // propriedade historica -- era verdadeira apenas enquanto nenhuma fase seguinte existisse, e
+  // deixou de ser valida no momento em que a Fase 27 adicionou 0030 legitimamente. Substituida
+  // pelo mesmo padrao robusto ja usado pelo teste seguinte desta suite ("nenhuma migration antiga
+  // (0001-0028) foi alterada"): prova que 0029 existe e que a sequencia 0001-0029 permanece
+  // intacta, sem afirmar que 0029 e ou sera eternamente a ultima migration do projeto.
+  it("0029 esta aplicada e a sequencia 0001-0029 permanece intacta (nao afirma ser a ultima)", async () => {
+    const applied = await database.pool.query(
+      "SELECT 1 FROM schema_migrations WHERE id = '0029_phase_26_onboarding_employment_link'"
     );
-    expect(result.rows[0].id).toBe("0029_phase_26_onboarding_employment_link");
-    const future = await database.pool.query(
-      "SELECT id FROM schema_migrations WHERE id > '0029_phase_26_onboarding_employment_link'"
+    expect(applied.rowCount).toBe(1);
+
+    const upToAndIncluding29 = await database.pool.query(
+      "SELECT count(*)::int AS count FROM schema_migrations WHERE id <= '0029_phase_26_onboarding_employment_link'"
     );
-    expect(future.rowCount).toBe(0);
+    expect(upToAndIncluding29.rows[0].count).toBe(29);
   });
 
   it("onboardings.employment_id existe como TEXT nullable", async () => {

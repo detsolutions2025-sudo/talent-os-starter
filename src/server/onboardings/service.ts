@@ -185,8 +185,16 @@ export class OnboardingService {
             throw conflict("onboarding_start_invalid_state", "Only draft onboarding can start.");
           }
           const tasks = await tx.onboardings.listTasksForUpdate(organizationId, onboarding.id);
+          // Revisao final da Fase 27 (gate destrutivo pre-aplicacao da 0030): SPEC-016 s9 diz
+          // explicitamente que tarefa obrigatoria cancelada "deixa de ser elegivel para
+          // progresso/CONCLUSAO" -- uma task cancelada nunca sera concluida, entao exigir
+          // assignee dela antes do start (cujo unico proposito e viabilizar a conclusao)
+          // contradiz o proprio texto da SPEC ja aprovada. Bug real, comprovado por teste
+          // executavel: uma task obrigatoria cancelada ANTES de qualquer assignee bloqueava
+          // start() mesmo sendo a unica task do Onboarding. Mesmo padrao ja corrigido em
+          // offboardings/service.ts (Fase 27) para o mesmo defeito estrutural.
           const missingAssignee = tasks.some(
-            (task) => task.isRequired && !task.assigneeMembershipId
+            (task) => task.isRequired && task.status === "open" && !task.assigneeMembershipId
           );
           if (missingAssignee) {
             throw conflict(
