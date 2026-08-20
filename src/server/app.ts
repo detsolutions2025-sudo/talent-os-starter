@@ -16,6 +16,7 @@ import type { OnboardingService } from "./onboardings/service";
 import type { EmploymentService } from "./employments/service";
 import type { DevelopmentRetentionService } from "./development-retention/service";
 import type { OffboardingService } from "./offboardings/service";
+import type { AccessGrantService } from "./access-grants/service";
 import type { PreInterviewService } from "./pre-interviews/service";
 import type { PublicApplicationService } from "./public-applications/service";
 import type { QuestionService } from "./questions/service";
@@ -47,7 +48,9 @@ export function createServer(
   employments?: EmploymentService,
   developmentRetention?: DevelopmentRetentionService,
   // Fase 27 (SPEC-026 v1.0). Mantido no fim da assinatura posicional.
-  offboardings?: OffboardingService
+  offboardings?: OffboardingService,
+  // Fase 28 (ADR-0025; SPEC-027 v1.0). Mantido no fim da assinatura posicional.
+  accessGrants?: AccessGrantService
 ) {
   const app = express();
 
@@ -92,7 +95,8 @@ export function createServer(
       onboardings,
       employments,
       developmentRetention,
-      offboardings
+      offboardings,
+      accessGrants
     )
   );
 

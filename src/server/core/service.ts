@@ -469,9 +469,21 @@ export class CoreService {
           }
 
           await repository.lockMembershipsByOrganization(membership.organizationId);
+          // Achado de concorrencia real (Fase 28, gate de concorrencia): a partir daqui, uma
+          // releitura FRESCA (ja sob o lock org-wide acima) e obrigatoria. `membership` (lido no
+          // topo do metodo, ANTES do lock) pode estar desatualizado se OUTRA chamada concorrente
+          // e independente de `updateMembership` -- por exemplo, uma mudanca de `role` correndo
+          // ao mesmo tempo que esta mudanca de `status` -- ja tiver commitado nesse intervalo.
+          // Sem esta releitura, o merge abaixo (`{...membership, role: input.role ?? ...}`)
+          // sobrescrevia com o valor ANTIGO de `role`/`status` (o campo que ESTA chamada nao
+          // pretendia tocar), REVERTENDO silenciosamente a mutacao concorrente -- um lost
+          // update classico. Bug pre-existente da Fase 1 (`CoreService`), nunca exercitado por
+          // nenhum dominio ate `AccessGrant.revoke` (SPEC-027) tornar-se, pela primeira vez, um
+          // segundo chamador concorrente e independente deste metodo sobre a mesma linha.
+          const current = (await repository.findMembershipById(membershipId)) ?? membership;
           const wouldChangeLastOwner =
-            membership.role === "owner" &&
-            membership.status === "active" &&
+            current.role === "owner" &&
+            current.status === "active" &&
             (input.status === "inactive" || (input.role !== undefined && input.role !== "owner"));
 
           if (
@@ -490,9 +502,9 @@ export class CoreService {
           }
 
           const updated: Membership = {
-            ...membership,
-            role: input.role ?? membership.role,
-            status: input.status ?? membership.status,
+            ...current,
+            role: input.role ?? current.role,
+            status: input.status ?? current.status,
             updatedAt: repository.now()
           };
 

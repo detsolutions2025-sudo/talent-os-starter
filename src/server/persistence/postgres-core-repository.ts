@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type pg from "pg";
+import { conflict } from "../core/errors";
 import type { CoreRepository, MembershipWithUser } from "../core/repository";
 import type { AuditEvent, Membership, Organization, User } from "../core/types";
 
@@ -27,6 +28,25 @@ export class PostgresCoreRepository implements CoreRepository {
       return result;
     } catch (error) {
       await client.query("ROLLBACK");
+      // Achado de concorrencia real (Fase 28, gate de concorrencia): uma chamada TOPO-DE-PILHA
+      // a `CoreService.updateMembership` (por exemplo, `PATCH /memberships/:id` chamada
+      // diretamente, fora de qualquer transacao de dominio pos-contratacao) pode colidir com
+      // `lockMembershipsByOrganization` de OUTRA transacao concorrente (nativamente da propria
+      // Fase 1, ou -- agora pela primeira vez -- de `AccessGrant.revoke`, SPEC-027 s13) numa
+      // ordem de lock cruzada real, produzindo um deadlock genuino (40P01) do PostgreSQL. Sem
+      // esta traducao, o erro cru propagava como 500 generico. Mesmo padrao ja usado em todo
+      // `*/transaction.ts` do dominio pos-contratacao (`employments`, `offboardings`,
+      // `access-grants`) -- aplicado aqui pela primeira vez porque esta e a UNICA chamada de
+      // `CoreService` que ainda nao tinha essa traducao (chamadas aninhadas, como a de
+      // `AccessGrant.revoke`, ja sao cobertas pelo `catch` do transaction runner do dominio
+      // chamador). Zero mudanca de comportamento para qualquer caminho que nao seja um erro
+      // fisico de concorrencia real.
+      if (isPostgresConcurrentConflict(error)) {
+        throw conflict(
+          "core_concurrent_change",
+          "Membership or Organization changed concurrently; retry the operation."
+        );
+      }
       throw error;
     } finally {
       client.release();
@@ -310,6 +330,15 @@ export class PostgresCoreRepository implements CoreRepository {
 
 function isPool(connection: pg.Pool | pg.PoolClient): connection is pg.Pool {
   return "connect" in connection;
+}
+
+// Mesmo padrao ja usado em employments/offboardings/access-grants `transaction.ts` -- aqui
+// restrito aos codigos genericos de deadlock/serializacao (nao ha nenhuma constraint 23505
+// especifica de dominio para traduzir em CoreRepository).
+function isPostgresConcurrentConflict(error: unknown) {
+  if (!error || typeof error !== "object" || !("code" in error)) return false;
+  const code = (error as { code?: unknown }).code;
+  return code === "40P01" || code === "40001" || code === "55P03";
 }
 
 function mapUser(row: Record<string, unknown>): User {

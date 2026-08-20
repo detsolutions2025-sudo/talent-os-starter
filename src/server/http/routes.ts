@@ -19,6 +19,7 @@ import type { OnboardingService } from "../onboardings/service";
 import type { EmploymentService } from "../employments/service";
 import type { DevelopmentRetentionService } from "../development-retention/service";
 import type { OffboardingService } from "../offboardings/service";
+import type { AccessGrantService } from "../access-grants/service";
 import type { PreInterviewService } from "../pre-interviews/service";
 import type { PublicApplicationService } from "../public-applications/service";
 import type { QuestionService } from "../questions/service";
@@ -55,7 +56,9 @@ export function createApiRouter(
   developmentRetention?: DevelopmentRetentionService,
   // Fase 27 (SPEC-026 v1.0). Mantido no fim da assinatura posicional, mesma convencao ja usada
   // por todo o roteador.
-  offboardings?: OffboardingService
+  offboardings?: OffboardingService,
+  // Fase 28 (ADR-0025; SPEC-027 v1.0). Mantido no fim da assinatura posicional.
+  accessGrants?: AccessGrantService
 ): Router {
   const router = createRouter();
 
@@ -4316,6 +4319,112 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await offboardings.adminRead(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            request.body
+          )
+        );
+      })
+    );
+  }
+
+  // Fase 28 (ADR-0025; SPEC-027 v1.0). AccessGrant e proveniencia/governanca sobre um
+  // Membership existente; CoreService/authorize() nunca sao alterados para exigir AccessGrant.
+  if (accessGrants) {
+    router.post(
+      "/organizations/:organizationId/access-grants",
+      asyncHandler(async (request, response) => {
+        const created = await accessGrants.grant(
+          getActor(request),
+          routeParam(request.params.organizationId),
+          request.body,
+          request.header("Idempotency-Key")
+        );
+        response.status(201).json(created);
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/access-grants/:accessGrantId/revoke",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await accessGrants.revoke(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.accessGrantId),
+            request.body,
+            request.header("Idempotency-Key")
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/access-grants/:accessGrantId",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await accessGrants.get(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.accessGrantId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/access-grants",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await accessGrants.list(getActor(request), routeParam(request.params.organizationId))
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/organization-people/:personId/access-grants",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await accessGrants.listByPerson(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.personId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/memberships/:membershipId/access-grants",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await accessGrants.listByMembership(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.membershipId)
+          )
+        );
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/employments/:employmentId/access-grants",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await accessGrants.listByEmployment(
+            getActor(request),
+            routeParam(request.params.organizationId),
+            routeParam(request.params.employmentId)
+          )
+        );
+      })
+    );
+
+    router.post(
+      "/platform/organizations/:organizationId/access-grants/admin-read",
+      asyncHandler(async (request, response) => {
+        response.json(
+          await accessGrants.adminRead(
             getActor(request),
             routeParam(request.params.organizationId),
             request.body

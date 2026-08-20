@@ -160,3 +160,53 @@ ou SPEC-004.
   Este saneamento formaliza apenas o registro em planejamento (este arquivo
   e `docs/01-produto/BACKLOG.md`); não implementa código, migration, banco
   ou testes executáveis, e não realiza commit.
+
+## Planejamento pós-Fase 27 (saneamento em 2026-08-20) — Fase 28, AccessGrant
+
+A etapa própria de definição de produto, exigida desde o saneamento pós-Fase
+25 para qualquer capacidade pós-contratação sem SPEC ou ADR aprovada, foi
+cumprida para o Ciclo de Vida de Acesso: `docs/03-arquitetura/decisoes/
+0025-ciclo-de-vida-de-acesso-pos-contratacao.md` (Status: Aceita) e
+`docs/02-requisitos/specs/SPEC-027-Ciclo-de-Vida-de-Acesso.md` (v1.0,
+Status: Aprovada) foram redigidas e passaram por revisão destrutiva nas
+próprias tarefas que as criaram, sem alterar ADR-0024, SPEC-003, SPEC-004,
+SPEC-025 ou SPEC-026.
+
+- **Fase 28 — Ciclo de Vida de Acesso Pós-Contratação (`AccessGrant`).**
+  `AccessGrant` é uma camada de proveniência e governança sobre um
+  `Membership` já existente — nunca uma segunda fonte de verdade de
+  autorização. Pontos fechados por ADR-0025/SPEC-027 e registrados aqui
+  sucintamente:
+  - `Membership` continua sendo, sozinho, a fonte de verdade de autorização
+    técnica; `authorize()` nunca consulta `AccessGrant`;
+  - `AccessGrant` é proveniência/governança — responde "por que este acesso
+    existe e sob qual vínculo", nunca "este acesso é válido agora";
+  - `OrganizationPerson` + `Membership` são as relações centrais de
+    `AccessGrant` (1:N históricos cada); `Membership` puramente
+    administrativo (owner/admin/recruiter sem vínculo laboral) nunca precisa
+    de `AccessGrant`;
+  - `Employment` é proveniência opcional (`0:N AccessGrant`), imutável após
+    a criação do `AccessGrant`, elegível em qualquer estado (`active` ou
+    `ended`);
+  - revogação funcional de acesso é a única operação deste domínio
+    autorizada a mutar `Membership`, e delega integralmente a
+    `CoreService.updateMembership` (SPEC-003) — herda RN-006 (proteção do
+    último owner), auditoria e RBAC já existentes, nunca reimplementados;
+  - zero automação por `Employment.end()` — preserva SPEC-025 §14/§16
+    integralmente, sem revogar nada automaticamente;
+  - zero automação por `Offboarding` — preserva SPEC-026 integralmente:
+    nunca cria, revoga ou altera `AccessGrant`/`Membership`; uma integração
+    aditiva opcional de contexto (`OffboardingTask` → `access_grant_id`)
+    permanece registrada como possibilidade futura, não decidida aqui;
+  - zero Inteligência Artificial: concessão e revogação são sempre atos
+    humanos explícitos, sem score, ranking ou sugestão automatizada.
+  Pré-requisito antes de qualquer código: nenhum adicional — ADR-0025 e
+  SPEC-027 já estão, respectivamente, Aceita e Aprovada. O processo
+  obrigatório da Constituição (especificação → revisão → plano →
+  desenvolvimento → testes → revisão de segurança → documentação → aprovação
+  → commit) segue valendo a partir do plano técnico, que ainda não foi
+  elaborado por este saneamento.
+  Este saneamento formaliza apenas o registro em planejamento (este arquivo
+  e `docs/01-produto/BACKLOG.md`) e o metadado `Fase` do cabeçalho de
+  SPEC-027; não implementa código, migration, banco ou testes executáveis, e
+  não realiza commit.

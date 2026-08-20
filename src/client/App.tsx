@@ -9,6 +9,7 @@ import { OnboardingPanel } from "./OnboardingPanel";
 import { EmploymentPanel } from "./EmploymentPanel";
 import { DevelopmentRetentionPanel } from "./DevelopmentRetentionPanel";
 import { OffboardingPanel } from "./OffboardingPanel";
+import { AccessGrantPanel } from "./AccessGrantPanel";
 import { ProposalPanel } from "./ProposalPanel";
 import "./styles.css";
 
@@ -2274,6 +2275,15 @@ export function App() {
 
         {selectedOrganization && (
           <OffboardingPanel
+            organizationId={selectedOrganization.id}
+            role={currentMembership?.role}
+            headers={devHeaders}
+            memberships={memberships}
+          />
+        )}
+
+        {selectedOrganization && (
+          <AccessGrantPanel
             organizationId={selectedOrganization.id}
             role={currentMembership?.role}
             headers={devHeaders}
