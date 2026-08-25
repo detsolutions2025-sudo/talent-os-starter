@@ -7,8 +7,10 @@ import type { BlueprintService } from "../blueprints/service";
 import type { CandidateApplicationService } from "../candidate-applications/service";
 import type { CandidateService } from "../candidates/service";
 import type { CompetencyService } from "../competencies/service";
-import { getActor } from "./dev-auth";
-import { forbidden } from "../core/errors";
+import { DevActorProvider, type ActorProvider } from "./actor-provider";
+import type { AuthService } from "../auth/service";
+import { clearSessionCookies, readSessionCookies, setSessionCookies } from "./cookies";
+import { badRequest, forbidden } from "../core/errors";
 import type { CoreService } from "../core/service";
 import type { DnaService } from "../dna/service";
 import type { JobOpeningService } from "../job-openings/service";
@@ -30,6 +32,12 @@ import type { CandidateDossierService } from "../candidate-dossiers/service";
 
 export function createApiRouter(
   core: CoreService,
+  // Fase 29 (ADR-0026; SPEC-028 v1.0). Excecao deliberada a convencao de "sempre acrescentar ao
+  // fim" -- `actorProvider` e infraestrutura central (como `core`), nunca um servico de dominio
+  // opcional. Default `DevActorProvider` preserva, sem tocar nenhum dos ~25 pontos de chamada
+  // de teste existentes, o comportamento identico de antes desta Fase (dev-auth); producao
+  // (index.ts) sempre passa o provider real explicitamente -- o default nunca e alcancado la.
+  actorProvider: ActorProvider = new DevActorProvider(),
   dna?: DnaService,
   organizationalUnits?: OrganizationalUnitService,
   competencies?: CompetencyService,
@@ -58,21 +66,28 @@ export function createApiRouter(
   // por todo o roteador.
   offboardings?: OffboardingService,
   // Fase 28 (ADR-0025; SPEC-027 v1.0). Mantido no fim da assinatura posicional.
-  accessGrants?: AccessGrantService
+  accessGrants?: AccessGrantService,
+  // Fase 29 (ADR-0026; SPEC-028 v1.0). Mantido no fim da assinatura posicional (servico
+  // opcional, ao contrario de `actorProvider` acima).
+  auth?: AuthService,
+  // Fase 29: `APP_ENV=production` determina se os cookies de sessao usam `Secure` -- passado
+  // explicitamente (nunca lido de `process.env` dentro de routes.ts) para manter o modulo
+  // testavel sem variaveis de ambiente globais.
+  isProductionEnv = false
 ): Router {
   const router = createRouter();
 
   router.get(
     "/dev/me",
     asyncHandler(async (request, response) => {
-      response.json(await core.getCurrentUser(getActor(request)));
+      response.json(await core.getCurrentUser(await actorProvider.resolve(request)));
     })
   );
 
   router.post(
     "/dev/users",
     asyncHandler(async (request, response) => {
-      const user = await core.createUser(getActor(request), request.body);
+      const user = await core.createUser(await actorProvider.resolve(request), request.body);
       response.status(201).json(user);
     })
   );
@@ -80,14 +95,14 @@ export function createApiRouter(
   router.get(
     "/dev/users",
     asyncHandler(async (request, response) => {
-      response.json(await core.listUsers(getActor(request)));
+      response.json(await core.listUsers(await actorProvider.resolve(request)));
     })
   );
 
   router.get(
     "/audit-events",
     asyncHandler(async (request, response) => {
-      const actor = getActor(request);
+      const actor = await actorProvider.resolve(request);
 
       if (actor.kind !== "platform") {
         throw forbidden("permission_denied", "Permission denied.");
@@ -100,7 +115,10 @@ export function createApiRouter(
   router.post(
     "/organizations",
     asyncHandler(async (request, response) => {
-      const result = await core.createOrganization(getActor(request), request.body);
+      const result = await core.createOrganization(
+        await actorProvider.resolve(request),
+        request.body
+      );
       response.status(201).json(result);
     })
   );
@@ -108,7 +126,7 @@ export function createApiRouter(
   router.get(
     "/organizations",
     asyncHandler(async (request, response) => {
-      response.json(await core.listOrganizations(getActor(request)));
+      response.json(await core.listOrganizations(await actorProvider.resolve(request)));
     })
   );
 
@@ -116,7 +134,10 @@ export function createApiRouter(
     "/organizations/:organizationId",
     asyncHandler(async (request, response) => {
       response.json(
-        await core.getOrganization(getActor(request), routeParam(request.params.organizationId))
+        await core.getOrganization(
+          await actorProvider.resolve(request),
+          routeParam(request.params.organizationId)
+        )
       );
     })
   );
@@ -126,7 +147,7 @@ export function createApiRouter(
     asyncHandler(async (request, response) => {
       response.json(
         await core.updateOrganization(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           request.body
         )
@@ -138,7 +159,10 @@ export function createApiRouter(
     "/organizations/:organizationId/archive",
     asyncHandler(async (request, response) => {
       response.json(
-        await core.archiveOrganization(getActor(request), routeParam(request.params.organizationId))
+        await core.archiveOrganization(
+          await actorProvider.resolve(request),
+          routeParam(request.params.organizationId)
+        )
       );
     })
   );
@@ -148,7 +172,7 @@ export function createApiRouter(
     asyncHandler(async (request, response) => {
       response.json(
         await core.reactivateOrganization(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId)
         )
       );
@@ -159,7 +183,10 @@ export function createApiRouter(
     "/organizations/:organizationId/memberships",
     asyncHandler(async (request, response) => {
       response.json(
-        await core.listMemberships(getActor(request), routeParam(request.params.organizationId))
+        await core.listMemberships(
+          await actorProvider.resolve(request),
+          routeParam(request.params.organizationId)
+        )
       );
     })
   );
@@ -167,7 +194,7 @@ export function createApiRouter(
   router.post(
     "/organizations/:organizationId/memberships",
     asyncHandler(async (request, response) => {
-      const membership = await core.createMembership(getActor(request), {
+      const membership = await core.createMembership(await actorProvider.resolve(request), {
         ...request.body,
         organizationId: routeParam(request.params.organizationId)
       });
@@ -179,7 +206,7 @@ export function createApiRouter(
     "/memberships/:membershipId",
     asyncHandler(async (request, response) => {
       const membership = await core.updateMembership(
-        getActor(request),
+        await actorProvider.resolve(request),
         routeParam(request.params.membershipId),
         request.body
       );
@@ -192,7 +219,10 @@ export function createApiRouter(
       "/organizations/:organizationId/dna",
       asyncHandler(async (request, response) => {
         response.json(
-          await dna.getPublished(getActor(request), routeParam(request.params.organizationId))
+          await dna.getPublished(
+            await actorProvider.resolve(request),
+            routeParam(request.params.organizationId)
+          )
         );
       })
     );
@@ -201,7 +231,10 @@ export function createApiRouter(
       "/organizations/:organizationId/dna/draft",
       asyncHandler(async (request, response) => {
         response.json(
-          await dna.getActiveDraft(getActor(request), routeParam(request.params.organizationId))
+          await dna.getActiveDraft(
+            await actorProvider.resolve(request),
+            routeParam(request.params.organizationId)
+          )
         );
       })
     );
@@ -210,7 +243,10 @@ export function createApiRouter(
       "/organizations/:organizationId/dna/versions",
       asyncHandler(async (request, response) => {
         response.json(
-          await dna.listVersions(getActor(request), routeParam(request.params.organizationId))
+          await dna.listVersions(
+            await actorProvider.resolve(request),
+            routeParam(request.params.organizationId)
+          )
         );
       })
     );
@@ -220,7 +256,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await dna.getVersion(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.versionId)
           )
@@ -232,7 +268,7 @@ export function createApiRouter(
       "/organizations/:organizationId/dna/drafts",
       asyncHandler(async (request, response) => {
         const draft = await dna.createDraft(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           request.body
         );
@@ -245,7 +281,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await dna.updateDraft(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.versionId),
             request.body
@@ -259,7 +295,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await dna.publishDraft(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.versionId)
           )
@@ -272,7 +308,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await dna.discardDraft(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.versionId)
           )
@@ -285,7 +321,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await dna.adminRead(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             request.body
           )
@@ -299,7 +335,7 @@ export function createApiRouter(
       "/organizations/:organizationId/organizational-units",
       asyncHandler(async (request, response) => {
         const unit = await organizationalUnits.createUnit(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           request.body
         );
@@ -312,7 +348,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await organizationalUnits.listTree(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId)
           )
         );
@@ -324,7 +360,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await organizationalUnits.listActive(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId)
           )
         );
@@ -336,7 +372,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await organizationalUnits.listHistory(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId)
           )
         );
@@ -348,7 +384,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await organizationalUnits.getUnit(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.unitId)
           )
@@ -361,7 +397,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await organizationalUnits.updateUnit(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.unitId),
             request.body
@@ -375,7 +411,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await organizationalUnits.moveUnit(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.unitId),
             request.body
@@ -389,7 +425,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await organizationalUnits.inactivateUnit(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.unitId)
           )
@@ -402,7 +438,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await organizationalUnits.reactivateUnit(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.unitId)
           )
@@ -415,7 +451,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await organizationalUnits.adminRead(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             request.body
           )
@@ -428,7 +464,10 @@ export function createApiRouter(
     router.post(
       "/platform/competencies/global",
       asyncHandler(async (request, response) => {
-        const competency = await competencies.createGlobal(getActor(request), request.body);
+        const competency = await competencies.createGlobal(
+          await actorProvider.resolve(request),
+          request.body
+        );
         response.status(201).json(competency);
       })
     );
@@ -436,14 +475,14 @@ export function createApiRouter(
     router.get(
       "/platform/competencies/global",
       asyncHandler(async (request, response) => {
-        response.json(await competencies.listGlobals(getActor(request)));
+        response.json(await competencies.listGlobals(await actorProvider.resolve(request)));
       })
     );
 
     router.get(
       "/platform/competencies/global/history",
       asyncHandler(async (request, response) => {
-        response.json(await competencies.globalHistory(getActor(request)));
+        response.json(await competencies.globalHistory(await actorProvider.resolve(request)));
       })
     );
 
@@ -452,7 +491,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await competencies.getGlobal(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.globalCompetencyId)
           )
         );
@@ -464,7 +503,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await competencies.updateGlobal(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.globalCompetencyId),
             request.body
           )
@@ -477,7 +516,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await competencies.setGlobalStatus(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.globalCompetencyId),
             "active"
           )
@@ -490,7 +529,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await competencies.setGlobalStatus(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.globalCompetencyId),
             "inactive"
           )
@@ -503,7 +542,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await competencies.setGlobalStatus(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.globalCompetencyId),
             "deprecated"
           )
@@ -515,7 +554,7 @@ export function createApiRouter(
       "/organizations/:organizationId/competencies",
       asyncHandler(async (request, response) => {
         const competency = await competencies.createOrganizationCompetency(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           request.body
         );
@@ -528,7 +567,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await competencies.listOrganizationCompetencies(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId)
           )
         );
@@ -540,7 +579,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await competencies.listUnifiedCatalog(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId)
           )
         );
@@ -552,7 +591,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await competencies.listAvailableGlobals(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId)
           )
         );
@@ -564,7 +603,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await competencies.listHistory(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId)
           )
         );
@@ -576,7 +615,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await competencies.getCatalogItem(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.catalogItemId)
           )
@@ -589,7 +628,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await competencies.updateOrganizationCompetency(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.competencyId),
             request.body
@@ -603,7 +642,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await competencies.setOrganizationCompetencyStatus(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.competencyId),
             "active"
@@ -617,7 +656,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await competencies.setOrganizationCompetencyStatus(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.competencyId),
             "inactive"
@@ -630,7 +669,7 @@ export function createApiRouter(
       "/organizations/:organizationId/competencies/adoptions",
       asyncHandler(async (request, response) => {
         const adoption = await competencies.adoptGlobal(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           request.body
         );
@@ -643,7 +682,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await competencies.setAdoptionStatus(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.adoptionId),
             "active"
@@ -657,7 +696,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await competencies.setAdoptionStatus(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.adoptionId),
             "inactive"
@@ -671,7 +710,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await competencies.adminRead(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             request.body
           )
@@ -685,7 +724,7 @@ export function createApiRouter(
       "/organizations/:organizationId/job-profiles",
       asyncHandler(async (request, response) => {
         const profile = await jobProfiles.createJobProfile(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           request.body
         );
@@ -697,7 +736,10 @@ export function createApiRouter(
       "/organizations/:organizationId/job-profiles",
       asyncHandler(async (request, response) => {
         response.json(
-          await jobProfiles.listActive(getActor(request), routeParam(request.params.organizationId))
+          await jobProfiles.listActive(
+            await actorProvider.resolve(request),
+            routeParam(request.params.organizationId)
+          )
         );
       })
     );
@@ -707,7 +749,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await jobProfiles.listInactive(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId)
           )
         );
@@ -719,7 +761,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await jobProfiles.getJobProfile(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.jobProfileId)
           )
@@ -732,7 +774,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await jobProfiles.updateJobProfile(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.jobProfileId),
             request.body
@@ -746,7 +788,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await jobProfiles.setJobProfileStatus(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.jobProfileId),
             "active"
@@ -760,7 +802,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await jobProfiles.setJobProfileStatus(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.jobProfileId),
             "inactive"
@@ -773,7 +815,7 @@ export function createApiRouter(
       "/organizations/:organizationId/job-profiles/:jobProfileId/drafts",
       asyncHandler(async (request, response) => {
         const draft = await jobProfiles.createDraft(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           routeParam(request.params.jobProfileId),
           request.body
@@ -787,7 +829,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await jobProfiles.getActiveDraft(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.jobProfileId)
           )
@@ -800,7 +842,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await jobProfiles.updateDraft(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.jobProfileId),
             routeParam(request.params.versionId),
@@ -815,7 +857,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await jobProfiles.publishDraft(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.jobProfileId),
             routeParam(request.params.versionId)
@@ -829,7 +871,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await jobProfiles.discardDraft(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.jobProfileId),
             routeParam(request.params.versionId)
@@ -843,7 +885,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await jobProfiles.getPublished(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.jobProfileId)
           )
@@ -856,7 +898,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await jobProfiles.listVersions(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.jobProfileId)
           )
@@ -869,7 +911,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await jobProfiles.getVersion(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.jobProfileId),
             routeParam(request.params.versionId)
@@ -883,7 +925,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await jobProfiles.history(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.jobProfileId)
           )
@@ -896,7 +938,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await jobProfiles.adminRead(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             request.body
           )
@@ -910,7 +952,10 @@ export function createApiRouter(
       "/organizations/:organizationId/blueprint",
       asyncHandler(async (request, response) => {
         response.json(
-          await blueprints.getStatus(getActor(request), routeParam(request.params.organizationId))
+          await blueprints.getStatus(
+            await actorProvider.resolve(request),
+            routeParam(request.params.organizationId)
+          )
         );
       })
     );
@@ -920,7 +965,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await blueprints.getReadiness(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId)
           )
         );
@@ -931,7 +976,10 @@ export function createApiRouter(
       "/organizations/:organizationId/blueprint/draft",
       asyncHandler(async (request, response) => {
         response.json(
-          await blueprints.getDraft(getActor(request), routeParam(request.params.organizationId))
+          await blueprints.getDraft(
+            await actorProvider.resolve(request),
+            routeParam(request.params.organizationId)
+          )
         );
       })
     );
@@ -940,7 +988,7 @@ export function createApiRouter(
       "/organizations/:organizationId/blueprint/drafts",
       asyncHandler(async (request, response) => {
         const draft = await blueprints.createDraft(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           request.body
         );
@@ -956,7 +1004,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await blueprints.getReadiness(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId)
           )
         );
@@ -968,7 +1016,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await blueprints.activateBlueprint(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId)
           )
         );
@@ -979,7 +1027,10 @@ export function createApiRouter(
       "/organizations/:organizationId/blueprint/active",
       asyncHandler(async (request, response) => {
         response.json(
-          await blueprints.getActive(getActor(request), routeParam(request.params.organizationId))
+          await blueprints.getActive(
+            await actorProvider.resolve(request),
+            routeParam(request.params.organizationId)
+          )
         );
       })
     );
@@ -988,7 +1039,10 @@ export function createApiRouter(
       "/organizations/:organizationId/blueprint/history",
       asyncHandler(async (request, response) => {
         response.json(
-          await blueprints.getHistory(getActor(request), routeParam(request.params.organizationId))
+          await blueprints.getHistory(
+            await actorProvider.resolve(request),
+            routeParam(request.params.organizationId)
+          )
         );
       })
     );
@@ -998,7 +1052,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await blueprints.getVersion(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.versionId)
           )
@@ -1011,7 +1065,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await blueprints.adminRead(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             request.body
           )
@@ -1024,7 +1078,10 @@ export function createApiRouter(
     router.post(
       "/platform/questions/global",
       asyncHandler(async (request, response) => {
-        const question = await questions.createGlobal(getActor(request), request.body);
+        const question = await questions.createGlobal(
+          await actorProvider.resolve(request),
+          request.body
+        );
         response.status(201).json(question);
       })
     );
@@ -1032,14 +1089,14 @@ export function createApiRouter(
     router.get(
       "/platform/questions/global",
       asyncHandler(async (request, response) => {
-        response.json(await questions.listGlobals(getActor(request)));
+        response.json(await questions.listGlobals(await actorProvider.resolve(request)));
       })
     );
 
     router.get(
       "/platform/questions/global/history",
       asyncHandler(async (request, response) => {
-        response.json(await questions.globalHistory(getActor(request)));
+        response.json(await questions.globalHistory(await actorProvider.resolve(request)));
       })
     );
 
@@ -1047,7 +1104,10 @@ export function createApiRouter(
       "/platform/questions/global/:globalQuestionId",
       asyncHandler(async (request, response) => {
         response.json(
-          await questions.getGlobal(getActor(request), routeParam(request.params.globalQuestionId))
+          await questions.getGlobal(
+            await actorProvider.resolve(request),
+            routeParam(request.params.globalQuestionId)
+          )
         );
       })
     );
@@ -1057,7 +1117,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await questions.updateGlobal(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.globalQuestionId),
             request.body
           )
@@ -1070,7 +1130,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await questions.setGlobalStatus(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.globalQuestionId),
             "active"
           )
@@ -1083,7 +1143,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await questions.setGlobalStatus(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.globalQuestionId),
             "inactive"
           )
@@ -1096,7 +1156,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await questions.setGlobalStatus(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.globalQuestionId),
             "deprecated"
           )
@@ -1108,7 +1168,7 @@ export function createApiRouter(
       "/organizations/:organizationId/questions",
       asyncHandler(async (request, response) => {
         const question = await questions.createOrganizationQuestion(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           request.body
         );
@@ -1121,7 +1181,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await questions.listOrganizationQuestions(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId)
           )
         );
@@ -1133,7 +1193,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await questions.listUnifiedCatalog(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId)
           )
         );
@@ -1145,7 +1205,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await questions.listAvailableGlobals(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId)
           )
         );
@@ -1156,7 +1216,10 @@ export function createApiRouter(
       "/organizations/:organizationId/questions/history",
       asyncHandler(async (request, response) => {
         response.json(
-          await questions.listHistory(getActor(request), routeParam(request.params.organizationId))
+          await questions.listHistory(
+            await actorProvider.resolve(request),
+            routeParam(request.params.organizationId)
+          )
         );
       })
     );
@@ -1166,7 +1229,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await questions.getCatalogItem(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.catalogItemId)
           )
@@ -1179,7 +1242,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await questions.updateOrganizationQuestion(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.questionId),
             request.body
@@ -1193,7 +1256,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await questions.setOrganizationQuestionStatus(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.questionId),
             "active"
@@ -1207,7 +1270,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await questions.setOrganizationQuestionStatus(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.questionId),
             "inactive"
@@ -1220,7 +1283,7 @@ export function createApiRouter(
       "/organizations/:organizationId/questions/adoptions",
       asyncHandler(async (request, response) => {
         const adoption = await questions.adoptGlobal(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           request.body
         );
@@ -1233,7 +1296,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await questions.setAdoptionStatus(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.adoptionId),
             "active"
@@ -1247,7 +1310,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await questions.setAdoptionStatus(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.adoptionId),
             "inactive"
@@ -1261,7 +1324,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await questions.adminRead(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             request.body
           )
@@ -1275,7 +1338,7 @@ export function createApiRouter(
       "/organizations/:organizationId/job-openings",
       asyncHandler(async (request, response) => {
         const opening = await jobOpenings.createJobOpening(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           request.body
         );
@@ -1288,7 +1351,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await jobOpenings.listJobOpenings(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId)
           )
         );
@@ -1300,7 +1363,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await jobOpenings.listInactive(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId)
           )
         );
@@ -1312,7 +1375,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await jobOpenings.getJobOpening(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.jobOpeningId)
           )
@@ -1325,7 +1388,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await jobOpenings.updateJobOpening(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.jobOpeningId),
             request.body
@@ -1338,7 +1401,7 @@ export function createApiRouter(
       "/organizations/:organizationId/job-openings/:jobOpeningId/drafts",
       asyncHandler(async (request, response) => {
         const draft = await jobOpenings.createDraft(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           routeParam(request.params.jobOpeningId)
         );
@@ -1351,7 +1414,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await jobOpenings.getActiveDraft(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.jobOpeningId)
           )
@@ -1364,7 +1427,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await jobOpenings.updateDraft(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.jobOpeningId),
             routeParam(request.params.versionId),
@@ -1379,7 +1442,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await jobOpenings.publishDraft(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.jobOpeningId),
             routeParam(request.params.versionId)
@@ -1393,7 +1456,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await jobOpenings.discardDraft(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.jobOpeningId),
             routeParam(request.params.versionId)
@@ -1407,7 +1470,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await jobOpenings.getPublished(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.jobOpeningId)
           )
@@ -1420,7 +1483,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await jobOpenings.listVersions(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.jobOpeningId)
           )
@@ -1433,7 +1496,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await jobOpenings.getVersion(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.jobOpeningId),
             routeParam(request.params.versionId)
@@ -1453,7 +1516,7 @@ export function createApiRouter(
         asyncHandler(async (request, response) => {
           response.json(
             await jobOpenings.transition(
-              getActor(request),
+              await actorProvider.resolve(request),
               routeParam(request.params.organizationId),
               routeParam(request.params.jobOpeningId),
               status
@@ -1468,7 +1531,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await jobOpenings.configurePublication(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.jobOpeningId),
             request.body
@@ -1482,7 +1545,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await jobOpenings.history(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.jobOpeningId)
           )
@@ -1495,7 +1558,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await jobOpenings.adminRead(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             request.body
           )
@@ -1563,7 +1626,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await preInterviews.getSettings(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.jobOpeningId)
           )
@@ -1576,7 +1639,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await preInterviews.updateSettings(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.jobOpeningId),
             request.body
@@ -1589,7 +1652,7 @@ export function createApiRouter(
       "/organizations/:organizationId/candidate-applications/:applicationId/pre-interviews",
       asyncHandler(async (request, response) => {
         const created = await preInterviews.createInternal(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           routeParam(request.params.applicationId)
         );
@@ -1602,7 +1665,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await preInterviews.listByApplication(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.applicationId)
           )
@@ -1615,7 +1678,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await preInterviews.getById(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.preInterviewId)
           )
@@ -1628,7 +1691,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await preInterviews.cancel(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.preInterviewId),
             request.body
@@ -1641,7 +1704,7 @@ export function createApiRouter(
       "/organizations/:organizationId/pre-interviews/:preInterviewId/retry",
       asyncHandler(async (request, response) => {
         const created = await preInterviews.retry(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           routeParam(request.params.preInterviewId)
         );
@@ -1654,7 +1717,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await preInterviews.rotateAccessToken(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.preInterviewId)
           )
@@ -1667,7 +1730,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await preInterviews.timeline(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.preInterviewId)
           )
@@ -1680,7 +1743,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await preInterviews.adminRead(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             request.body
           )
@@ -1751,7 +1814,7 @@ export function createApiRouter(
       "/platform/behavioral-instruments",
       asyncHandler(async (request, response) => {
         const created = await behavioralAssessments.createGlobalInstrument(
-          getActor(request),
+          await actorProvider.resolve(request),
           request.body
         );
         response.status(201).json(created);
@@ -1761,7 +1824,9 @@ export function createApiRouter(
     router.get(
       "/platform/behavioral-instruments",
       asyncHandler(async (request, response) => {
-        response.json(await behavioralAssessments.listGlobalInstruments(getActor(request)));
+        response.json(
+          await behavioralAssessments.listGlobalInstruments(await actorProvider.resolve(request))
+        );
       })
     );
 
@@ -1770,7 +1835,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await behavioralAssessments.getInstrument(
-            getActor(request),
+            await actorProvider.resolve(request),
             null,
             routeParam(request.params.instrumentId)
           )
@@ -1783,7 +1848,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await behavioralAssessments.updateInstrument(
-            getActor(request),
+            await actorProvider.resolve(request),
             null,
             routeParam(request.params.instrumentId),
             request.body
@@ -1797,7 +1862,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await behavioralAssessments.setInstrumentStatus(
-            getActor(request),
+            await actorProvider.resolve(request),
             null,
             routeParam(request.params.instrumentId),
             request.body?.status
@@ -1810,7 +1875,7 @@ export function createApiRouter(
       "/platform/behavioral-instruments/:instrumentId/versions",
       asyncHandler(async (request, response) => {
         const created = await behavioralAssessments.createDraftVersion(
-          getActor(request),
+          await actorProvider.resolve(request),
           null,
           routeParam(request.params.instrumentId),
           request.body
@@ -1824,7 +1889,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await behavioralAssessments.listVersions(
-            getActor(request),
+            await actorProvider.resolve(request),
             null,
             routeParam(request.params.instrumentId)
           )
@@ -1837,7 +1902,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await behavioralAssessments.activateVersion(
-            getActor(request),
+            await actorProvider.resolve(request),
             null,
             routeParam(request.params.instrumentId),
             routeParam(request.params.versionId)
@@ -1851,7 +1916,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await behavioralAssessments.archiveVersion(
-            getActor(request),
+            await actorProvider.resolve(request),
             null,
             routeParam(request.params.instrumentId),
             routeParam(request.params.versionId)
@@ -1865,7 +1930,7 @@ export function createApiRouter(
       "/organizations/:organizationId/behavioral-instruments",
       asyncHandler(async (request, response) => {
         const created = await behavioralAssessments.createPrivateInstrument(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           request.body
         );
@@ -1878,7 +1943,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await behavioralAssessments.listAvailableInstruments(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId)
           )
         );
@@ -1894,7 +1959,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await behavioralAssessments.listGlobalCatalog(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId)
           )
         );
@@ -1906,7 +1971,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await behavioralAssessments.getInstrument(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.instrumentId)
           )
@@ -1919,7 +1984,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await behavioralAssessments.updateInstrument(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.instrumentId),
             request.body
@@ -1933,7 +1998,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await behavioralAssessments.setInstrumentStatus(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.instrumentId),
             request.body?.status
@@ -1946,7 +2011,7 @@ export function createApiRouter(
       "/organizations/:organizationId/behavioral-instruments/:instrumentId/versions",
       asyncHandler(async (request, response) => {
         const created = await behavioralAssessments.createDraftVersion(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           routeParam(request.params.instrumentId),
           request.body
@@ -1960,7 +2025,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await behavioralAssessments.listVersions(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.instrumentId)
           )
@@ -1973,7 +2038,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await behavioralAssessments.activateVersion(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.instrumentId),
             routeParam(request.params.versionId)
@@ -1987,7 +2052,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await behavioralAssessments.archiveVersion(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.instrumentId),
             routeParam(request.params.versionId)
@@ -2002,7 +2067,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await behavioralAssessments.listOrganizationInstrumentSettings(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId)
           )
         );
@@ -2014,7 +2079,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await behavioralAssessments.setOrganizationInstrumentEnabled(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.instrumentId),
             request.body
@@ -2029,7 +2094,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await behavioralAssessments.getJobOpeningSettings(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.jobOpeningId)
           )
@@ -2042,7 +2107,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await behavioralAssessments.updateJobOpeningSettings(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.jobOpeningId),
             request.body
@@ -2056,7 +2121,7 @@ export function createApiRouter(
       "/organizations/:organizationId/candidate-applications/:applicationId/behavioral-assessments",
       asyncHandler(async (request, response) => {
         const created = await behavioralAssessments.createAssessment(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           routeParam(request.params.applicationId),
           request.body
@@ -2069,7 +2134,7 @@ export function createApiRouter(
       "/organizations/:organizationId/candidate-applications/:applicationId/behavioral-assessments/external-import",
       asyncHandler(async (request, response) => {
         const created = await behavioralAssessments.registerExternalImport(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           routeParam(request.params.applicationId),
           request.body
@@ -2083,7 +2148,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await behavioralAssessments.listByApplication(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.applicationId)
           )
@@ -2096,7 +2161,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await behavioralAssessments.getById(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.assessmentId)
           )
@@ -2109,7 +2174,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await behavioralAssessments.cancel(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.assessmentId),
             request.body
@@ -2122,7 +2187,7 @@ export function createApiRouter(
       "/organizations/:organizationId/behavioral-assessments/:assessmentId/retry",
       asyncHandler(async (request, response) => {
         const created = await behavioralAssessments.retry(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           routeParam(request.params.assessmentId)
         );
@@ -2135,7 +2200,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await behavioralAssessments.timeline(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.assessmentId)
           )
@@ -2148,7 +2213,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await behavioralAssessments.adminRead(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             request.body
           )
@@ -2214,7 +2279,7 @@ export function createApiRouter(
       "/organizations/:organizationId/candidates",
       asyncHandler(async (request, response) => {
         const candidate = await candidates.createCandidate(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           request.body
         );
@@ -2226,7 +2291,10 @@ export function createApiRouter(
       "/organizations/:organizationId/candidates",
       asyncHandler(async (request, response) => {
         response.json(
-          await candidates.listActive(getActor(request), routeParam(request.params.organizationId))
+          await candidates.listActive(
+            await actorProvider.resolve(request),
+            routeParam(request.params.organizationId)
+          )
         );
       })
     );
@@ -2236,7 +2304,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await candidates.listInactive(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId)
           )
         );
@@ -2248,7 +2316,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await candidates.getCandidate(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.candidateId)
           )
@@ -2261,7 +2329,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await candidates.updateCandidate(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.candidateId),
             request.body
@@ -2275,7 +2343,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await candidates.changeEmail(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.candidateId),
             request.body
@@ -2289,7 +2357,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await candidates.setStatus(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.candidateId),
             "inactive"
@@ -2303,7 +2371,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await candidates.setStatus(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.candidateId),
             "active"
@@ -2317,7 +2385,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await candidates.history(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.candidateId)
           )
@@ -2329,7 +2397,7 @@ export function createApiRouter(
       "/organizations/:organizationId/candidates/:candidateId/consents",
       asyncHandler(async (request, response) => {
         const consent = await candidates.addConsent(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           routeParam(request.params.candidateId),
           request.body
@@ -2342,7 +2410,7 @@ export function createApiRouter(
       "/organizations/:organizationId/candidates/:candidateId/consents/revoke",
       asyncHandler(async (request, response) => {
         const consent = await candidates.revokeConsent(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           routeParam(request.params.candidateId)
         );
@@ -2354,7 +2422,7 @@ export function createApiRouter(
       "/organizations/:organizationId/candidates/:candidateId/internal-notes",
       asyncHandler(async (request, response) => {
         const note = await candidates.addInternalNote(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           routeParam(request.params.candidateId),
           request.body
@@ -2368,7 +2436,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await candidates.adminRead(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             request.body
           )
@@ -2382,7 +2450,7 @@ export function createApiRouter(
       "/organizations/:organizationId/candidate-applications",
       asyncHandler(async (request, response) => {
         const application = await candidateApplications.createApplication(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           request.body
         );
@@ -2395,7 +2463,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await candidateApplications.listApplications(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId)
           )
         );
@@ -2407,7 +2475,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await candidateApplications.getApplication(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.applicationId)
           )
@@ -2420,7 +2488,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await candidateApplications.moveStage(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.applicationId),
             request.body
@@ -2440,7 +2508,7 @@ export function createApiRouter(
         asyncHandler(async (request, response) => {
           response.json(
             await candidateApplications[action](
-              getActor(request),
+              await actorProvider.resolve(request),
               routeParam(request.params.organizationId),
               routeParam(request.params.applicationId),
               request.body
@@ -2454,7 +2522,7 @@ export function createApiRouter(
       "/organizations/:organizationId/candidate-applications/:applicationId/notes",
       asyncHandler(async (request, response) => {
         const note = await candidateApplications.addNote(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           routeParam(request.params.applicationId),
           request.body
@@ -2468,7 +2536,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await candidateApplications.listEvents(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.applicationId)
           )
@@ -2481,7 +2549,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await candidateApplications.listNotes(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.applicationId)
           )
@@ -2494,7 +2562,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await candidateApplications.history(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.applicationId)
           )
@@ -2507,7 +2575,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await candidateApplications.adminRead(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             request.body
           )
@@ -2521,7 +2589,7 @@ export function createApiRouter(
       "/organizations/:organizationId/candidate-applications/:applicationId/proposals/draft",
       asyncHandler(async (request, response) => {
         const draft = await proposals.createDraft(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           routeParam(request.params.applicationId),
           request.body
@@ -2535,7 +2603,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await proposals.createDraft(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.applicationId),
             request.body
@@ -2548,7 +2616,7 @@ export function createApiRouter(
       "/organizations/:organizationId/candidate-applications/:applicationId/proposals/issue",
       asyncHandler(async (request, response) => {
         const result = await proposals.issue(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           routeParam(request.params.applicationId),
           request.body,
@@ -2562,7 +2630,7 @@ export function createApiRouter(
       "/organizations/:organizationId/candidate-applications/:applicationId/proposals/supersede",
       asyncHandler(async (request, response) => {
         const result = await proposals.supersede(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           routeParam(request.params.applicationId),
           request.body,
@@ -2577,7 +2645,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await proposals.cancel(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.applicationId),
             request.body,
@@ -2592,7 +2660,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await proposals.discardDraft(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.applicationId),
             request.body
@@ -2605,7 +2673,7 @@ export function createApiRouter(
       "/organizations/:organizationId/candidate-applications/:applicationId/proposals/rotate-grant",
       asyncHandler(async (request, response) => {
         const result = await proposals.rotateGrant(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           routeParam(request.params.applicationId),
           request.header("Idempotency-Key")
@@ -2619,7 +2687,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await proposals.getProposal(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.applicationId)
           )
@@ -2632,7 +2700,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await proposals.listVersions(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.applicationId)
           )
@@ -2645,7 +2713,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await proposals.listEvents(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.applicationId)
           )
@@ -2658,7 +2726,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await proposals.adminRead(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             request.body
           )
@@ -2713,7 +2781,7 @@ export function createApiRouter(
       "/organizations/:organizationId/interviews",
       asyncHandler(async (request, response) => {
         const interview = await interviews.createInterview(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           request.body
         );
@@ -2726,7 +2794,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await interviews.listInterviews(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId)
           )
         );
@@ -2738,7 +2806,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await interviews.listByApplication(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.applicationId)
           )
@@ -2751,7 +2819,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await interviews.getInterview(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.interviewId)
           )
@@ -2764,7 +2832,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await interviews.updateDraft(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.interviewId),
             request.body
@@ -2777,7 +2845,7 @@ export function createApiRouter(
       "/organizations/:organizationId/interviews/:interviewId/participants",
       asyncHandler(async (request, response) => {
         const participant = await interviews.addParticipant(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           routeParam(request.params.interviewId),
           request.body
@@ -2791,7 +2859,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await interviews.removeParticipant(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.interviewId),
             routeParam(request.params.userId)
@@ -2804,7 +2872,7 @@ export function createApiRouter(
       "/organizations/:organizationId/interviews/:interviewId/questions",
       asyncHandler(async (request, response) => {
         const question = await interviews.addQuestion(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           routeParam(request.params.interviewId),
           request.body
@@ -2822,7 +2890,7 @@ export function createApiRouter(
         asyncHandler(async (request, response) => {
           response.json(
             await interviews[action](
-              getActor(request),
+              await actorProvider.resolve(request),
               routeParam(request.params.organizationId),
               routeParam(request.params.interviewId),
               request.body
@@ -2837,7 +2905,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await interviews.start(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.interviewId)
           )
@@ -2849,7 +2917,7 @@ export function createApiRouter(
       "/organizations/:organizationId/interviews/:interviewId/responses",
       asyncHandler(async (request, response) => {
         const result = await interviews.recordResponse(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           routeParam(request.params.interviewId),
           request.body
@@ -2862,7 +2930,7 @@ export function createApiRouter(
       "/organizations/:organizationId/interviews/:interviewId/evaluations",
       asyncHandler(async (request, response) => {
         const result = await interviews.recordEvaluation(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           routeParam(request.params.interviewId),
           request.body
@@ -2881,7 +2949,7 @@ export function createApiRouter(
         asyncHandler(async (request, response) => {
           response.json(
             await interviews[action](
-              getActor(request),
+              await actorProvider.resolve(request),
               routeParam(request.params.organizationId),
               routeParam(request.params.interviewId),
               request.body
@@ -2896,7 +2964,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await interviews.timeline(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.interviewId)
           )
@@ -2909,7 +2977,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await interviews.adminRead(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             request.body
           )
@@ -2923,13 +2991,17 @@ export function createApiRouter(
     router.get(
       "/platform/ai/features",
       asyncHandler(async (request, response) => {
-        response.json(await ai.policy.listFeatureCatalogAsPlatformAdmin(getActor(request)));
+        response.json(
+          await ai.policy.listFeatureCatalogAsPlatformAdmin(await actorProvider.resolve(request))
+        );
       })
     );
     router.post(
       "/platform/ai/features",
       asyncHandler(async (request, response) => {
-        response.status(201).json(await ai.policy.createFeature(getActor(request), request.body));
+        response
+          .status(201)
+          .json(await ai.policy.createFeature(await actorProvider.resolve(request), request.body));
       })
     );
     router.patch(
@@ -2937,7 +3009,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await ai.policy.setFeatureAvailability(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.featureKey),
             request.body
           )
@@ -2949,7 +3021,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await ai.policy.setFallbackAllowedOnPlatform(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.featureKey),
             request.body
           )
@@ -2961,7 +3033,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await ai.policy.setDefaultPromptKey(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.featureKey),
             request.body
           )
@@ -2974,7 +3046,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await ai.policy.getOrganizationSettingsAsPlatformAdmin(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId)
           )
         );
@@ -2986,7 +3058,7 @@ export function createApiRouter(
         const value = validatePlatformAllowedInput(request.body);
         response.json(
           await ai.policy.setPlatformAllowed(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             value
           )
@@ -2997,7 +3069,9 @@ export function createApiRouter(
     router.get(
       "/platform/ai/providers",
       asyncHandler(async (request, response) => {
-        response.json(await ai.providerCatalog.listAsPlatformAdmin(getActor(request)));
+        response.json(
+          await ai.providerCatalog.listAsPlatformAdmin(await actorProvider.resolve(request))
+        );
       })
     );
     router.post(
@@ -3005,14 +3079,19 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response
           .status(201)
-          .json(await ai.providerCatalog.register(getActor(request), request.body));
+          .json(
+            await ai.providerCatalog.register(await actorProvider.resolve(request), request.body)
+          );
       })
     );
     router.patch(
       "/platform/ai/providers/:provider/retire",
       asyncHandler(async (request, response) => {
         response.json(
-          await ai.providerCatalog.retire(getActor(request), routeParam(request.params.provider))
+          await ai.providerCatalog.retire(
+            await actorProvider.resolve(request),
+            routeParam(request.params.provider)
+          )
         );
       })
     );
@@ -3020,13 +3099,19 @@ export function createApiRouter(
     router.get(
       "/platform/ai/models",
       asyncHandler(async (request, response) => {
-        response.json(await ai.modelRegistry.listAsPlatformAdmin(getActor(request)));
+        response.json(
+          await ai.modelRegistry.listAsPlatformAdmin(await actorProvider.resolve(request))
+        );
       })
     );
     router.post(
       "/platform/ai/models",
       asyncHandler(async (request, response) => {
-        response.status(201).json(await ai.modelRegistry.register(getActor(request), request.body));
+        response
+          .status(201)
+          .json(
+            await ai.modelRegistry.register(await actorProvider.resolve(request), request.body)
+          );
       })
     );
     router.patch(
@@ -3034,7 +3119,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await ai.modelRegistry.retire(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.provider),
             routeParam(request.params.modelKey)
           )
@@ -3047,7 +3132,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await ai.promptRegistry.listVersionsAsPlatformAdmin(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.promptKey)
           )
         );
@@ -3058,7 +3143,9 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response
           .status(201)
-          .json(await ai.promptRegistry.createDraft(getActor(request), request.body));
+          .json(
+            await ai.promptRegistry.createDraft(await actorProvider.resolve(request), request.body)
+          );
       })
     );
     router.post(
@@ -3066,7 +3153,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await ai.promptRegistry.publish(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.promptKey),
             Number(routeParam(request.params.version))
           )
@@ -3078,7 +3165,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await ai.promptRegistry.archivePublished(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.promptKey)
           )
         );
@@ -3090,7 +3177,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.status(201).json(
           await ai.providerConfig.configureCredential(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             {
               provider: routeParam(request.params.provider),
@@ -3106,7 +3193,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await ai.providerConfig.revokeCredential(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.provider)
           )
@@ -3118,7 +3205,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await ai.providerConfig.testConnection(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.provider)
           )
@@ -3132,7 +3219,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await ai.policy.getOrganizationSettings(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId)
           )
         );
@@ -3144,7 +3231,7 @@ export function createApiRouter(
         const value = validateOrganizationAiEnabledInput(request.body);
         response.json(
           await ai.policy.setOrganizationPreference(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             value
           )
@@ -3157,7 +3244,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await ai.policy.listAvailableFeatures(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId)
           )
         );
@@ -3168,7 +3255,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await ai.policy.getFeatureSettings(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.featureKey)
           )
@@ -3180,7 +3267,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await ai.policy.setOrganizationFeatureEnabled(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.featureKey),
             request.body
@@ -3193,7 +3280,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await ai.policy.setOrganizationFallbackEnabled(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.featureKey),
             request.body
@@ -3207,7 +3294,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await ai.providerCatalog.listActiveForOrganization(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId)
           )
         );
@@ -3219,7 +3306,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await ai.providerConfig.listForOrganization(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId)
           )
         );
@@ -3230,7 +3317,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await ai.providerConfig.getStatus(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.provider)
           )
@@ -3244,7 +3331,7 @@ export function createApiRouter(
           .status(201)
           .json(
             await ai.providerConfig.configureCredential(
-              getActor(request),
+              await actorProvider.resolve(request),
               routeParam(request.params.organizationId),
               request.body
             )
@@ -3256,7 +3343,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await ai.providerConfig.revokeCredential(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.provider)
           )
@@ -3268,7 +3355,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await ai.providerConfig.testConnection(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.provider)
           )
@@ -3281,7 +3368,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await ai.modelRegistry.listAvailableForOrganization(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId)
           )
         );
@@ -3293,7 +3380,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await ai.routing.listRoutes(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.featureKey)
           )
@@ -3307,7 +3394,7 @@ export function createApiRouter(
           .status(201)
           .json(
             await ai.routing.createRoute(
-              getActor(request),
+              await actorProvider.resolve(request),
               routeParam(request.params.organizationId),
               request.body
             )
@@ -3319,7 +3406,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await ai.routing.deactivateRoute(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.routingId)
           )
@@ -3333,7 +3420,7 @@ export function createApiRouter(
         const featureKey = request.query.featureKey;
         response.json(
           await ai.listExecutions(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             typeof featureKey === "string" ? featureKey : undefined
           )
@@ -3349,7 +3436,7 @@ export function createApiRouter(
       "/organizations/:organizationId/candidate-applications/:applicationId/pre-analyses",
       asyncHandler(async (request, response) => {
         const created = await preAnalyses.requestPreAnalysis(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           { candidateApplicationId: routeParam(request.params.applicationId) }
         );
@@ -3362,7 +3449,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await preAnalyses.listByApplication(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.applicationId)
           )
@@ -3375,7 +3462,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await preAnalyses.getForOwner(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.preAnalysisId)
           )
@@ -3390,7 +3477,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await preAnalyses.getForMember(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.preAnalysisId)
           )
@@ -3403,7 +3490,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await preAnalyses.getResult(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.preAnalysisId)
           )
@@ -3416,7 +3503,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await preAnalyses.getEvidences(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.preAnalysisId)
           )
@@ -3429,7 +3516,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await preAnalyses.listEvents(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.preAnalysisId)
           )
@@ -3442,7 +3529,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await preAnalyses.cancel(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.preAnalysisId),
             request.body
@@ -3456,7 +3543,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await preAnalyses.adminRead(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             request.body
           )
@@ -3472,7 +3559,7 @@ export function createApiRouter(
       "/organizations/:organizationId/candidate-applications/:applicationId/candidate-dossiers",
       asyncHandler(async (request, response) => {
         const created = await candidateDossiers.generate(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           {
             ...request.body,
@@ -3489,7 +3576,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await candidateDossiers.listByApplication(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.applicationId)
           )
@@ -3502,7 +3589,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await candidateDossiers.getForOwner(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.candidateDossierId)
           )
@@ -3515,7 +3602,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await candidateDossiers.getForMember(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.candidateDossierId)
           )
@@ -3528,7 +3615,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await candidateDossiers.getSources(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.candidateDossierId)
           )
@@ -3541,7 +3628,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await candidateDossiers.adminRead(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             request.body
           )
@@ -3557,7 +3644,7 @@ export function createApiRouter(
       "/organizations/:organizationId/candidate-applications/:applicationId/onboarding",
       asyncHandler(async (request, response) => {
         const created = await onboardings.create(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           routeParam(request.params.applicationId),
           request.body,
@@ -3572,7 +3659,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await onboardings.getByApplication(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.applicationId)
           )
@@ -3585,7 +3672,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await onboardings.get(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.onboardingId)
           )
@@ -3598,7 +3685,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await onboardings.listTasks(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.onboardingId)
           )
@@ -3611,7 +3698,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await onboardings.listMyTasks(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId)
           )
         );
@@ -3623,7 +3710,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await onboardings.start(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.onboardingId),
             request.header("Idempotency-Key")
@@ -3639,7 +3726,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await onboardings.linkEmployment(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.onboardingId),
             request.body,
@@ -3653,7 +3740,7 @@ export function createApiRouter(
       "/organizations/:organizationId/onboardings/:onboardingId/tasks",
       asyncHandler(async (request, response) => {
         const task = await onboardings.addTask(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           routeParam(request.params.onboardingId),
           request.body
@@ -3667,7 +3754,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await onboardings.assignTask(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.taskId),
             request.body
@@ -3681,7 +3768,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await onboardings.completeTask(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.taskId)
           )
@@ -3694,7 +3781,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await onboardings.cancelTask(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.taskId),
             request.body
@@ -3708,7 +3795,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await onboardings.complete(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.onboardingId),
             request.header("Idempotency-Key")
@@ -3722,7 +3809,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await onboardings.cancel(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.onboardingId),
             request.body,
@@ -3737,7 +3824,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await onboardings.adminRead(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             request.body
           )
@@ -3754,7 +3841,7 @@ export function createApiRouter(
       "/organizations/:organizationId/organization-people",
       asyncHandler(async (request, response) => {
         const created = await employments.createPerson(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           request.body,
           request.header("Idempotency-Key")
@@ -3767,7 +3854,10 @@ export function createApiRouter(
       "/organizations/:organizationId/organization-people",
       asyncHandler(async (request, response) => {
         response.json(
-          await employments.listPeople(getActor(request), routeParam(request.params.organizationId))
+          await employments.listPeople(
+            await actorProvider.resolve(request),
+            routeParam(request.params.organizationId)
+          )
         );
       })
     );
@@ -3777,7 +3867,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await employments.getPerson(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.personId)
           )
@@ -3789,7 +3879,7 @@ export function createApiRouter(
       "/organizations/:organizationId/employments",
       asyncHandler(async (request, response) => {
         const created = await employments.createEmployment(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           request.body,
           request.header("Idempotency-Key")
@@ -3807,7 +3897,7 @@ export function createApiRouter(
             : undefined;
         response.json(
           await employments.listEmployments(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             organizationPersonId
           )
@@ -3820,7 +3910,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await employments.activate(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.employmentId),
             request.body,
@@ -3835,7 +3925,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await employments.cancel(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.employmentId),
             request.body,
@@ -3850,7 +3940,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await employments.end(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.employmentId),
             request.body,
@@ -3865,7 +3955,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await employments.adminRead(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             request.body
           )
@@ -3882,7 +3972,7 @@ export function createApiRouter(
       "/organizations/:organizationId/employments/:employmentId/development-plans",
       asyncHandler(async (request, response) => {
         const created = await developmentRetention.createPlan(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           routeParam(request.params.employmentId),
           request.body,
@@ -3897,7 +3987,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await developmentRetention.listPlans(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.employmentId)
           )
@@ -3910,7 +4000,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await developmentRetention.getPlan(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.planId)
           )
@@ -3923,7 +4013,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await developmentRetention.activatePlan(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.planId),
             request.header("Idempotency-Key")
@@ -3937,7 +4027,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await developmentRetention.completePlan(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.planId),
             request.header("Idempotency-Key")
@@ -3951,7 +4041,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await developmentRetention.cancelPlan(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.planId),
             request.body,
@@ -3965,7 +4055,7 @@ export function createApiRouter(
       "/organizations/:organizationId/development-plans/:planId/goals",
       asyncHandler(async (request, response) => {
         const created = await developmentRetention.createGoal(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           routeParam(request.params.planId),
           request.body,
@@ -3980,7 +4070,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await developmentRetention.completeGoal(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.goalId),
             request.header("Idempotency-Key")
@@ -3994,7 +4084,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await developmentRetention.cancelGoal(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.goalId),
             request.body,
@@ -4008,7 +4098,7 @@ export function createApiRouter(
       "/organizations/:organizationId/development-plans/:planId/check-ins",
       asyncHandler(async (request, response) => {
         const created = await developmentRetention.createCheckIn(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           routeParam(request.params.planId),
           request.body,
@@ -4022,7 +4112,7 @@ export function createApiRouter(
       "/organizations/:organizationId/employments/:employmentId/retention-concerns",
       asyncHandler(async (request, response) => {
         const created = await developmentRetention.createConcern(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           routeParam(request.params.employmentId),
           request.body,
@@ -4037,7 +4127,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await developmentRetention.listConcerns(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.employmentId)
           )
@@ -4050,7 +4140,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await developmentRetention.resolveConcern(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.concernId),
             request.body,
@@ -4065,7 +4155,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await developmentRetention.cancelConcern(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.concernId),
             request.body,
@@ -4079,7 +4169,7 @@ export function createApiRouter(
       "/organizations/:organizationId/employments/:employmentId/retention-actions",
       asyncHandler(async (request, response) => {
         const created = await developmentRetention.createAction(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           routeParam(request.params.employmentId),
           request.body,
@@ -4094,7 +4184,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await developmentRetention.listActions(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.employmentId)
           )
@@ -4107,7 +4197,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await developmentRetention.completeAction(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.actionId),
             request.header("Idempotency-Key")
@@ -4121,7 +4211,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await developmentRetention.cancelAction(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.actionId),
             request.body,
@@ -4136,7 +4226,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await developmentRetention.adminRead(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             request.body
           )
@@ -4152,7 +4242,7 @@ export function createApiRouter(
       "/organizations/:organizationId/employments/:employmentId/offboardings",
       asyncHandler(async (request, response) => {
         const created = await offboardings.create(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           routeParam(request.params.employmentId),
           request.body,
@@ -4167,7 +4257,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await offboardings.listForEmployment(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.employmentId)
           )
@@ -4180,7 +4270,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await offboardings.get(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.offboardingId)
           )
@@ -4193,7 +4283,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await offboardings.start(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.offboardingId),
             request.header("Idempotency-Key")
@@ -4207,7 +4297,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await offboardings.listTasks(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.offboardingId)
           )
@@ -4220,7 +4310,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await offboardings.listMyTasks(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId)
           )
         );
@@ -4231,7 +4321,7 @@ export function createApiRouter(
       "/organizations/:organizationId/offboardings/:offboardingId/tasks",
       asyncHandler(async (request, response) => {
         const task = await offboardings.addTask(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           routeParam(request.params.offboardingId),
           request.body,
@@ -4246,7 +4336,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await offboardings.assignTask(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.taskId),
             request.body,
@@ -4261,7 +4351,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await offboardings.completeTask(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.taskId),
             request.header("Idempotency-Key")
@@ -4275,7 +4365,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await offboardings.cancelTask(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.taskId),
             request.body,
@@ -4290,7 +4380,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await offboardings.complete(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.offboardingId),
             request.header("Idempotency-Key")
@@ -4304,7 +4394,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await offboardings.cancel(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.offboardingId),
             request.body,
@@ -4319,7 +4409,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await offboardings.adminRead(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             request.body
           )
@@ -4335,7 +4425,7 @@ export function createApiRouter(
       "/organizations/:organizationId/access-grants",
       asyncHandler(async (request, response) => {
         const created = await accessGrants.grant(
-          getActor(request),
+          await actorProvider.resolve(request),
           routeParam(request.params.organizationId),
           request.body,
           request.header("Idempotency-Key")
@@ -4349,7 +4439,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await accessGrants.revoke(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.accessGrantId),
             request.body,
@@ -4364,7 +4454,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await accessGrants.get(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.accessGrantId)
           )
@@ -4376,7 +4466,10 @@ export function createApiRouter(
       "/organizations/:organizationId/access-grants",
       asyncHandler(async (request, response) => {
         response.json(
-          await accessGrants.list(getActor(request), routeParam(request.params.organizationId))
+          await accessGrants.list(
+            await actorProvider.resolve(request),
+            routeParam(request.params.organizationId)
+          )
         );
       })
     );
@@ -4386,7 +4479,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await accessGrants.listByPerson(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.personId)
           )
@@ -4399,7 +4492,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await accessGrants.listByMembership(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.membershipId)
           )
@@ -4412,7 +4505,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await accessGrants.listByEmployment(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             routeParam(request.params.employmentId)
           )
@@ -4425,7 +4518,7 @@ export function createApiRouter(
       asyncHandler(async (request, response) => {
         response.json(
           await accessGrants.adminRead(
-            getActor(request),
+            await actorProvider.resolve(request),
             routeParam(request.params.organizationId),
             request.body
           )
@@ -4434,7 +4527,173 @@ export function createApiRouter(
     );
   }
 
+  // Fase 29 (ADR-0026; SPEC-028 v1.0). Todas as rotas abaixo dependem de `auth` (AuthService).
+  // `/auth/session`, `/auth/refresh` e `/auth/invitations/:id/accept` sao publicas por
+  // definicao (a pessoa ainda nao tem sessao local no momento em que as acessa, SPEC-028 s23) --
+  // nunca chamam `actorProvider.resolve`. As demais exigem Actor normalmente.
+  if (auth) {
+    // Ponte de sessao (SPEC-028 s9/s13/s15): frontend fala com o provider diretamente para a
+    // credencial (login, aceite de convite) e entrega o token aqui UMA VEZ; o servidor verifica
+    // a assinatura localmente e emite os cookies HttpOnly -- o token nunca fica em
+    // localStorage/JS do frontend depois deste ponto.
+    router.post(
+      "/auth/session",
+      asyncHandler(async (request, response) => {
+        const accessToken = requireBodyString(request.body, "accessToken");
+        const refreshToken = requireBodyString(request.body, "refreshToken");
+        // Verificacao local (mesma usada por qualquer requisicao autenticada) -- confirma que o
+        // token e legitimo antes de emitir cookie a partir dele; nao exige AuthIdentity
+        // existente (pode ser a primeira sessao apos aceite de convite, SPEC-028 s10).
+        await auth.verifyToken(accessToken);
+        setSessionCookies(response, { accessToken, refreshToken }, isProductionEnv);
+        response.status(204).end();
+      })
+    );
+
+    router.post(
+      "/auth/refresh",
+      asyncHandler(async (request, response) => {
+        const { refreshToken } = readSessionCookies(request);
+        if (!refreshToken) {
+          throw forbidden("session_required", "A valid session is required.");
+        }
+        const session = await auth.refreshSession(refreshToken);
+        setSessionCookies(
+          response,
+          { accessToken: session.accessToken, refreshToken: session.refreshToken },
+          isProductionEnv
+        );
+        response.status(204).end();
+      })
+    );
+
+    router.post(
+      "/auth/logout",
+      asyncHandler(async (request, response) => {
+        const { refreshToken } = readSessionCookies(request);
+        // Limpeza local e revogacao do refresh token no provider sempre ocorrem, mesmo que o
+        // access token ja tenha expirado ou a AuthIdentity nao seja mais resolvivel (SPEC-028
+        // s9) -- resolucao de Actor e tentada apenas para a AUDITORIA (que exige um userId),
+        // nunca como pre-condicao para revogar o refresh token em si (ver comentario em
+        // `AuthService.logout`).
+        let actor = null;
+        try {
+          actor = await actorProvider.resolve(request);
+        } catch {
+          // Sem Actor resolvivel -- auditoria e pulada, mas a revogacao do refresh token
+          // (dentro de `auth.logout`) ainda acontece normalmente.
+        }
+        await auth.logout(actor, refreshToken);
+        clearSessionCookies(response, isProductionEnv);
+        response.status(204).end();
+      })
+    );
+
+    router.get(
+      "/me",
+      asyncHandler(async (request, response) => {
+        const actor = await actorProvider.resolve(request);
+        const user = await core.getCurrentUser(actor);
+        const organizations = actor.kind === "user" ? await core.listOrganizations(actor) : [];
+        response.json({ user, organizations });
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/invitations",
+      asyncHandler(async (request, response) => {
+        const actor = await actorProvider.resolve(request);
+        const result = await auth.createInvitation(
+          actor,
+          routeParam(request.params.organizationId),
+          request.body,
+          request.header("Idempotency-Key")
+        );
+        response.status(201).json(result);
+      })
+    );
+
+    router.get(
+      "/organizations/:organizationId/invitations",
+      asyncHandler(async (request, response) => {
+        const actor = await actorProvider.resolve(request);
+        response.json(await auth.listInvitations(actor, routeParam(request.params.organizationId)));
+      })
+    );
+
+    router.post(
+      "/organizations/:organizationId/invitations/:invitationId/cancel",
+      asyncHandler(async (request, response) => {
+        const actor = await actorProvider.resolve(request);
+        response.json(
+          await auth.cancelInvitation(
+            actor,
+            routeParam(request.params.organizationId),
+            routeParam(request.params.invitationId)
+          )
+        );
+      })
+    );
+
+    // SPEC-028 s10/s27: sem Actor previo -- le o access token do proprio cookie de sessao (ja
+    // emitido por `/auth/session` apos a confirmacao do provider), nunca de um body separado.
+    router.post(
+      "/auth/invitations/:invitationId/accept",
+      asyncHandler(async (request, response) => {
+        const { accessToken } = readSessionCookies(request);
+        if (!accessToken) {
+          throw forbidden("session_required", "A valid session is required.");
+        }
+        response.json(
+          await auth.acceptInvitation(accessToken, routeParam(request.params.invitationId))
+        );
+      })
+    );
+
+    router.post(
+      "/platform/organizations/bootstrap",
+      asyncHandler(async (request, response) => {
+        const actor = await actorProvider.resolve(request);
+        response
+          .status(201)
+          .json(
+            await auth.bootstrapOrganization(actor, request.body, request.header("Idempotency-Key"))
+          );
+      })
+    );
+
+    router.post(
+      "/platform/sessions/:userId/revoke",
+      asyncHandler(async (request, response) => {
+        const actor = await actorProvider.resolve(request);
+        await auth.revokeSessionForUser(actor, routeParam(request.params.userId), request.body);
+        response.status(204).end();
+      })
+    );
+
+    router.post(
+      "/sessions/revoke",
+      asyncHandler(async (request, response) => {
+        const actor = await actorProvider.resolve(request);
+        const selfUserId = actor.kind === "user" ? actor.userId : null;
+        if (!selfUserId) {
+          throw forbidden("permission_denied", "Permission denied.");
+        }
+        await auth.revokeSessionForUser(actor, selfUserId, request.body);
+        response.status(204).end();
+      })
+    );
+  }
+
   return router;
+}
+
+function requireBodyString(body: unknown, field: string) {
+  const value = (body as Record<string, unknown> | null)?.[field];
+  if (typeof value !== "string" || !value.trim()) {
+    throw badRequest(`${field}_required`, `${field} is required.`);
+  }
+  return value;
 }
 
 function routeParam(value: string | string[]) {

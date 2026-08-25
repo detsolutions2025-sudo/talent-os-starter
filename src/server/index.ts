@@ -27,6 +27,14 @@ import { createPostgresBehavioralAssessmentService } from "./behavioral-assessme
 import { createPostgresPreAnalysisService } from "./pre-analyses/service";
 import { createPostgresCandidateDossierService } from "./candidate-dossiers/service";
 import { createPostgresProposalService } from "./proposals/service";
+import {
+  assertSupabaseAuthConfiguredForProduction,
+  requireSupabaseAuthConfig
+} from "./auth/config";
+import { createRemoteProviderJwks } from "./auth/jwt";
+import { createSupabaseAdminAdapter } from "./auth/supabase-admin-adapter";
+import { createPostgresAuthService, type AuthService } from "./auth/service";
+import { createActorProvider } from "./http/actor-provider";
 
 const port = Number(process.env.PORT ?? 3001);
 const connectionString = requirePostgresDatabaseUrl();
@@ -46,6 +54,34 @@ const pool = createPostgresPool(connectionString);
 // normalized configuration_error, instead of crashing the whole process at boot or silently
 // pretending a fake credential/response is real.
 const appEnv = process.env.APP_ENV ?? "development";
+
+// Fase 29 (ADR-0026; SPEC-028 v1.0). Fail-fast: producao NUNCA sobe sem configuracao real do
+// Supabase Auth -- nunca um fallback silencioso para dev-auth (SPEC-028 s22/CA-030).
+assertSupabaseAuthConfiguredForProduction();
+
+// `auth`/`SupabaseActorProvider` so sao construidos quando a configuracao esta presente -- em
+// producao isso e GARANTIDO pelo fail-fast acima; fora de producao (nenhum projeto Supabase
+// configurado ainda neste ambiente), o servidor de desenvolvimento continua subindo normalmente
+// com `auth` ausente (rotas registradas condicionalmente, mesmo padrao ja usado por todo servico
+// opcional deste roteador) e `DevActorProvider` cuidando da resolucao de Actor, exatamente como
+// antes desta Fase -- ativar basta configurar as variaveis, sem nenhuma mudanca de codigo.
+let authService: AuthService | undefined;
+if (
+  process.env.VITE_SUPABASE_URL &&
+  process.env.SUPABASE_SERVICE_ROLE_KEY &&
+  process.env.VITE_SUPABASE_ANON_KEY
+) {
+  const supabaseConfig = requireSupabaseAuthConfig();
+  authService = createPostgresAuthService(pool, {
+    provider: createSupabaseAdminAdapter(supabaseConfig, process.env.VITE_SUPABASE_ANON_KEY),
+    getKey: createRemoteProviderJwks(supabaseConfig.jwksUrl),
+    jwtOptions: { issuer: supabaseConfig.issuer, audience: supabaseConfig.audience }
+  });
+}
+
+const actorProvider = createActorProvider(appEnv, { authService });
+const isProductionEnv = appEnv === "production";
+
 const aiService = createPostgresAIService(
   pool,
   appEnv === "production"
@@ -69,6 +105,7 @@ const app = createServer(
   // Version `draft`, na mesma transacao fisica da propria criacao (ver
   // blueprints/organization-onboarding.ts).
   createCoreService(new PostgresCoreRepository(pool), createOrganizationBlueprintOnboardingHook()),
+  actorProvider,
   createPostgresDnaService(pool),
   createPostgresOrganizationalUnitService(pool),
   createPostgresCompetencyService(pool),
@@ -95,7 +132,9 @@ const app = createServer(
   createPostgresEmploymentService(pool),
   createPostgresDevelopmentRetentionService(pool),
   createPostgresOffboardingService(pool),
-  createPostgresAccessGrantService(pool)
+  createPostgresAccessGrantService(pool),
+  authService,
+  isProductionEnv
 );
 
 app.listen(port, () => {

@@ -2,6 +2,7 @@ import request from "supertest";
 import type { CreateAIServiceOptions } from "../../src/server/ai/service";
 import { createPostgresAIService } from "../../src/server/ai/service";
 import { createServer } from "../../src/server/app";
+import { DevActorProvider } from "../../src/server/http/actor-provider";
 import { createOrganizationBlueprintOnboardingHook } from "../../src/server/blueprints/organization-onboarding";
 import { createPostgresBlueprintService } from "../../src/server/blueprints/service";
 import { createPostgresCandidateApplicationService } from "../../src/server/candidate-applications/service";
@@ -66,6 +67,7 @@ export function createAppWithServices(
       new PostgresCoreRepository(database.pool),
       createOrganizationBlueprintOnboardingHook()
     ),
+    new DevActorProvider(),
     createPostgresDnaService(database.pool),
     createPostgresOrganizationalUnitService(database.pool),
     createPostgresCompetencyService(database.pool),

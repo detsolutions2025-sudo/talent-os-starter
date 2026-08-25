@@ -1,6 +1,7 @@
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createServer } from "../../src/server/app";
+import { DevActorProvider } from "../../src/server/http/actor-provider";
 import { createCoreService } from "../../src/server/core/service";
 import { createPostgresDnaService } from "../../src/server/dna/service";
 import { createPostgresOrganizationalUnitService } from "../../src/server/organizational-units/service";
@@ -86,6 +87,7 @@ async function createUnit(
 function createApp(database: PostgresTestDatabase) {
   return createServer(
     createCoreService(new PostgresCoreRepository(database.pool)),
+    new DevActorProvider(),
     createPostgresDnaService(database.pool),
     createPostgresOrganizationalUnitService(database.pool)
   );

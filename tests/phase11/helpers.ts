@@ -2,6 +2,7 @@ import request from "supertest";
 import type { CreateAIServiceOptions } from "../../src/server/ai/service";
 import { createPostgresAIService } from "../../src/server/ai/service";
 import { createServer } from "../../src/server/app";
+import { DevActorProvider } from "../../src/server/http/actor-provider";
 import { createPostgresCandidateApplicationService } from "../../src/server/candidate-applications/service";
 import { createPostgresCandidateService } from "../../src/server/candidates/service";
 import { createPostgresCompetencyService } from "../../src/server/competencies/service";
@@ -40,6 +41,7 @@ export function createAppWithAiService(
   const aiService = createPostgresAIService(database.pool, aiOptions);
   const app = createServer(
     createCoreService(new PostgresCoreRepository(database.pool)),
+    new DevActorProvider(),
     createPostgresDnaService(database.pool),
     createPostgresOrganizationalUnitService(database.pool),
     createPostgresCompetencyService(database.pool),

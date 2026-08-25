@@ -5,6 +5,13 @@ import { PublicApplicationForm } from "./PublicApplicationForm";
 import { PublicPreInterviewForm } from "./PublicPreInterviewForm";
 import { PublicBehavioralAssessmentForm } from "./PublicBehavioralAssessmentForm";
 import { PublicProposalForm } from "./PublicProposalForm";
+import { AcceptInvitePage } from "./AcceptInvitePage";
+import { SessionGate } from "./SessionGate";
+import { installCredentialedFetch } from "./apiClient";
+
+// Fase 29 (ADR-0026; SPEC-028 v1.0). Uma unica instalacao, no boot -- ver `apiClient.ts` para a
+// justificativa de por que isto substitui a reescrita das ~150 chamadas `fetch()` existentes.
+installCredentialedFetch();
 
 // Fase 17 (SPEC-020 v1.1): a candidatura publica precisa ser acessivel por um Visitante nao
 // autenticado, sem passar pelo App interno (que sempre exige contexto de dev-auth). Nao ha
@@ -21,6 +28,9 @@ const publicBehavioralAssessmentMatch = window.location.pathname.match(
   /^\/behavioral-assessment\/?$/
 );
 const publicProposalMatch = window.location.pathname.match(/^\/proposal\/?$/);
+// Fase 29 (SPEC-028 s15/s23): rota publica por definicao -- callback do provider apos confirmar
+// convite, mesma familia das demais rotas publicas acima.
+const acceptInviteMatch = window.location.pathname.match(/^\/accept-invite\/?$/);
 
 const root = (
   <React.StrictMode>
@@ -32,8 +42,12 @@ const root = (
       <PublicBehavioralAssessmentForm />
     ) : publicProposalMatch ? (
       <PublicProposalForm />
+    ) : acceptInviteMatch ? (
+      <AcceptInvitePage />
     ) : (
-      <App />
+      <SessionGate>
+        <App />
+      </SessionGate>
     )}
   </React.StrictMode>
 );

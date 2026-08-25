@@ -10,6 +10,7 @@ import { EmploymentPanel } from "./EmploymentPanel";
 import { DevelopmentRetentionPanel } from "./DevelopmentRetentionPanel";
 import { OffboardingPanel } from "./OffboardingPanel";
 import { AccessGrantPanel } from "./AccessGrantPanel";
+import { InvitationPanel } from "./InvitationPanel";
 import { ProposalPanel } from "./ProposalPanel";
 import "./styles.css";
 
@@ -552,14 +553,21 @@ const questionTypes: QuestionType[] = [
   "technical"
 ];
 
-const platformHeaders = {
-  "x-dev-platform-admin": "true"
-};
+// Fase 29 (ADR-0026 "Dev/test auth"; SPEC-028 s22/CA-029/CA-030). Fora de `import.meta.env.DEV`
+// (build de producao), estes dois objetos ficam vazios -- nenhuma das ~150 chamadas `fetch()`
+// que os referenciam precisa mudar: elas simplesmente deixam de enviar qualquer header de
+// desenvolvimento, e a sessao real passa a vir do cookie HttpOnly (enviado automaticamente via
+// `credentials: "include"`, instalado globalmente em `apiClient.ts`). Isso e apenas defesa em
+// profundidade do lado do cliente -- a garantia real e no servidor, que nunca le esses headers
+// fora de `development`/`test` (`dev-auth.ts`, inalterado).
+const platformHeaders: Record<string, string> = import.meta.env.DEV
+  ? { "x-dev-platform-admin": "true" }
+  : {};
 
 const currentDevUserId = import.meta.env.VITE_DEV_USER_ID ?? "usr_000001";
-const devHeaders = {
-  "x-dev-user-id": currentDevUserId
-};
+const devHeaders: Record<string, string> = import.meta.env.DEV
+  ? { "x-dev-user-id": currentDevUserId }
+  : {};
 
 export function App() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -2288,6 +2296,14 @@ export function App() {
             role={currentMembership?.role}
             headers={devHeaders}
             memberships={memberships}
+          />
+        )}
+
+        {selectedOrganization && (
+          <InvitationPanel
+            organizationId={selectedOrganization.id}
+            role={currentMembership?.role}
+            headers={devHeaders}
           />
         )}
 

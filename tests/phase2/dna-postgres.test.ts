@@ -2,6 +2,7 @@ import request from "supertest";
 import type pg from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createServer } from "../../src/server/app";
+import { DevActorProvider } from "../../src/server/http/actor-provider";
 import type { CoreRepository } from "../../src/server/core/repository";
 import { createCoreService } from "../../src/server/core/service";
 import type { AuditEvent } from "../../src/server/core/types";
@@ -95,6 +96,7 @@ describe("phase 2 organization DNA API", () => {
     process.env.APP_ENV = "test";
     app = createServer(
       createCoreService(new PostgresCoreRepository(database.pool)),
+      new DevActorProvider(),
       createPostgresDnaService(database.pool)
     );
   });
@@ -513,6 +515,7 @@ describe("phase 2 organization DNA API", () => {
 
     const recreated = createServer(
       createCoreService(new PostgresCoreRepository(database.pool)),
+      new DevActorProvider(),
       createPostgresDnaService(database.pool)
     );
 
@@ -535,6 +538,7 @@ describe("phase 2 organization DNA API", () => {
       .expect(201);
     const failingApp = createServer(
       createCoreService(new PostgresCoreRepository(database.pool)),
+      new DevActorProvider(),
       createFailingAuditDnaService(database.pool)
     );
 

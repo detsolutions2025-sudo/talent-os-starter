@@ -2,6 +2,7 @@ import request from "supertest";
 import type pg from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createServer } from "../../src/server/app";
+import { DevActorProvider } from "../../src/server/http/actor-provider";
 import {
   CandidateService,
   createPostgresCandidateService
@@ -105,6 +106,7 @@ function candidatePayload(email: string, overrides: Record<string, unknown> = {}
 function createApp(database: PostgresTestDatabase, service = createPostgresCandidateService) {
   return createServer(
     createCoreService(new PostgresCoreRepository(database.pool)),
+    new DevActorProvider(),
     createPostgresDnaService(database.pool),
     createPostgresOrganizationalUnitService(database.pool),
     createPostgresCompetencyService(database.pool),

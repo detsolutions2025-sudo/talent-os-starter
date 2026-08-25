@@ -24,9 +24,15 @@ import type { BehavioralAssessmentService } from "./behavioral-assessments/servi
 import type { PreAnalysisService } from "./pre-analyses/service";
 import type { ProposalService } from "./proposals/service";
 import type { CandidateDossierService } from "./candidate-dossiers/service";
+import { DevActorProvider, type ActorProvider } from "./http/actor-provider";
+import type { AuthService } from "./auth/service";
 
 export function createServer(
   core: CoreService,
+  // Fase 29 (ADR-0026; SPEC-028 v1.0). Ver `http/routes.ts` para a justificativa do default
+  // `DevActorProvider` -- preserva compatibilidade com todo ponto de chamada de teste existente
+  // sem exigir edicao mecanica; producao (index.ts) sempre passa o provider real.
+  actorProvider: ActorProvider = new DevActorProvider(),
   dna?: DnaService,
   organizationalUnits?: OrganizationalUnitService,
   competencies?: CompetencyService,
@@ -50,7 +56,10 @@ export function createServer(
   // Fase 27 (SPEC-026 v1.0). Mantido no fim da assinatura posicional.
   offboardings?: OffboardingService,
   // Fase 28 (ADR-0025; SPEC-027 v1.0). Mantido no fim da assinatura posicional.
-  accessGrants?: AccessGrantService
+  accessGrants?: AccessGrantService,
+  // Fase 29 (ADR-0026; SPEC-028 v1.0). Mantido no fim da assinatura posicional.
+  auth?: AuthService,
+  isProductionEnv = false
 ) {
   const app = express();
 
@@ -75,6 +84,7 @@ export function createServer(
     "/api",
     createApiRouter(
       core,
+      actorProvider,
       dna,
       organizationalUnits,
       competencies,
@@ -96,7 +106,9 @@ export function createServer(
       employments,
       developmentRetention,
       offboardings,
-      accessGrants
+      accessGrants,
+      auth,
+      isProductionEnv
     )
   );
 

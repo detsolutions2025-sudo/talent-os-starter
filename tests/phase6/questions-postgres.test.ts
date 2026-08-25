@@ -2,6 +2,7 @@ import request from "supertest";
 import type pg from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createServer } from "../../src/server/app";
+import { DevActorProvider } from "../../src/server/http/actor-provider";
 import { createPostgresCompetencyService } from "../../src/server/competencies/service";
 import type { CompetencyRepository } from "../../src/server/competencies/repository";
 import { createCoreService } from "../../src/server/core/service";
@@ -160,6 +161,7 @@ async function createCompetencyCatalogItem(
 function createApp(database: PostgresTestDatabase, service = createPostgresQuestionService) {
   return createServer(
     createCoreService(new PostgresCoreRepository(database.pool)),
+    new DevActorProvider(),
     createPostgresDnaService(database.pool),
     createPostgresOrganizationalUnitService(database.pool),
     createPostgresCompetencyService(database.pool),

@@ -21,31 +21,32 @@
 
 ## Especificações
 
-| ID       | Funcionalidade                                | Fase | Versão  | Status     |
-| -------- | ----------------------------------------------- | ---: | ------- | ---------- |
-| SPEC-005 | DNA Organizacional                              |    2 | v0.2.0  | Concluída |
-| SPEC-006 | Estrutura Organizacional                        |    3 | v0.3.0  | Concluída |
-| SPEC-007 | Catálogo de Competências                        |    4 | v0.4.0  | Concluída |
-| SPEC-008 | Cargos                                          |    5 | v0.5.0  | Concluída |
-| SPEC-009 | Banco de Perguntas                              |    6 | —       | Concluída |
-| SPEC-010 | Vagas                                           |    7 | —       | Concluída |
-| SPEC-011 | Candidatos                                      |    8 | —       | Concluída |
-| SPEC-012 | Processo Seletivo                               |    9 | —       | Concluída |
-| SPEC-013 | Entrevistas                                     |   10 | —       | Concluída |
-| SPEC-014 | Infraestrutura de IA                            |   11 | v1.0    | Concluída |
-| SPEC-015 | Propostas                                       |   22 | v1.0    | Concluída |
-| SPEC-016 | Onboarding                                      |   23 | v1.0    | Concluída |
-| SPEC-025 | OrganizationPerson e Employment                 |   24 | 1.0     | Concluída |
-| SPEC-017 | Desenvolvimento e Retenção                      |   25 | v1.0    | Concluída |
-| SPEC-026 | Offboarding                                     |   27 | 1.0     | Aprovada   |
-| SPEC-027 | Ciclo de Vida de Acesso Pós-Contratação (AccessGrant) | 28 | 1.0     | Aprovada   |
-| SPEC-018 | Blueprint Organizacional / Implantação Guiada   |   15 | 1.0     | Aprovada   |
-| SPEC-019 | Portal Público de Vagas                         |   16 | 0.1     | Em revisão |
-| SPEC-020 | Candidatura Pública                             |   17 | 1.1     | Aprovada   |
-| SPEC-021 | Pré-Entrevista Estruturada                      |   18 | 1.0     | Aprovada   |
-| SPEC-022 | Perfil Comportamental                           |   19 | 1.0     | Aprovada   |
-| SPEC-023 | Pré-Análise Assistida por IA                    |   20 | 1.1     | Aprovada   |
-| SPEC-024 | Dossiê Inteligente do Candidato                 |   21 | 1.1     | Aprovada   |
+| ID       | Funcionalidade                                        | Fase | Versão | Status     |
+| -------- | ----------------------------------------------------- | ---: | ------ | ---------- |
+| SPEC-005 | DNA Organizacional                                    |    2 | v0.2.0 | Concluída  |
+| SPEC-006 | Estrutura Organizacional                              |    3 | v0.3.0 | Concluída  |
+| SPEC-007 | Catálogo de Competências                              |    4 | v0.4.0 | Concluída  |
+| SPEC-008 | Cargos                                                |    5 | v0.5.0 | Concluída  |
+| SPEC-009 | Banco de Perguntas                                    |    6 | —      | Concluída  |
+| SPEC-010 | Vagas                                                 |    7 | —      | Concluída  |
+| SPEC-011 | Candidatos                                            |    8 | —      | Concluída  |
+| SPEC-012 | Processo Seletivo                                     |    9 | —      | Concluída  |
+| SPEC-013 | Entrevistas                                           |   10 | —      | Concluída  |
+| SPEC-014 | Infraestrutura de IA                                  |   11 | v1.0   | Concluída  |
+| SPEC-015 | Propostas                                             |   22 | v1.0   | Concluída  |
+| SPEC-016 | Onboarding                                            |   23 | v1.0   | Concluída  |
+| SPEC-025 | OrganizationPerson e Employment                       |   24 | 1.0    | Concluída  |
+| SPEC-017 | Desenvolvimento e Retenção                            |   25 | v1.0   | Concluída  |
+| SPEC-026 | Offboarding                                           |   27 | 1.0    | Aprovada   |
+| SPEC-027 | Ciclo de Vida de Acesso Pós-Contratação (AccessGrant) |   28 | 1.0    | Aprovada   |
+| SPEC-028 | Autenticação Real                                     |   29 | 1.0    | Aprovada   |
+| SPEC-018 | Blueprint Organizacional / Implantação Guiada         |   15 | 1.0    | Aprovada   |
+| SPEC-019 | Portal Público de Vagas                               |   16 | 0.1    | Em revisão |
+| SPEC-020 | Candidatura Pública                                   |   17 | 1.1    | Aprovada   |
+| SPEC-021 | Pré-Entrevista Estruturada                            |   18 | 1.0    | Aprovada   |
+| SPEC-022 | Perfil Comportamental                                 |   19 | 1.0    | Aprovada   |
+| SPEC-023 | Pré-Análise Assistida por IA                          |   20 | 1.1    | Aprovada   |
+| SPEC-024 | Dossiê Inteligente do Candidato                       |   21 | 1.1    | Aprovada   |
 
 > **Nota sobre SPEC-014:** o item foi corrigido nominalmente para "Infraestrutura de IA" e a Versão para `v1.0`, para corresponder ao documento aprovado (`docs/02-requisitos/specs/SPEC-014-Infraestrutura-de-IA.md`, Status: Aprovada, Versao: 1.0). Status (Concluída) e Fase (11) foram mantidos — não há inconsistência documental nesses dois campos.
 
@@ -57,6 +58,8 @@
 
 > **Nota de saneamento — Fase 28 (2026-08-20):** concluída a Fase 27 (Offboarding), o gate arquitetural e normativo do domínio de Ciclo de Vida de Acesso Pós-Contratação foi cumprido: ADR-0025 — Ciclo de Vida de Acesso Pós-Contratação (Status: Aceita, `docs/03-arquitetura/decisoes/0025-ciclo-de-vida-de-acesso-pos-contratacao.md`) e SPEC-027 — Ciclo de Vida de Acesso Pós-Contratação / AccessGrant (v1.0, Status: Aprovada, `docs/02-requisitos/specs/SPEC-027-Ciclo-de-Vida-de-Acesso.md`) já foram redigidas e passaram por revisão destrutiva nas próprias tarefas que as criaram. Este saneamento apenas formaliza a Fase 28 nesta tabela e no roadmap, e atualiza o metadado `Fase` do cabeçalho de SPEC-027 (de "a formalizar" para "28"); não altera conteúdo normativo de ADR-0025 ou SPEC-027, não implementa código, migration, banco, testes executáveis nem faz commit. Status registrado como `Aprovada` (não `Concluída`) porque a implementação (Fase 28 propriamente dita) ainda não começou.
 
+> **Nota de saneamento — Fase 29 (2026-08-20):** concluída e implementada a Fase 28 (AccessGrant, commit `b0f067a`), uma auditoria de prontidão de MVP/produção classificou a ausência de autenticação real (o único mecanismo existente, `dev-auth.ts`, é deliberadamente restrito a `development`/`test`) como bloqueador de produção. A etapa de definição de produto/arquitetura foi cumprida em resposta a esse achado: ADR-0026 — Autenticação Real (Status: Aceita, `docs/03-arquitetura/decisoes/0026-autenticacao-real.md`, provider escolhido: Supabase Auth) e SPEC-028 — Autenticação Real (v1.0, Status: Aprovada, `docs/02-requisitos/specs/SPEC-028-Autenticacao-Real.md`) já foram redigidas e passaram por revisão destrutiva nas próprias tarefas que as criaram, sem alterar ADR-0003, ADR-0025, SPEC-002, SPEC-003, SPEC-004 ou SPEC-027. Este saneamento apenas formaliza a Fase 29 nesta tabela e no roadmap; não implementa código, migration, banco, testes executáveis nem faz commit. Status registrado como `Aprovada` (não `Concluída`) porque a implementação (Fase 29 propriamente dita) ainda não começou.
+
 ### Dependências conceituais
 
 A tabela acima não possui coluna de dependências (diferente da tabela "Núcleo da plataforma"); para não alterar sua estrutura estabelecida, as dependências conceituais das próximas SPECs são registradas aqui, como referência para o detalhamento futuro de cada documento:
@@ -65,6 +68,7 @@ A tabela acima não possui coluna de dependências (diferente da tabela "Núcleo
 - **SPEC-017 — Desenvolvimento e Retenção:** SPEC-025, Employment como aggregate root, ADR-0024, SPEC-003, SPEC-011, SPEC-012, SPEC-015, SPEC-016.
 - **SPEC-026 — Offboarding:** ADR-0024, SPEC-025 (Employment como aggregate root operacional externo; SPEC-025 permanece autoridade exclusiva do lifecycle de Employment), SPEC-016 (padrão operacional de checklist reutilizado para tasks), SPEC-003 e SPEC-004 (fronteira de acesso e RBAC). Não gerencia revogação automática de acesso; automação real de acesso fica fora da v1 e exige SPEC/ADR própria futura.
 - **SPEC-027 — Ciclo de Vida de Acesso Pós-Contratação (AccessGrant):** ADR-0025 (decisão arquitetural que cria `AccessGrant`), SPEC-003 — Membership (fonte de verdade de autorização técnica, nunca substituída; revogação delega a `CoreService.updateMembership`), SPEC-004 — Roles & Permissions (RBAC herdado por delegação). Dependências conceituais adicionais citadas pela própria SPEC-027, sem serem operacionalmente obrigatórias: SPEC-025 — OrganizationPerson e Employment (`Employment` como proveniência opcional, nunca dependência para `Membership` administrativo) e SPEC-026 — Offboarding, apenas como fronteira/integrador conceitual futuro (nenhuma automação: Offboarding nunca cria, revoga ou altera `AccessGrant`/`Membership`).
+- **SPEC-028 — Autenticação Real:** ADR-0026 (decisão arquitetural — Supabase Auth como provider, `User` interno canônico preservado), ADR-0003 (promessa original de que a troca para autenticação real substituiria apenas a resolução do `Actor`, cumprida por esta SPEC), SPEC-002 — User (entidade interna canônica que a nova identidade externa se associa, e-mail como campo de correlação), SPEC-003 — Membership (permanece fonte exclusiva de autorização organizacional, nunca tocada por esta SPEC), SPEC-004 — Roles & Permissions (RBAC das novas operações de convite/revogação de sessão espelha a matriz já existente, nunca a substitui). SPEC-027 — AccessGrant é citada apenas como _consumidora_ da garantia de que `authorize()` revalida `Membership` a cada requisição (nenhuma sessão sobrevive a uma revogação de acesso), não como dependência operacional: `AccessGrant` nunca é mecanismo de autenticação e não exige nenhuma alteração por esta SPEC.
 - **SPEC-018 — Blueprint Organizacional / Implantação Guiada:** Organization, DNA Organizacional (SPEC-005), Estrutura Organizacional (SPEC-006), Catálogo de Competências (SPEC-007), Cargos (SPEC-008), Banco de Perguntas (SPEC-009), ADR-0020, ADR-0021, ADR-0022.
 - **SPEC-019 — Portal Público de Vagas:** Vagas (SPEC-010), Organization, Blueprint Organizacional (SPEC-018).
 - **SPEC-020 — Candidatura Pública:** Portal Público (SPEC-019), Candidatos (SPEC-011), Vagas (SPEC-010), Processo Seletivo (SPEC-012).

@@ -200,13 +200,71 @@ SPEC-025 ou SPEC-026.
     permanece registrada como possibilidade futura, não decidida aqui;
   - zero Inteligência Artificial: concessão e revogação são sempre atos
     humanos explícitos, sem score, ranking ou sugestão automatizada.
-  Pré-requisito antes de qualquer código: nenhum adicional — ADR-0025 e
-  SPEC-027 já estão, respectivamente, Aceita e Aprovada. O processo
-  obrigatório da Constituição (especificação → revisão → plano →
-  desenvolvimento → testes → revisão de segurança → documentação → aprovação
-  → commit) segue valendo a partir do plano técnico, que ainda não foi
-  elaborado por este saneamento.
-  Este saneamento formaliza apenas o registro em planejamento (este arquivo
-  e `docs/01-produto/BACKLOG.md`) e o metadado `Fase` do cabeçalho de
-  SPEC-027; não implementa código, migration, banco ou testes executáveis, e
-  não realiza commit.
+    Pré-requisito antes de qualquer código: nenhum adicional — ADR-0025 e
+    SPEC-027 já estão, respectivamente, Aceita e Aprovada. O processo
+    obrigatório da Constituição (especificação → revisão → plano →
+    desenvolvimento → testes → revisão de segurança → documentação → aprovação
+    → commit) segue valendo a partir do plano técnico, que ainda não foi
+    elaborado por este saneamento.
+    Este saneamento formaliza apenas o registro em planejamento (este arquivo
+    e `docs/01-produto/BACKLOG.md`) e o metadado `Fase` do cabeçalho de
+    SPEC-027; não implementa código, migration, banco ou testes executáveis, e
+    não realiza commit.
+
+## Planejamento pós-Fase 28 (saneamento em 2026-08-20) — Fase 29, Autenticação Real
+
+Concluída e implementada a Fase 28 (`AccessGrant`, commit `b0f067a`), uma
+auditoria de prontidão de MVP/produção identificou que o único mecanismo de
+identificação existente no projeto (`src/server/http/dev-auth.ts`, headers
+`x-dev-user-id`/`x-dev-platform-admin`) é deliberadamente restrito a
+`APP_ENV=development`/`test` desde a Fase 1 (ADR-0003) e nunca foi substituído
+por autenticação real — classificado como bloqueador de produção. A etapa
+própria de definição de arquitetura e produto foi cumprida em resposta:
+`docs/03-arquitetura/decisoes/0026-autenticacao-real.md` (Status: Aceita) e
+`docs/02-requisitos/specs/SPEC-028-Autenticacao-Real.md` (v1.0, Status:
+Aprovada) foram redigidas e passaram por revisão destrutiva nas próprias
+tarefas que as criaram, sem alterar ADR-0003, ADR-0025, SPEC-002, SPEC-003,
+SPEC-004 ou SPEC-027.
+
+- **Fase 29 — Autenticação Real.** Pontos fechados por ADR-0026/SPEC-028 e
+  registrados aqui sucintamente:
+  - **Supabase Auth (GoTrue)** é o provider de identidade escolhido —
+    avaliado contra autenticação custom e provedores externos concorrentes,
+    não escolhido apenas por já ser o mesmo fornecedor do PostgreSQL atual;
+  - `users` permanece a entidade interna canônica; a nova identidade externa
+    é uma associação aditiva (`auth_identities`, tabela própria, 1:1 nesta
+    Fase), nunca uma substituição de `User`;
+  - `Membership` continua sendo, sozinha, a fonte de verdade de autorização
+    organizacional — login bem-sucedido nunca concede acesso a nenhuma
+    Organization por si só; `authorize()` permanece sem nenhuma linha
+    alterada;
+  - o JWT emitido pelo provider identifica o `User` (via verificação local
+    de assinatura, JWKS), nunca carrega Role/autorização organizacional —
+    nenhuma Role de negócio passa a residir no provider;
+  - `dev-auth.ts` é preservado, nunca removido, restrito exatamente como
+    hoje a `development`/`test` — a resolução de `Actor` passa a ter duas
+    implementações possíveis pela mesma interface, nunca simultâneas no
+    mesmo ambiente;
+  - convite e bootstrap do primeiro tenant tornam-se reais (via API
+    administrativa do provider), eliminando a dependência funcional de
+    `POST /api/dev/users` em produção; criação de Organization continua
+    exclusiva de Platform Admin (SPEC-004, inalterada);
+  - **sem signup público nesta Fase** — apenas por convite ou bootstrap;
+  - sessão válida + `AccessGrant` revogado (Fase 28) continua resultando em
+    acesso negado na próxima operação protegida, garantido inteiramente pela
+    revalidação de `Membership` já existente em `authorize()` — zero mudança
+    exigida em `AccessGrant`/migration `0031`, que permanece imutável;
+  - duas tabelas conceituais previstas para o plano técnico futuro:
+    `auth_identities` (ponte User ↔ identidade externa) e `invitations`
+    (convite/bootstrap, sem criar `Membership` antes do aceite).
+    Pré-requisito antes de qualquer código: nenhum adicional — ADR-0026 e
+    SPEC-028 já estão, respectivamente, Aceita e Aprovada. O processo
+    obrigatório da Constituição (especificação → revisão → plano →
+    desenvolvimento → testes → revisão de segurança → documentação → aprovação
+    → commit) segue valendo a partir do plano técnico, que ainda não foi
+    elaborado por este saneamento. Production Hardening (CI/CD, cabeçalhos de
+    segurança HTTP, observabilidade, backup/restore) continua candidato
+    natural a uma fase posterior, não formalizada por este saneamento.
+    Este saneamento formaliza apenas o registro em planejamento (este arquivo
+    e `docs/01-produto/BACKLOG.md`); não implementa código, migration, banco
+    ou testes executáveis, e não realiza commit.
