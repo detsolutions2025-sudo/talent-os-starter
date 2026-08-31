@@ -2,6 +2,13 @@
 // usado por `requirePostgresDatabaseUrl` (postgres.ts) -- nunca um default silencioso em
 // producao. `VITE_`-prefixadas sao frontend-safe (Vite so expoe ao bundle o que comeca com esse
 // prefixo -- mecanismo do proprio bundler, nao apenas disciplina); as demais sao server-only.
+//
+// Fase 30 (ADR-0027; SPEC-029 v1.0): `requireVar` abaixo reutiliza a primitiva generica de
+// presenca `requireConfigValue` (`../config-validation`) em vez de reimplementa-la -- contrato,
+// mensagem publica e retorno preservados byte a byte. Auth pode depender da infraestrutura
+// generica de configuracao; o inverso nunca acontece.
+
+import { requireConfigValue } from "../config-validation";
 
 export type SupabaseAuthConfig = {
   url: string;
@@ -35,11 +42,7 @@ export function assertSupabaseAuthConfiguredForProduction(env = process.env) {
 }
 
 function requireVar(env: NodeJS.ProcessEnv, name: string) {
-  const value = env[name]?.trim();
-  if (!value) {
-    throw new Error(`${name} is required for Supabase Auth.`);
-  }
-  return value;
+  return requireConfigValue(env, name, `${name} is required for Supabase Auth.`);
 }
 
 function trimTrailingSlash(value: string) {

@@ -20,6 +20,7 @@ import { createPostgresOffboardingService } from "./offboardings/service";
 import { createPostgresAccessGrantService } from "./access-grants/service";
 import { PostgresCoreRepository } from "./persistence/postgres-core-repository";
 import { createPostgresPreInterviewService } from "./pre-interviews/service";
+import { assertProductionConfig } from "./config-validation";
 import { createPostgresPool, requirePostgresDatabaseUrl } from "./postgres";
 import { createPostgresPublicApplicationService } from "./public-applications/service";
 import { createPostgresQuestionService } from "./questions/service";
@@ -35,6 +36,15 @@ import { createRemoteProviderJwks } from "./auth/jwt";
 import { createSupabaseAdminAdapter } from "./auth/supabase-admin-adapter";
 import { createPostgresAuthService, type AuthService } from "./auth/service";
 import { createActorProvider } from "./http/actor-provider";
+
+const appEnv = process.env.APP_ENV ?? "development";
+
+// Fase 30 (ADR-0027; SPEC-029 v1.0 -- veja config-validation.ts). Ponto unico de validacao de
+// PRESENCA das quatro variaveis obrigatorias em producao/staging, chamado antes de qualquer
+// outra inicializacao significativa (pool do Postgres, authService, app.listen()). Nomeia TODAS
+// as variaveis ausentes de uma vez, nunca so a primeira. Fora de producao/staging, e no-op --
+// preserva o boot de development/test exatamente como antes desta fase.
+assertProductionConfig();
 
 const port = Number(process.env.PORT ?? 3001);
 const connectionString = requirePostgresDatabaseUrl();
@@ -53,10 +63,12 @@ const pool = createPostgresPool(connectionString);
 // need to actually store/resolve a secret or call a provider fails immediately and safely with a
 // normalized configuration_error, instead of crashing the whole process at boot or silently
 // pretending a fake credential/response is real.
-const appEnv = process.env.APP_ENV ?? "development";
 
 // Fase 29 (ADR-0026; SPEC-028 v1.0). Fail-fast: producao NUNCA sobe sem configuracao real do
-// Supabase Auth -- nunca um fallback silencioso para dev-auth (SPEC-028 s22/CA-030).
+// Supabase Auth -- nunca um fallback silencioso para dev-auth (SPEC-028 s22/CA-030). Continua
+// rodando aqui, na mesma posicao de sempre, como defesa em profundidade apos o gate central da
+// Fase 30 acima (assertProductionConfig ja garante presenca; este validator especializado
+// preserva seu proprio contrato e mensagens, sem nenhuma mudanca de comportamento).
 assertSupabaseAuthConfiguredForProduction();
 
 // `auth`/`SupabaseActorProvider` so sao construidos quando a configuracao esta presente -- em

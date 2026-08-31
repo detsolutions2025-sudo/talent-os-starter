@@ -268,3 +268,133 @@ SPEC-004 ou SPEC-027.
     Este saneamento formaliza apenas o registro em planejamento (este arquivo
     e `docs/01-produto/BACKLOG.md`); não implementa código, migration, banco
     ou testes executáveis, e não realiza commit.
+
+## Fechamento da Fase 29 (2026-08-25) — Autenticação Real concluída
+
+O plano técnico referido pela nota acima foi elaborado e executado: a Fase
+29 (Autenticação Real) está implementada, testada e commitada (`1611d60`),
+sem alterar o conteúdo normativo de ADR-0026 ou SPEC-028. Migration final
+da fase: `0033_phase_29_bootstrap_invitation.sql`, aditiva sobre
+`0032_phase_29_authentication.sql` (identidade/sessão), ambas já aplicadas
+em DEV (Supabase) e verificadas fisicamente antes e depois da aplicação.
+Todos os pontos fechados por ADR-0026/SPEC-028 listados na seção anterior
+permanecem verdadeiros no código entregue: Supabase Auth como provider,
+`users` como entidade interna canônica, `Membership`/`authorize()` sem
+nenhuma linha alterada, JWT sem Role/tenant de negócio, `dev-auth.ts`
+preservado e restrito a `development`/`test`, convite e bootstrap do
+primeiro tenant reais, sem signup público.
+
+**Production Hardening (CI/CD, cabeçalhos de segurança HTTP, CORS,
+observabilidade, backup/restore) permanece exatamente o que já era:
+candidato a trabalho posterior, citado por ADR-0026 ("Impacto Futuro") e
+por SPEC-028 (seção 2, "Fora do Escopo"). Este fechamento não o formaliza
+como Fase 30** — nenhum ADR ou SPEC dedicados existem ainda para essa
+frente; a numeração de fase seguinte permanece em aberto até que esse
+pré-requisito normativo seja cumprido, no mesmo padrão já usado por todas
+as fases anteriores deste roadmap.
+
+## Planejamento pós-Fase 29 (saneamento em 2026-08-27) — Fase 30, Configuração e Segredos / Fail-Fast de Produção
+
+O pré-requisito normativo registrado pela nota de fechamento da Fase 29
+acima foi cumprido: `docs/03-arquitetura/decisoes/0027-production-hardening.md`
+(ADR-0027 — Production Hardening / Prontidão Operacional, Status: Aceita)
+define o guarda-chuva arquitetural completo de prontidão operacional,
+separado em sete frentes (segurança de borda, entrega/deploy, observabilidade,
+disponibilidade, recovery, controle de abuso, operação), e decide
+explicitamente pelo fatiamento em múltiplas SPECs/fases subsequentes, nunca
+uma fase única monolítica (ADR-0027, seção 2). A ordem recomendada elege
+configuração/secrets como primeira sub-frente, pelo motivo que a própria ADR
+registra: menor custo, maior urgência — hoje só
+`assertSupabaseAuthConfiguredForProduction` (Fase 29) existe, e precisa ser
+generalizado para todas as variáveis obrigatórias de produção.
+
+- **Fase 30 — Configuração e Segredos / Fail-Fast de Produção.** Especificada
+  em `docs/02-requisitos/specs/SPEC-029-Configuracao-e-Segredos-Fail-Fast.md`
+  (v1.0, Status: Aprovada), que passou por revisão destrutiva na própria
+  tarefa que a criou, sem alterar ADR-0027, ADR-0026 ou SPEC-028. Pontos
+  fechados por essa SPEC, registrados aqui sucintamente:
+  - objetivo: impedir que o processo de produção suba parcialmente
+    configurado — generaliza o mecanismo de fail-fast já existente e
+    testado desde a Fase 29 (`assertSupabaseAuthConfiguredForProduction`)
+    para um único ponto de validação no boot, cobrindo todas as variáveis
+    hoje obrigatórias em `APP_ENV=production`: `SUPABASE_DATABASE_URL`,
+    `VITE_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` e
+    `VITE_SUPABASE_ANON_KEY` (esta última hoje sem validação nomeada — gap
+    físico fechado normativamente por esta SPEC);
+  - `development`/`test` permanecem exatamente como hoje — nenhuma dessas
+    variáveis passa a ser exigida fora de produção; `dev-auth.ts` continua
+    funcionando sem alteração;
+  - `staging`/homologação segue exatamente a mesma exigência de produção,
+    nunca uma validação reduzida — consistente com ADR-0027 (seção 4);
+  - **zero migration prevista** — mecanismo é puramente de validação de
+    configuração em `process.env`, sem nova tabela ou coluna de domínio;
+  - este mecanismo absorve, nunca duplica ou substitui, o padrão já
+    existente e testado da Fase 29 e de `requirePostgresDatabaseUrl`
+    (Fase 1.1);
+  - esta Fase **não é o Production Hardening completo** — é apenas a
+    primeira das sete sub-frentes ordenadas pela ADR-0027 (seção 2); as
+    demais seis (segurança de borda, CI/CD, observabilidade, backup/
+    restore, rate limiting distribuído, E2E) permanecem candidatas a fases
+    futuras, sem número atribuído, cada uma exigindo sua própria SPEC
+    dedicada antes de virar fase numerada — o ADR-0027 continua sendo o
+    guarda-chuva arquitetural de todas elas.
+    Pré-requisito antes de qualquer código: nenhum adicional — ADR-0027 e
+    SPEC-029 já estão, respectivamente, Aceita e Aprovada. O processo
+    obrigatório da Constituição (especificação → revisão → plano →
+    desenvolvimento → testes → revisão de segurança → documentação →
+    aprovação → commit) segue valendo a partir do plano técnico, que ainda
+    não foi elaborado por este saneamento.
+    Este saneamento formaliza apenas o registro em planejamento (este
+    arquivo e `docs/01-produto/BACKLOG.md`) e o metadado `Fase` do
+    cabeçalho de SPEC-029 (de "a formalizar" para "30"); não implementa
+    código, migration, banco ou testes executáveis, e não realiza commit.
+
+## Fechamento da Fase 30 (2026-08-31) — Configuração e Segredos / Fail-Fast de Produção concluída
+
+A Fase 30 (Configuração e Segredos / Fail-Fast de Produção) foi implementada
+e testada, reaproveitando integralmente ADR-0027/SPEC-029 sem alterar seu
+conteúdo normativo. **Zero migration** — mecanismo puramente de validação de
+`process.env` no boot, sem nova tabela ou coluna de domínio; a migration mais
+recente do projeto permanece `0033_phase_29_bootstrap_invitation.sql`, sem
+nenhuma alteração de schema.
+
+Entregue: `src/server/config-validation.ts` (novo módulo, exporta
+`assertProductionConfig()` — ponto único de validação de presença das quatro
+variáveis obrigatórias em `APP_ENV=production`/`APP_ENV=staging`
+[`SUPABASE_DATABASE_URL`, `VITE_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
+`VITE_SUPABASE_ANON_KEY`], e `requireConfigValue()` — primitiva genérica de
+presença, reutilizada por `auth/config.ts` sem alterar nenhum contrato,
+mensagem ou comportamento público seu). `src/server/index.ts` passou a
+chamar `assertProductionConfig()` antes de qualquer inicialização
+significativa (antes do pool do Postgres, antes de `authService`, antes de
+`app.listen()`), preservando `requirePostgresDatabaseUrl` (Fase 1.1) e
+`assertSupabaseAuthConfiguredForProduction` (Fase 29) exatamente como
+defesa em profundidade na mesma posição relativa de sempre — nenhuma lógica
+de formato/derivação foi duplicada.
+
+Testes/gates executados e verdes: suíte dedicada `tests/phase30/`
+(`config-validation.test.ts`, `bootstrap-smoke.test.ts` — spawn do
+entrypoint real provando que configuração inválida nunca alcança
+`app.listen()` nem cria pool —, `auth-postgres-validators-regression.test.ts`
+— prova de ausência de regressão nos validators absorvidos), regressão de
+`tests/postgres.test.ts` e `tests/phase29/` (85 testes, sem alteração),
+`tsc --noEmit`, `eslint`, `prettier --check`, `npm run build` e
+`npm audit --omit=dev` (zero vulnerabilidades) limpos. Nenhuma dependência
+nova (`package.json`/`package-lock.json` sem diff).
+
+Esta é a **primeira fatia** do ADR-0027 concluída. **Production Hardening
+geral permanece incompleto** — as demais seis sub-frentes ordenadas pela
+ADR-0027 (seção 2) seguem candidatas a fases futuras, sem número atribuído,
+cada uma exigindo sua própria SPEC dedicada antes de virar fase numerada,
+mesmo padrão de gate já exigido para todas as capacidades anteriores deste
+roadmap. A próxima sub-frente recomendada pela ordem da ADR-0027 é
+**Segurança de Borda** (security headers, CORS, CSRF adicional) — citada
+aqui apenas como próximo candidato, sem formalizar número de fase nesta
+tarefa.
+
+Convenção observada e preservada: o cabeçalho `**Status:**` do próprio
+documento SPEC-029 permanece `Aprovada` (não `Concluída`) mesmo após esta
+implementação — mesmo padrão já em vigor para SPEC-028 (Fase 29, também
+implementada e commitada, cujo cabeçalho também permanece `Aprovada`). A
+reconciliação de status "implementada" fica restrita à tabela de
+`docs/01-produto/BACKLOG.md`, como já praticado na fecho da Fase 29.
