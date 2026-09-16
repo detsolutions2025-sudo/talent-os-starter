@@ -1,5 +1,8 @@
 import express from "express";
 import type { AIService } from "./ai/service";
+import { createCorsMiddleware } from "./http/cors";
+import { createCsrfMiddleware } from "./http/csrf";
+import { createSecurityHeadersMiddleware } from "./http/security-headers";
 import type { BlueprintService } from "./blueprints/service";
 import type { CandidateApplicationService } from "./candidate-applications/service";
 import type { CandidateService } from "./candidates/service";
@@ -59,9 +62,51 @@ export function createServer(
   accessGrants?: AccessGrantService,
   // Fase 29 (ADR-0026; SPEC-028 v1.0). Mantido no fim da assinatura posicional.
   auth?: AuthService,
-  isProductionEnv = false
+  isProductionEnv = false,
+  // Fase 31 (ADR-0027; SPEC-030 v1.0). Mantidos no fim da assinatura posicional, mesma
+  // convencao ja usada por toda Fase anterior. Default vazio/ausente preserva, sem nenhuma
+  // mudanca de comportamento, todo ponto de chamada existente (CORS nunca aprova nenhuma
+  // origem, CSRF fica no-op, `trust proxy` permanece desabilitado -- ver `http/cors.ts`,
+  // `http/csrf.ts`, RN-025). Producao (`index.ts`) sempre passa os tres explicitamente.
+  trustedFrontendOrigins: ReadonlySet<string> = new Set(),
+  trustProxyConfig?: string,
+  supabaseAuthOrigin?: string,
+  // Correcao pre-commit (gate 8). Deliberadamente SEPARADO de `isProductionEnv` acima --
+  // `isProductionEnv` e o contrato da Fase 29 (`Secure` do cookie de sessao, `cookies.ts`), que
+  // hoje reflete literalmente `APP_ENV === "production"` e NUNCA `staging`; alterar esse
+  // significado esta fora do escopo desta Fase (SPEC-030 "Fora do Escopo": nao altera nenhum
+  // contrato de autenticacao/cookie ja fechado pela Fase 29). Mas SPEC-030 secao 8 exige que
+  // staging aplique "exatamente a mesma politica de producao -- mesmos headers, mesma CSP" --
+  // este flag, exclusivo dos headers desta Fase (nunca usado por cookies), cobre isso: default
+  // `= isProductionEnv` preserva byte a byte o comportamento de todo ponto de chamada existente
+  // que ainda nao conhece este parametro; producao (`index.ts`) passa explicitamente
+  // `appEnv === "production" || appEnv === "staging"`.
+  isProductionOrStagingEnv: boolean = isProductionEnv
 ) {
   const app = express();
+
+  // RN-024/RN-025 (INV-05): nunca `true` generico -- somente quando a topologia real de
+  // hosting define uma fronteira de proxy explicita (numero de hops ou faixa de IPs). Ausente
+  // (default): `trust proxy` permanece desabilitado, comportamento identico ao anterior a esta
+  // Fase (`request.ip` reflete o socket remoto real).
+  if (trustProxyConfig !== undefined) {
+    const hops = Number(trustProxyConfig);
+    app.set("trust proxy", Number.isInteger(hops) && hops > 0 ? hops : trustProxyConfig);
+  }
+
+  // Fase 31: montados ANTES de `express.json()` -- uma requisicao rejeitada por CORS/CSRF nunca
+  // paga o custo de parsear um body, e os headers de seguranca abaixo se aplicam a toda
+  // resposta de `/api`, incluindo respostas de erro (413, 403, 500). Gate 8: usa
+  // `isProductionOrStagingEnv` (staging inclusa), nunca o `isProductionEnv` de cookies.
+  app.use(
+    "/api",
+    createSecurityHeadersMiddleware({
+      isProductionEnv: isProductionOrStagingEnv,
+      supabaseAuthOrigin
+    })
+  );
+  app.use("/api", createCorsMiddleware(trustedFrontendOrigins));
+  app.use("/api", createCsrfMiddleware(trustedFrontendOrigins));
 
   // Limite de tamanho de body explicito (revisao destrutiva da Fase 17, item 24) -- antes
   // desta revisao, `express.json()` sem opcoes ja aplicava o limite implicito padrao do

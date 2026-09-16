@@ -36,15 +36,24 @@ import { createRemoteProviderJwks } from "./auth/jwt";
 import { createSupabaseAdminAdapter } from "./auth/supabase-admin-adapter";
 import { createPostgresAuthService, type AuthService } from "./auth/service";
 import { createActorProvider } from "./http/actor-provider";
+import { parseTrustedOrigins, TRUSTED_FRONTEND_ORIGINS_ENV_VAR } from "./http/trusted-origins";
 
 const appEnv = process.env.APP_ENV ?? "development";
 
-// Fase 30 (ADR-0027; SPEC-029 v1.0 -- veja config-validation.ts). Ponto unico de validacao de
-// PRESENCA das quatro variaveis obrigatorias em producao/staging, chamado antes de qualquer
-// outra inicializacao significativa (pool do Postgres, authService, app.listen()). Nomeia TODAS
-// as variaveis ausentes de uma vez, nunca so a primeira. Fora de producao/staging, e no-op --
+// Fase 30 (ADR-0027; SPEC-029 v1.0 -- veja config-validation.ts). Ponto UNICO de validacao de
+// PRESENCA de configuracao obrigatoria em producao/staging, chamado antes de qualquer outra
+// inicializacao significativa (pool do Postgres, authService, app.listen()). Nomeia TODAS as
+// variaveis ausentes de uma vez, nunca so a primeira. Fora de producao/staging, e no-op --
 // preserva o boot de development/test exatamente como antes desta fase.
-assertProductionConfig();
+//
+// Fase 31 (ADR-0027 secao 17: "generalizar esse mesmo padrao [...] em um UNICO ponto de
+// validacao no boot"; SPEC-030 RN-045). `TRUSTED_FRONTEND_ORIGINS` (a origem confiavel do
+// frontend, usada por CORS E por CSRF -- ver `http/trusted-origins.ts`) e adicionada a ESTA MESMA
+// chamada central, nunca a um segundo gate de startup independente. `assertProductionConfig`
+// (config-validation.ts) continua sem importar nada de nenhum modulo de dominio -- e este
+// `index.ts`, o unico lugar que ja conhece toda a configuracao do boot, quem monta a lista
+// completa de variaveis obrigatorias desta execucao.
+assertProductionConfig(process.env, [TRUSTED_FRONTEND_ORIGINS_ENV_VAR]);
 
 const port = Number(process.env.PORT ?? 3001);
 const connectionString = requirePostgresDatabaseUrl();
@@ -93,6 +102,37 @@ if (
 
 const actorProvider = createActorProvider(appEnv, { authService });
 const isProductionEnv = appEnv === "production";
+
+// Fase 31 (ADR-0027; SPEC-030 v1.0, secao 8: "staging... aplica exatamente a mesma politica de
+// producao -- mesmos headers, mesma CSP"). Correcao pre-commit (gate 8): DELIBERADAMENTE
+// diferente de `isProductionEnv` acima -- aquele e o contrato de cookie da Fase 29 (`Secure`,
+// hoje so `production`, fora do escopo desta Fase alterar). Este flag e exclusivo dos headers de
+// seguranca desta Fase (`app.ts`/`security-headers.ts`), nunca usado para cookies.
+const isProductionOrStagingEnv = appEnv === "production" || appEnv === "staging";
+
+// Fase 31 (ADR-0027; SPEC-030 v1.0). `assertProductionConfig` acima (com
+// `TRUSTED_FRONTEND_ORIGINS_ENV_VAR`) ja GARANTE, em producao/staging, que esta variavel esta
+// presente e nao-vazia -- o boot nunca alcanca esta linha caso contrario. Por isso um unico
+// caminho de leitura serve os dois casos: em producao/staging o parse abaixo sempre produz um
+// Set nao-vazio (CORS habilitado e CSRF ativo, fail-closed); fora de producao/staging a variavel
+// e opcional -- ausente, `parseTrustedOrigins` devolve um Set vazio e `createServer()` cai no
+// default seguro (CORS nunca aprova nenhuma origem, CSRF vira no-op, ver `http/csrf.ts`),
+// exatamente como `dev-auth.ts` continua funcionando sem nenhuma variavel de Supabase Auth.
+const trustedFrontendOrigins = parseTrustedOrigins(process.env.TRUSTED_FRONTEND_ORIGINS);
+
+// RN-024/RN-025 (INV-05): ausente por default -- `trust proxy` permanece desabilitado ate que a
+// topologia real de hosting defina uma fronteira de proxy explicita (numero de hops ou faixa de
+// IPs). Nunca um valor obrigatorio (RN-046): nenhuma topologia conhecida hoje exige proxy
+// (SPEC-030 secao 3).
+const trustProxyConfig = process.env.TRUST_PROXY_CONFIG;
+
+// RN-012: origem real do projeto Supabase configurado, derivada de `VITE_SUPABASE_URL` (nunca um
+// `project-ref` fixo/ficticio). Ausente fora de producao/staging (nenhum projeto configurado
+// ainda) -- `createSecurityHeadersMiddleware` e no-op nesses ambientes de qualquer forma
+// (RN-005/RN-010), entao a ausencia nunca importa ali.
+const supabaseAuthOrigin = process.env.VITE_SUPABASE_URL
+  ? new URL(process.env.VITE_SUPABASE_URL).origin
+  : undefined;
 
 const aiService = createPostgresAIService(
   pool,
@@ -146,7 +186,11 @@ const app = createServer(
   createPostgresOffboardingService(pool),
   createPostgresAccessGrantService(pool),
   authService,
-  isProductionEnv
+  isProductionEnv,
+  trustedFrontendOrigins,
+  trustProxyConfig,
+  supabaseAuthOrigin,
+  isProductionOrStagingEnv
 );
 
 app.listen(port, () => {

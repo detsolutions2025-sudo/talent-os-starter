@@ -77,6 +77,19 @@ export function createApiRouter(
 ): Router {
   const router = createRouter();
 
+  // Fase 31 (ADR-0027; SPEC-030 v1.0, RN-036/RN-037/RN-038). `Cache-Control: no-store` para
+  // toda resposta deste roteador -- cobre as classes E/F (Membership/Platform Admin
+  // cookie-autenticadas, mandatorio) e G (bootstrap de sessao, tambem `no-store` pela matriz da
+  // SPEC), e estende conservadoramente as classes B/C (a SPEC deixa "a definir"/"recomendado",
+  // nunca proibido). `GET /api/health` (classe A, RN-038) fica FORA deste roteador (registrado
+  // direto em `app.ts`), entao seu comportamento de cache atual e preservado sem alteracao. As
+  // chamadas manuais ja existentes em rotas publicas token-based (classe D, RN-037) permanecem
+  // intocadas -- redundantes com este middleware, nunca removidas.
+  router.use((_request, response, next) => {
+    response.set("Cache-Control", "no-store");
+    next();
+  });
+
   router.get(
     "/dev/me",
     asyncHandler(async (request, response) => {

@@ -398,3 +398,137 @@ implementação — mesmo padrão já em vigor para SPEC-028 (Fase 29, também
 implementada e commitada, cujo cabeçalho também permanece `Aprovada`). A
 reconciliação de status "implementada" fica restrita à tabela de
 `docs/01-produto/BACKLOG.md`, como já praticado na fecho da Fase 29.
+
+## Planejamento pós-Fase 30 (saneamento em 2026-08-31) — Fase 31, Segurança de Borda
+
+O pré-requisito normativo registrado pela nota de fechamento da Fase 30
+acima foi cumprido: a segunda sub-frente da ordem recomendada por
+ADR-0027 (seção 2) — segurança de borda — foi especificada em
+`docs/02-requisitos/specs/SPEC-030-Seguranca-de-Borda.md` (v1.0, Status:
+Aprovada), que passou por revisão destrutiva de 50 cenários na própria
+tarefa que a criou, sem alterar ADR-0027, ADR-0026, SPEC-028 ou SPEC-029.
+A ordem recomendada elege segurança de borda como segunda sub-frente pelo
+motivo que a própria ADR registra: baixo custo técnico, amplifica
+diretamente a proteção que a Fase 29 acabou de introduzir (cookies
+HttpOnly, sessão real).
+
+- **Fase 31 — Segurança de Borda.** Especificada em
+  `docs/02-requisitos/specs/SPEC-030-Seguranca-de-Borda.md` (v1.0, Status:
+  Aprovada). Pontos fechados por essa SPEC, registrados aqui
+  sucintamente:
+  - objetivo: fechar a superfície de risco HTTP/borda que a Fase 29 abriu
+    (sessão real, cookies HttpOnly) — security headers (nosniff,
+    proteção de framing, Referrer-Policy, Permissions-Policy), CSP, HSTS,
+    CORS, CSRF por validação de Origin/Referer, preservação integral dos
+    cookies já testados, fronteira de confiança de proxy (`trust proxy`)
+    e `Cache-Control: no-store` para respostas autenticadas sensíveis;
+  - cookies HttpOnly/SameSite=Lax/host-only da Fase 29 são preservados
+    integralmente, sem nenhuma linha alterada em `http/cookies.ts` além,
+    possivelmente, de como `secure` é calculado;
+  - **topologia de produção (mesma origem vs. origens distintas) segue
+    sendo decisão de hosting ainda não tomada** (ADR-0027, seção 4) — a
+    SPEC-030 não escolhe arbitrariamente entre elas, define invariantes
+    seguros para os dois modos conceituais possíveis, tratando a origem
+    real como pré-condição de configuração explícita, nunca como
+    wildcard nem como decisão escondida;
+  - a política de métodos HTTP permitidos por CORS deve cobrir os métodos
+    efetivamente usados pela API (hoje isso inclui GET, POST, PATCH, PUT
+    e DELETE) — nunca uma lista menor por conveniência;
+  - **sequenciamento crítico:** a validação de Origin/Referer para
+    mutações autenticadas por cookie deve entrar em produção antes ou no
+    mesmo deploy que qualquer habilitação de CORS credenciado, nunca
+    depois (SPEC-030, INV-03) — a ausência de CORS hoje bloqueia
+    acidentalmente requisições cross-origin com corpo JSON; habilitar
+    CORS remove essa barreira acidental para a origem permitida;
+  - a fronteira de confiança de proxy (`trust proxy`) faz parte desta
+    fase — `request.ip` já é consumido hoje por rate limiting e hash de
+    auditoria em capacidades existentes (candidatura pública,
+    pré-entrevista, avaliação comportamental, propostas); a configuração
+    exata depende da topologia real de hosting, e `trust proxy = true`
+    genérico nunca é uma solução aceitável;
+  - **zero migration prevista** — mecanismo é puramente de configuração/
+    middleware HTTP, sem nova tabela ou coluna de domínio;
+  - esta Fase **não é o Production Hardening completo** — é apenas a
+    segunda das sete sub-frentes ordenadas pela ADR-0027 (seção 2); as
+    demais cinco (CI/CD, observabilidade, backup/restore, rate limiting
+    distribuído, E2E) permanecem candidatas a fases futuras, sem número
+    atribuído, cada uma exigindo sua própria SPEC dedicada antes de virar
+    fase numerada — o ADR-0027 continua sendo o guarda-chuva
+    arquitetural de todas elas. A próxima sub-frente recomendada após
+    esta é **CI/CD mínimo** (GitHub Actions), citada aqui apenas como
+    próximo candidato, sem número de fase.
+    Pré-requisito antes de qualquer código: nenhum adicional — ADR-0027
+    e SPEC-030 já estão, respectivamente, Aceita e Aprovada. O processo
+    obrigatório da Constituição (especificação → revisão → plano →
+    desenvolvimento → testes → revisão de segurança → documentação →
+    aprovação → commit) segue valendo a partir do plano técnico, que
+    ainda não foi elaborado por este saneamento.
+    Este saneamento formaliza apenas o registro em planejamento (este
+    arquivo e `docs/01-produto/BACKLOG.md`) e o metadado `Fase` do
+    cabeçalho de SPEC-030 (de "a formalizar" para "31"); não implementa
+    código, migration, banco ou testes executáveis, e não realiza commit.
+
+## Fechamento da Fase 31 (2026-09-16) — Segurança de Borda concluída
+
+A Fase 31 (Segurança de Borda) foi implementada e testada, reaproveitando
+integralmente ADR-0027/SPEC-030 sem alterar seu conteúdo normativo. **Zero
+migration** — mecanismo puramente de middleware HTTP, sem nova tabela ou
+coluna de domínio; a migration mais recente do projeto permanece
+`0033_phase_29_bootstrap_invitation.sql`, sem nenhuma alteração de schema.
+
+Entregue: `src/server/http/trusted-origins.ts` (fonte única de origens
+confiáveis, compartilhada por CORS e CSRF), `src/server/http/cors.ts`
+(delegate por requisição, sem wildcard, credentials computado por origem
+aprovada), `src/server/http/csrf.ts` (validação de Origin com fallback para
+Referer em toda mutação cookie-autenticada, rotas `/public/` isentas por
+RN-017), `src/server/http/security-headers.ts` (Helmet configurado
+explicitamente — CSP, HSTS, Permissions-Policy, X-Frame-Options — nunca com
+defaults aceitos às cegas). `src/server/app.ts` monta os três middlewares
+desta Fase antes de `express.json()`, usando `isProductionOrStagingEnv`
+(deliberadamente separado do contrato de cookie `Secure` da Fase 29) para
+que staging receba a mesma baseline de headers de produção. `src/server/
+index.ts` integra `TRUSTED_FRONTEND_ORIGINS` ao gate central de fail-fast
+da Fase 30 (`assertProductionConfig`), nunca um segundo mecanismo paralelo.
+
+Testes/gates executados e verdes: suíte dedicada `tests/phase31/` (7
+arquivos, 50 testes — config central integrado ao gate da Fase 30, CORS,
+CSRF, security headers/CSP/HSTS/Permissions-Policy, Cache-Control, trust
+proxy/X-Forwarded-For), regressão isolada de `tests/phase29/` (85),
+`tests/phase30/` (49), candidatura pública/Fase 17 (44), pré-entrevista/
+Fase 18 (63), avaliação comportamental/Fase 19 (47) e Core/Membership
+(`tests/phase1` + `tests/tenant.test.ts`, 34) — nenhuma quebra causada pela
+proteção CSRF cookie-based nos fluxos públicos/token-based; `tsc --noEmit`,
+`eslint` e `npm run build` limpos.
+
+**Residual explícito, não fechado por esta Fase:** o Express não serve o
+HTML do SPA (sem `express.static`/`sendFile` em nenhum ponto do backend) —
+a CSP implementada aqui protege exclusivamente respostas de `/api`; a
+política de segurança do documento HTML do frontend continuará dependendo
+inteiramente do hosting/edge que efetivamente o servir em staging/produção,
+decisão de topologia ainda em aberto (ADR-0027, seção 4).
+
+Demais residuais conhecidos, não bloqueantes: 3 vulnerabilidades moderadas
+pré-existentes na cadeia `express`/`body-parser`/`qs` (`npm audit
+--omit=dev`, correção de patch disponível, sem relação com esta Fase);
+limitação conhecida do harness Vitest em execuções monolíticas/combinadas
+longas (já documentada em `vitest.config.ts`), contornada nesta revalidação
+via execução isolada por suíte; schemas `test_phase_*` residuais
+acumulados no banco DEV, não removidos por decisão explícita de escopo;
+contrato de cookie `Secure` (Fase 29) permanece restrito a
+`APP_ENV=production`, fora do escopo normativo desta Fase.
+
+Convenção observada e preservada: o cabeçalho `**Status:**` do próprio
+documento SPEC-030 permanece `Aprovada` (não `Concluída`) mesmo após esta
+implementação — mesmo padrão já em vigor para SPEC-028 e SPEC-029. A
+reconciliação de status "implementada" fica restrita à tabela de
+`docs/01-produto/BACKLOG.md`.
+
+**Production Hardening geral permanece incompleto** — esta é apenas a
+segunda das sete sub-frentes ordenadas pela ADR-0027 (seção 2); as demais
+cinco (CI/CD, observabilidade, backup/restore, rate limiting distribuído,
+E2E) seguem candidatas a fases futuras, sem número atribuído, cada uma
+exigindo sua própria SPEC dedicada antes de virar fase numerada, mesmo
+padrão de gate já exigido para todas as capacidades anteriores deste
+roadmap. A próxima sub-frente recomendada pela ordem da ADR-0027 é
+**CI/CD mínimo** (GitHub Actions), citada aqui apenas como próximo
+candidato, sem formalizar número de fase nesta tarefa.

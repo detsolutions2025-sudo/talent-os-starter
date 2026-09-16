@@ -57,14 +57,29 @@ export function requireConfigValue(
 // - production: fail-fast completo (RN-001).
 //
 // Quando ha uma ou mais ausencias, todas sao coletadas antes de lancar um unico Error (RN-002/
-// CA-007), em ordem deterministica (a ordem de `REQUIRED_PRODUCTION_VARS`). A mensagem nomeia
-// apenas os NOMES das variaveis ausentes -- nunca um valor, nunca `process.env` serializado
-// (RN-005/INV-03/CA-008).
-export function assertProductionConfig(env: NodeJS.ProcessEnv = process.env): void {
+// CA-007), em ordem deterministica (a ordem de `REQUIRED_PRODUCTION_VARS`, seguida da ordem de
+// `additionalRequiredVars`). A mensagem nomeia apenas os NOMES das variaveis ausentes -- nunca um
+// valor, nunca `process.env` serializado (RN-005/INV-03/CA-008).
+//
+// `additionalRequiredVars` (Fase 31; ADR-0027 secao 17: "generalizar esse mesmo padrao para
+// todas as variaveis obrigatorias de producao [...] e quaisquer novas introduzidas pelo
+// hardening [...] em um UNICO ponto de validacao no boot"). Este e esse ponto unico -- fases
+// futuras que precisem de fail-fast de presenca em producao/staging estendem a MESMA chamada,
+// no MESMO `index.ts`, em vez de introduzir uma segunda autoridade de startup independente.
+// Default `[]` preserva byte a byte o comportamento e as mensagens de erro de todo chamador
+// existente (`REQUIRED_PRODUCTION_VARS` continua sendo o unico conjunto avaliado quando nenhuma
+// lista adicional e passada) -- nenhum teste de `tests/phase30/` precisa mudar. `config-
+// validation.ts` continua sem importar nada de nenhum modulo de dominio (cabecalho do arquivo):
+// o chamador (`index.ts`) e quem monta a lista de nomes, nunca este modulo.
+export function assertProductionConfig(
+  env: NodeJS.ProcessEnv = process.env,
+  additionalRequiredVars: readonly string[] = []
+): void {
   const appEnv = env.APP_ENV ?? "development";
   if (appEnv !== "production" && appEnv !== "staging") return;
 
-  const missing = REQUIRED_PRODUCTION_VARS.filter((name) => !env[name]?.trim());
+  const allRequiredVars = [...REQUIRED_PRODUCTION_VARS, ...additionalRequiredVars];
+  const missing = allRequiredVars.filter((name) => !env[name]?.trim());
 
   if (missing.length > 0) {
     throw new Error(`Missing required configuration for APP_ENV=${appEnv}: ${missing.join(", ")}`);
