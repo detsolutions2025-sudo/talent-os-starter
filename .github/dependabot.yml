@@ -1,0 +1,21 @@
+# FAST TRACK CI/CD + Observabilidade (ADR-0027 secao 21, "Dependabot (nativo do GitHub, zero
+# custo/operacao) para patch/minor automatico via PR; major continua manual/revisado -- nunca
+# merge automatico de breaking change"). `open-pull-requests-limit` baixo (evita ruido); major
+# ignorado explicitamente para toda dependencia -- Dependabot nunca propoe merge automatico de
+# breaking change, apenas abre o PR para revisao manual.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5

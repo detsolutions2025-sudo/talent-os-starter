@@ -37,6 +37,15 @@ import { createSupabaseAdminAdapter } from "./auth/supabase-admin-adapter";
 import { createPostgresAuthService, type AuthService } from "./auth/service";
 import { createActorProvider } from "./http/actor-provider";
 import { parseTrustedOrigins, TRUSTED_FRONTEND_ORIGINS_ENV_VAR } from "./http/trusted-origins";
+import { logger } from "./observability/logger";
+import { registerProcessResilienceHandlers } from "./observability/process-resilience";
+import { registerGracefulShutdown } from "./observability/graceful-shutdown";
+
+// FAST TRACK CI/CD + Observabilidade (ADR-0027 secao 19). Registrado o mais cedo possivel no
+// boot -- antes de qualquer inicializacao que possa falhar de forma assincrona -- para que
+// nenhuma janela do processo fique sem os handlers globais de `uncaughtException`/
+// `unhandledRejection`.
+registerProcessResilienceHandlers();
 
 const appEnv = process.env.APP_ENV ?? "development";
 
@@ -134,6 +143,20 @@ const supabaseAuthOrigin = process.env.VITE_SUPABASE_URL
   ? new URL(process.env.VITE_SUPABASE_URL).origin
   : undefined;
 
+// FAST TRACK CI/CD + Observabilidade (ADR-0027 secao 12). Unica dependencia critica de toda
+// requisicao de negocio verificada pela readiness -- Auth provider e AI provider ficam de fora
+// por design (ja opcionais/isolados por requisicao, ver ADR-0027 secao 12), nunca tornando um
+// provider opcional causa de downtime global. Nunca propaga o erro real ao chamador (so
+// verdadeiro/falso) -- detalhe de conexao nunca vaza pela rota HTTP.
+const checkDatabaseReady = async () => {
+  try {
+    await pool.query("SELECT 1");
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 const aiService = createPostgresAIService(
   pool,
   appEnv === "production"
@@ -190,9 +213,15 @@ const app = createServer(
   trustedFrontendOrigins,
   trustProxyConfig,
   supabaseAuthOrigin,
-  isProductionOrStagingEnv
+  isProductionOrStagingEnv,
+  checkDatabaseReady
 );
 
-app.listen(port, () => {
-  console.log(`Talent OS API listening on http://127.0.0.1:${port}`);
+const server = app.listen(port, () => {
+  logger.info({ port }, "Talent OS API listening");
 });
+
+// FAST TRACK CI/CD + Observabilidade (ADR-0027 secao 19). Pre-requisito para rolling restart
+// seguro: para de aceitar novas conexoes, aguarda requisicoes em voo, fecha o pool do Postgres
+// explicitamente, e so entao encerra.
+registerGracefulShutdown(server, pool);

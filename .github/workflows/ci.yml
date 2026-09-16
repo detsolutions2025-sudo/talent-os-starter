@@ -1,0 +1,115 @@
+# FAST TRACK CI/CD + Observabilidade (ADR-0027 secao 3, "CI/CD"). Provider: GitHub Actions,
+# justificado exclusivamente pela hospedagem atual do repositorio -- nenhuma decisao de vendor
+# nova. Gatilhos, checks obrigatorios e estrategia de banco em CI seguem exatamente o que a
+# ADR-0027 (secoes 3, 21 e 22) ja decidiu; nenhuma decisao nova de arquitetura foi tomada aqui.
+#
+# CD/deploy: DELIBERADAMENTE nao implementado nesta rodada -- nenhum hosting de producao foi
+# decidido ainda (ADR-0027 secao 4, "Hosting especifico: nao decidido nesta ADR"). CI verde e o
+# objetivo desta Fase; o job de deploy fica preparado apenas conceitualmente (ver comentario ao
+# final deste arquivo), nunca inventado sem ambiente real para publicar.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Evita duas execucoes concorrentes do mesmo ref (ADR-0027 secao 4, "deploys devem ser
+# serializados" -- mesmo principio aplicado aqui a CI): um novo push cancela a execucao anterior
+# ainda em andamento para o mesmo branch/PR.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: Typecheck, lint, format, migrations, tests, build, audit
+    runs-on: ubuntu-latest
+
+    # ADR-0027 secao 22 ("Test Database em CI"): PostgreSQL efemero em container, nativo do
+    # GitHub Actions, descartado ao fim do run -- NUNCA o Supabase DEV compartilhado. Credenciais
+    # abaixo sao locais a este container efemero (existe e morre dentro do proprio job), nunca um
+    # segredo real -- nao correspondem a nenhum ambiente de negocio.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      APP_ENV: test
+      # Ambas apontam para o Postgres efemero do proprio job (nunca para o Supabase DEV
+      # compartilhado) -- cobre tanto `TEST_DATABASE_URL` (usada preferencialmente pelo harness
+      # de teste, ver `tests/helpers/postgres-test-db.ts`) quanto `SUPABASE_DATABASE_URL`
+      # (fallback do mesmo harness e usada pelo passo de fresh-install de migrations abaixo).
+      SUPABASE_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+
+    steps:
+      # ADR-0027 secao 3 ("Seguranca do proprio pipeline"): Actions de terceiros fixadas por hash
+      # de commit (nunca tag mutavel). Hashes conferidos fisicamente contra a tag oficial mais
+      # recente de cada Action no momento desta implementacao (v4.4.0 de ambas).
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+          cache: npm
+
+      # Instalacao deterministica -- respeita exatamente o `package-lock.json` versionado, nunca
+      # resolve/atualiza faixas de versao (ao contrario de `npm install`).
+      - name: Install dependencies (npm ci)
+        run: npm ci
+
+      - name: Typecheck (tsc --noEmit)
+        run: npx tsc --noEmit -p tsconfig.json
+
+      - name: Lint (eslint)
+        run: npm run lint
+
+      - name: Format check (prettier --check)
+        run: npm run format
+
+      # ADR-0027 secoes 3/21: fresh install de `db/migrations/` (0001..N) validado contra o
+      # Postgres efemero deste job -- nunca contra o Supabase DEV compartilhado. Prova que a
+      # sequencia completa de migrations aplica sem erro a partir de um banco genuinamente vazio.
+      - name: Fresh-install migrations (0001..N) against ephemeral Postgres
+        run: npm run db:migrate:supabase
+
+      # ADR-0027 secao 22: cada arquivo de teste Postgres-dependente cria/aplica migrations no
+      # seu proprio schema temporario dentro deste mesmo Postgres efemero (nunca o de cima
+      # diretamente) e remove tudo ao final -- ver `tests/helpers/postgres-test-db.ts`.
+      - name: Run tests (vitest)
+        run: npm test
+
+      - name: Build (tsc --noEmit + vite build)
+        run: npm run build
+
+      # ADR-0027 secao 21: gate obrigatorio de CI -- apenas dependencias de producao (dev nunca
+      # bloqueia merge, mesmo padrao ja seguido manualmente em toda Fase anterior).
+      - name: Dependency audit (production only)
+        run: npm audit --omit=dev
+
+      - name: Diff sanity (no trailing whitespace / no missing newline at EOF)
+        run: git diff --check
+
+# ADR-0027 secao 3 ("Protecao de branch"): `main` deve exigir PR + CI verde + revisao humana --
+# esta e uma decisao CONCEITUAL da ADR, configurada em Settings > Branches do repositorio no
+# GitHub (fora do escopo de um arquivo de workflow), nao implementada por este commit.
+#
+# CD (deploy): fica para quando o hosting real for decidido (ADR-0027 secao 4). Quando isso
+# acontecer, a ordem ja decidida e: migrations -> deploy do backend -> `GET /api/ready` responder
+# OK -> deploy do frontend, com deploys sempre serializados (nunca dois simultaneos para o mesmo
+# ambiente).

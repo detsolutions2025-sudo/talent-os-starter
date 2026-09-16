@@ -532,3 +532,26 @@ padrão de gate já exigido para todas as capacidades anteriores deste
 roadmap. A próxima sub-frente recomendada pela ordem da ADR-0027 é
 **CI/CD mínimo** (GitHub Actions), citada aqui apenas como próximo
 candidato, sem formalizar número de fase nesta tarefa.
+
+## FAST TRACK — CI/CD mínimo + Observabilidade mínima (2026-09-16)
+
+Implementadas diretamente a partir das decisões ja tomadas pela ADR-0027
+(secoes 3, 10-12, 19, 21-22), sem SPEC dedicada nem numero de fase --
+bloco fast-track, revisao humana ainda pendente antes de qualquer
+fechamento formal. Entregue: `.github/workflows/ci.yml` (GitHub Actions --
+typecheck, lint, format, fresh-install de migrations contra um Postgres
+efemero de CI, testes, build, `npm audit --omit=dev`; Actions de terceiros
+pinadas por hash de commit; `concurrency` para nunca rodar dois workflows
+simultaneos do mesmo ref) e `.github/dependabot.yml`; modulo
+`src/server/observability/*` (logger estruturado via `pino`, com
+correlation/request ID e redacao explicita de segredos; handlers globais
+de `uncaughtException`/`unhandledRejection`; graceful shutdown em
+SIGTERM/SIGINT); `GET /api/ready` (readiness separada de liveness,
+verificando apenas Postgres, nunca expondo detalhe interno). CD/deploy
+permanece **deliberadamente nao implementado** -- nenhum hosting de
+producao foi decidido (ADR-0027 secao 4); CI verde e o objetivo desta
+rodada.
+
+**Production Hardening geral continua incompleto** -- restam
+Backup/Restore + DR, Rate limiting distribuido e E2E, cada uma ainda
+candidata a SPEC propria futura, sem numero de fase atribuido.

@@ -3,3 +3,31 @@ db/**/*.sql
 node_modules
 dist
 coverage
+
+# FAST TRACK CI/CD + Observabilidade (2026-09-16). Divida de formatacao PRE-EXISTENTE a este
+# bloco (documentacao historica de fases ja concluidas/fechadas, nunca tocada por este workflow)
+# -- carve-out explicito e registrado aqui, nunca uma reformatacao em massa desses arquivos.
+# `prettier --check .` (usado tanto localmente via `npm run format` quanto pelo gate de CI) so
+# deve falhar por regressao real em algo que este bloco de trabalho realmente toca; nao por um
+# historico documental que nenhuma tarefa recente alterou. Qualquer arquivo abaixo que for
+# editado no futuro deve ser removido desta lista e formatado normalmente naquele commit.
+docs/01-produto/JORNADA-DO-SISTEMA.md
+docs/02-requisitos/specs/SPEC-011-Candidatos.md
+docs/02-requisitos/specs/SPEC-012-Processo-Seletivo.md
+docs/02-requisitos/specs/SPEC-015-Propostas.md
+docs/02-requisitos/specs/SPEC-016-Onboarding.md
+docs/02-requisitos/specs/SPEC-017-Desenvolvimento-e-Retencao.md
+docs/02-requisitos/specs/SPEC-018-Blueprint-Organizacional-Implantacao-Guiada.md
+docs/02-requisitos/specs/SPEC-019-Portal-Publico-de-Vagas.md
+docs/02-requisitos/specs/SPEC-020-Candidatura-Publica.md
+docs/02-requisitos/specs/SPEC-021-Pre-Entrevista-Estruturada.md
+docs/02-requisitos/specs/SPEC-023-Pre-Analise-Assistida-por-IA.md
+docs/02-requisitos/specs/SPEC-024-Dossie-Inteligente-do-Candidato.md
+docs/02-requisitos/specs/SPEC-025-OrganizationPerson-e-Employment.md
+docs/02-requisitos/specs/SPEC-026-Offboarding.md
+docs/02-requisitos/specs/SPEC-027-Ciclo-de-Vida-de-Acesso.md
+docs/02-requisitos/specs/SPEC-029-Configuracao-e-Segredos-Fail-Fast.md
+docs/03-arquitetura/decisoes/0020-organization-como-unidade-autonoma.md
+docs/03-arquitetura/decisoes/0022-ciclo-de-vida-do-blueprint-organizacional.md
+docs/03-arquitetura/decisoes/0025-ciclo-de-vida-de-acesso-pos-contratacao.md
+docs/03-arquitetura/decisoes/0027-production-hardening.md
