@@ -1,16 +1,28 @@
 import { useEffect, useState } from "react";
+import { Alert } from "../../components/ui/Alert";
+import { Badge, type BadgeTone } from "../../components/ui/Badge";
+import { Button } from "../../components/ui/Button";
+import { Card, CardHeader } from "../../components/ui/Card";
+import { ConfigStatus } from "../../components/ui/ConfigStatus";
+import { EmptyState } from "../../components/ui/EmptyState";
+import { SectionHeader } from "../../components/ui/SectionHeader";
 
 // Fase 15 (SPEC-018) - Implantacao Guiada / Blueprint Organizacional.
 //
-// Esta e a primeira extracao de componente do cliente: uma decisao pontual para nao agravar
-// mais o crescimento de `src/client/App.tsx` (ja com milhares de linhas, seguindo o padrao
-// unico usado pelas 9 fases anteriores). Nao e uma refatoracao dos modulos ja existentes em
-// App.tsx -- eles continuam exatamente como estao; apenas o Blueprint, que comeca nesta fase,
-// vive em seu proprio arquivo.
+// Migrado para o Design System v1 na Wave 2 (visual apenas -- toda a logica interna, chamadas de
+// API e sequencia de operacoes permanecem identicas ao componente original).
 //
 // A tela mostra apenas leitura e a acao de ativacao (Owner); toda edicao de conteudo continua
 // acontecendo nos modulos reais ja existentes (DNA, Estrutura, Competencias, Cargos,
 // Perguntas, IA) -- nenhum editor duplicado e criado aqui (SPEC-018, RN-053).
+//
+// Investigacao desta Wave (src/server/blueprints/readiness.ts, linha 11): "Readiness e uma
+// funcao pura e deterministica ... Nunca usa IA (RN-024)". O unico uso de IA em
+// blueprints/service.ts e leitura de configuracao (listOrganizationFeatureSettings/
+// listProviderConfigs) para o manifesto versionado -- nenhum conteudo exibido aqui e gerado ou
+// sugerido por IA. Por isso este painel nao usa AiBadge: aplica-lo seria simular participacao de
+// IA que nao existe neste fluxo (Wave 2, item 9 -- "nunca representar resultado de IA como
+// configuracao confirmada" tambem cobre o inverso, nao inventar IA onde nao ha).
 
 type ReadinessCheck = {
   key: string;
@@ -55,6 +67,12 @@ const stepDestinations: Record<string, string> = {
   job_profile_published: "Publique ao menos um Cargo",
   owner_active: "Verifique o Owner da Organization",
   organization_active: "Verifique se a Organization esta ativa"
+};
+
+const readinessTone: Record<ReadinessResult["status"], BadgeTone> = {
+  ready: "success",
+  incomplete: "warning",
+  blocked: "danger"
 };
 
 export function BlueprintPanel({
@@ -149,104 +167,115 @@ export function BlueprintPanel({
   }
 
   return (
-    <div className="panel blueprint-panel" aria-label="Implantacao / Blueprint Organizacional">
-      <span>Implantacao / Blueprint Organizacional</span>
+    <div className="ds-feature">
+      <SectionHeader
+        title="Blueprint Organizacional"
+        description="Checklist de implantação — cada pendência aponta para o módulo real onde ela é resolvida. Nunca usa IA (readiness é uma função determinística)."
+      />
+
+      {message && <Alert tone="info">{message}</Alert>}
 
       {status?.progress && (
-        <p>
-          Progresso: {status.progress.completedSteps} de {status.progress.applicableSteps} etapas
-          concluidas
+        <p className="ds-blueprint-progress">
+          Progresso: <strong>{status.progress.completedSteps}</strong> de{" "}
+          {status.progress.applicableSteps} etapas concluídas
         </p>
       )}
 
       {readiness && (
-        <div className="blueprint-readiness">
-          <p>
-            Readiness: <strong>{readiness.status}</strong>
-          </p>
+        <Card>
+          <CardHeader
+            title="Readiness"
+            action={<Badge tone={readinessTone[readiness.status]}>{readiness.status}</Badge>}
+          />
+
           {readiness.pendingRequired.length > 0 && (
-            <div>
-              <span>Pendencias obrigatorias</span>
-              <ul>
+            <>
+              <p className="ds-blueprint-group-title">Pendências obrigatórias</p>
+              <ul className="ds-simple-list">
                 {readiness.pendingRequired.map((key) => (
                   <li key={key}>{stepDestinations[key] ?? key}</li>
                 ))}
               </ul>
-            </div>
+            </>
           )}
+
           {readiness.pendingOptional.length > 0 && (
-            <div>
-              <span>Recomendacoes (opcionais, nunca bloqueiam)</span>
-              <ul>
+            <>
+              <p className="ds-blueprint-group-title">Recomendações (opcionais, nunca bloqueiam)</p>
+              <ul className="ds-simple-list">
                 {readiness.pendingOptional.map((key) => (
                   <li key={key}>{stepDestinations[key] ?? key}</li>
                 ))}
               </ul>
-            </div>
+            </>
           )}
+
           {readiness.blockingReasons.length > 0 && (
-            <div>
-              <span>Bloqueios</span>
-              <ul>
+            <>
+              <p className="ds-blueprint-group-title">Bloqueios</p>
+              <ul className="ds-simple-list">
                 {readiness.blockingReasons.map((key) => (
                   <li key={key}>{key}</li>
                 ))}
               </ul>
-            </div>
+            </>
           )}
-        </div>
+        </Card>
       )}
 
-      <div className="panel">
-        <span>Draft atual</span>
+      <Card>
+        <CardHeader title="Draft atual" />
         {status?.draft ? (
-          <p>
-            Versao {status.draft.versionNumber} - {status.draft.status}
-          </p>
+          <ConfigStatus
+            label={`Versão ${status.draft.versionNumber}`}
+            tone="info"
+            meta={status.draft.status}
+          />
         ) : (
-          <p>Nenhum draft em construcao.</p>
+          <EmptyState title="Nenhum draft em construção" />
         )}
         {canActivate && status?.draft && (
-          <button type="button" onClick={activate} disabled={readiness?.status !== "ready"}>
-            Ativar Blueprint
-          </button>
+          <div className="ds-form-section__actions">
+            <Button onClick={activate} disabled={readiness?.status !== "ready"}>
+              Ativar Blueprint
+            </Button>
+          </div>
         )}
-      </div>
+      </Card>
 
-      <div className="panel">
-        <span>Versao ativa</span>
+      <Card>
+        <CardHeader title="Versão ativa" />
         {status?.active ? (
-          <p>
-            Versao {status.active.versionNumber} - ativada em {status.active.activatedAt}
-          </p>
+          <ConfigStatus
+            label={`Versão ${status.active.versionNumber}`}
+            tone="success"
+            meta={`ativada em ${status.active.activatedAt}`}
+          />
         ) : (
-          <p>Nenhuma versao ativa ainda.</p>
+          <EmptyState title="Nenhuma versão ativa ainda" />
         )}
         {canActivate && status?.active && !status.draft && (
-          <button type="button" onClick={createRevision}>
-            Iniciar nova revisao
-          </button>
+          <div className="ds-form-section__actions">
+            <Button variant="secondary" onClick={createRevision}>
+              Iniciar nova revisão
+            </Button>
+          </div>
         )}
-      </div>
+      </Card>
 
-      <div className="panel">
-        <span>Historico</span>
+      <Card>
+        <CardHeader title="Histórico" />
         {history.length === 0 ? (
-          <p>Nenhuma versao arquivada ainda.</p>
+          <EmptyState title="Nenhuma versão arquivada ainda" />
         ) : (
-          <ul>
+          <ul className="ds-simple-list">
             {history.map((version) => (
-              <li key={version.id}>Versao {version.versionNumber} - archived</li>
+              <li key={version.id}>Versão {version.versionNumber} — archived</li>
             ))}
           </ul>
         )}
-      </div>
-
-      {message && (
-        <div className="message" role="status">
-          {message}
-        </div>
-      )}
+      </Card>
     </div>
   );
 }

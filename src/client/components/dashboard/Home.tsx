@@ -52,10 +52,9 @@ const groupDescriptions: Record<string, string> = {
   configuracoes: "Membros, convites e ciclo de vida de acesso."
 };
 
-const aiModules = [
-  { anchorId: "panel-blueprint", label: "Blueprint Organizacional" },
-  { anchorId: "panel-pre-analysis", label: "Pré-Análise" }
-];
+// Blueprint nao entra aqui: investigacao da Wave 2 confirmou que seu readiness e
+// deterministico (nunca usa IA -- src/server/blueprints/readiness.ts, RN-024).
+const aiModules = [{ anchorId: "panel-pre-analysis", label: "Pré-Análise" }];
 
 export function Home({
   organization,

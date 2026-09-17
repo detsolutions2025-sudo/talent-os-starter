@@ -39,18 +39,42 @@ export type DataListItemProps = {
   status?: ReactNode;
   meta?: ReactNode;
   actions?: ReactNode;
+  onSelect?: () => void;
+  selected?: boolean;
 };
 
-export function DataListItem({ title, status, meta, actions }: DataListItemProps) {
-  return (
-    <div className="ds-data-list__row">
-      <div className="ds-data-list__main">
-        <div className="ds-data-list__title-row">
-          <strong className="ds-data-list__title">{title}</strong>
-          {status}
-        </div>
-        {meta && <div className="ds-data-list__meta">{meta}</div>}
+export function DataListItem({
+  title,
+  status,
+  meta,
+  actions,
+  onSelect,
+  selected
+}: DataListItemProps) {
+  const main = (
+    <div className="ds-data-list__main">
+      <div className="ds-data-list__title-row">
+        <strong className="ds-data-list__title">{title}</strong>
+        {status}
       </div>
+      {meta && <div className="ds-data-list__meta">{meta}</div>}
+    </div>
+  );
+
+  return (
+    <div className={`ds-data-list__row${selected ? " ds-data-list__row--selected" : ""}`}>
+      {onSelect ? (
+        <button
+          type="button"
+          className="ds-data-list__select"
+          aria-current={selected ? "true" : undefined}
+          onClick={onSelect}
+        >
+          {main}
+        </button>
+      ) : (
+        main
+      )}
       {actions && <div className="ds-data-list__actions">{actions}</div>}
     </div>
   );

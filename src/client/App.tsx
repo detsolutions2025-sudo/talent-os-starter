@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BlueprintPanel } from "./BlueprintPanel";
+import { BlueprintPanel } from "./features/blueprint/BlueprintPanel";
 import { PreInterviewPanel } from "./PreInterviewPanel";
 import { BehavioralInstrumentPanel } from "./BehavioralInstrumentPanel";
 import { BehavioralAssessmentPanel } from "./BehavioralAssessmentPanel";
@@ -23,6 +23,11 @@ import { JobsPanel } from "./features/jobs/JobsPanel";
 import { CandidatesPanel } from "./features/candidates/CandidatesPanel";
 import { SelectionPanel } from "./features/selection/SelectionPanel";
 import { InterviewsPanel } from "./features/interviews/InterviewsPanel";
+import { DnaPanel } from "./features/organizational-dna/DnaPanel";
+import { OrganizationStructurePanel } from "./features/organization-structure/OrganizationStructurePanel";
+import { CompetenciesPanel } from "./features/competencies/CompetenciesPanel";
+import { JobProfilesPanel } from "./features/job-profiles/JobProfilesPanel";
+import { QuestionBankPanel } from "./features/question-bank/QuestionBankPanel";
 import "./styles/tokens.css";
 import "./styles/primitives.css";
 import "./styles/shell.css";
@@ -48,7 +53,7 @@ export type Membership = {
   } | null;
 };
 
-type DnaValue = {
+export type DnaValue = {
   name: string;
   description: string;
   practicalMeaning: string;
@@ -56,14 +61,14 @@ type DnaValue = {
   incompatibleBehaviors: string[];
 };
 
-type DnaCompetency = {
+export type DnaCompetency = {
   name: string;
   description: string;
   importance: "low" | "medium" | "high" | "critical";
   examples: string[];
 };
 
-type DnaVersion = {
+export type DnaVersion = {
   id: string;
   versionNumber: number | null;
   status: "draft" | "published" | "archived";
@@ -78,7 +83,7 @@ type DnaVersion = {
   discardedAt: string | null;
 };
 
-type OrganizationalUnit = {
+export type OrganizationalUnit = {
   id: string;
   code: string;
   name: string;
@@ -102,7 +107,7 @@ type OrganizationalUnit = {
   children?: OrganizationalUnit[];
 };
 
-type OrganizationalUnitDraft = {
+export type OrganizationalUnitDraft = {
   code: string;
   name: string;
   type: OrganizationalUnit["type"];
@@ -113,7 +118,7 @@ type OrganizationalUnitDraft = {
   displayOrder: number;
 };
 
-type CompetencyCategory =
+export type CompetencyCategory =
   | "technical"
   | "behavioral"
   | "leadership"
@@ -124,7 +129,7 @@ type CompetencyCategory =
   | "safety"
   | "other";
 
-type GlobalCompetency = {
+export type GlobalCompetency = {
   id: string;
   code: string;
   name: string;
@@ -133,7 +138,7 @@ type GlobalCompetency = {
   status: "active" | "inactive" | "deprecated";
 };
 
-type OrganizationCompetency = {
+export type OrganizationCompetency = {
   id: string;
   code: string;
   name: string;
@@ -142,7 +147,7 @@ type OrganizationCompetency = {
   status: "active" | "inactive";
 };
 
-type UnifiedCatalogItem = {
+export type UnifiedCatalogItem = {
   competencyCatalogItemId: string;
   origin: "global" | "organization";
   code: string;
@@ -155,7 +160,7 @@ type UnifiedCatalogItem = {
   deprecated: boolean;
 };
 
-type QuestionCategory =
+export type QuestionCategory =
   | "general"
   | "technical"
   | "behavioral"
@@ -168,7 +173,7 @@ type QuestionCategory =
   | "screening"
   | "other";
 
-type QuestionType =
+export type QuestionType =
   | "open_text"
   | "long_text"
   | "single_choice"
@@ -181,7 +186,7 @@ type QuestionType =
   | "behavioral"
   | "technical";
 
-type GlobalQuestion = {
+export type GlobalQuestion = {
   id: string;
   code: string;
   title: string;
@@ -191,7 +196,7 @@ type GlobalQuestion = {
   status: "active" | "inactive" | "deprecated";
 };
 
-type OrganizationQuestion = {
+export type OrganizationQuestion = {
   id: string;
   code: string;
   title: string;
@@ -202,7 +207,7 @@ type OrganizationQuestion = {
   status: "active" | "inactive";
 };
 
-type UnifiedQuestionCatalogItem = {
+export type UnifiedQuestionCatalogItem = {
   questionCatalogItemId: string;
   origin: "global" | "organization";
   code: string;
@@ -217,7 +222,7 @@ type UnifiedQuestionCatalogItem = {
   competencyCatalogItemId: string | null;
 };
 
-type QuestionDraft = {
+export type QuestionDraft = {
   code: string;
   title: string;
   questionText: string;
@@ -226,21 +231,21 @@ type QuestionDraft = {
   competencyCatalogItemId: string;
 };
 
-type CompetencyDraft = {
+export type CompetencyDraft = {
   code: string;
   name: string;
   category: CompetencyCategory;
   definition: string;
 };
 
-type JobProfile = {
+export type JobProfile = {
   id: string;
   code: string;
   name: string;
   status: "active" | "inactive";
 };
 
-type JobProfileDraft = {
+export type JobProfileDraft = {
   code: string;
   name: string;
 };
@@ -491,46 +496,9 @@ const emptyInterviewDraft: InterviewDraft = {
 // applicationStatusOf/applicationStageOf/applicationCandidateName/interviewScheduledStart etc.
 // foram extraidos para src/client/features/{selection,interviews}/*-helpers.ts (Wave 1 da
 // migracao visual) -- usados apenas pelos paineis de Processo Seletivo e Entrevistas.
-
-const competencyCategories: CompetencyCategory[] = [
-  "technical",
-  "behavioral",
-  "leadership",
-  "management",
-  "tools",
-  "languages",
-  "compliance",
-  "safety",
-  "other"
-];
-
-const questionCategories: QuestionCategory[] = [
-  "general",
-  "technical",
-  "behavioral",
-  "situational",
-  "culture",
-  "leadership",
-  "management",
-  "compliance",
-  "safety",
-  "screening",
-  "other"
-];
-
-const questionTypes: QuestionType[] = [
-  "open_text",
-  "long_text",
-  "single_choice",
-  "multiple_choice",
-  "yes_no",
-  "numeric",
-  "scale",
-  "date",
-  "situational",
-  "behavioral",
-  "technical"
-];
+//
+// competencyCategories/questionCategories/questionTypes foram extraidos para
+// src/client/features/{competencies,question-bank}/*Panel.tsx (Wave 2) -- usados apenas la.
 
 // Fase 29 (ADR-0026 "Dev/test auth"; SPEC-028 s22/CA-029/CA-030). Fora de `import.meta.env.DEV`
 // (build de producao), estes dois objetos ficam vazios -- nenhuma das ~150 chamadas `fetch()`
@@ -2120,29 +2088,8 @@ export function App() {
       .catch((error: Error) => setMessage(error.message));
   }
 
-  function renderUnitNodes(units: OrganizationalUnit[]) {
-    if (!units.length) {
-      return <p>Nenhuma unidade carregada.</p>;
-    }
-
-    return (
-      <ul className="unit-tree">
-        {units
-          .filter((unit) => showInactiveUnits || unit.status === "active")
-          .map((unit) => (
-            <li key={unit.id}>
-              <button type="button" className="unit-row" onClick={() => selectUnit(unit)}>
-                <strong>{unit.name}</strong>
-                <small>
-                  {unit.code} - {unit.type} - {unit.status}
-                </small>
-              </button>
-              {unit.children && unit.children.length > 0 && renderUnitNodes(unit.children)}
-            </li>
-          ))}
-      </ul>
-    );
-  }
+  // renderUnitNodes foi substituido pelo componente recursivo
+  // src/client/features/organization-structure/UnitTree.tsx (Wave 2).
 
   return (
     <AppShell
@@ -2424,464 +2371,69 @@ export function App() {
           </div>
 
           {selectedOrganization && (
-            <div className="panel dna-panel" id="panel-dna">
-              <span>DNA Organizacional</span>
-              {publishedDna ? (
-                <div className="dna-summary">
-                  <strong>
-                    Publicado v{publishedDna.versionNumber} - {publishedDna.status}
-                  </strong>
-                  <p>{publishedDna.mission || "Sem missao informada."}</p>
-                </div>
-              ) : (
-                <p>Nenhuma versao publicada.</p>
-              )}
-
-              {canManageDna && !draftDna && (
-                <button type="button" onClick={createDnaDraft}>
-                  Criar rascunho
-                </button>
-              )}
-
-              {canManageDna && draftDna && (
-                <div className="dna-editor">
-                  <strong>Rascunho</strong>
-                  <input
-                    aria-label="Missao"
-                    placeholder="Missao"
-                    value={draftDna.mission}
-                    onChange={(event) => updateDraftField("mission", event.target.value)}
-                  />
-                  <input
-                    aria-label="Visao"
-                    placeholder="Visao"
-                    value={draftDna.vision}
-                    onChange={(event) => updateDraftField("vision", event.target.value)}
-                  />
-                  <input
-                    aria-label="Proposito"
-                    placeholder="Proposito"
-                    value={draftDna.purpose}
-                    onChange={(event) => updateDraftField("purpose", event.target.value)}
-                  />
-                  <input
-                    aria-label="Valor"
-                    placeholder="Valor"
-                    value={draftDna.values[0]?.name ?? ""}
-                    onChange={(event) => updateFirstValue("name", event.target.value)}
-                  />
-                  <input
-                    aria-label="Descricao do valor"
-                    placeholder="Descricao do valor"
-                    value={draftDna.values[0]?.description ?? ""}
-                    onChange={(event) => updateFirstValue("description", event.target.value)}
-                  />
-                  <input
-                    aria-label="Competencia"
-                    placeholder="Competencia"
-                    value={draftDna.competencies[0]?.name ?? ""}
-                    onChange={(event) => updateFirstCompetency("name", event.target.value)}
-                  />
-                  <input
-                    aria-label="Descricao da competencia"
-                    placeholder="Descricao da competencia"
-                    value={draftDna.competencies[0]?.description ?? ""}
-                    onChange={(event) => updateFirstCompetency("description", event.target.value)}
-                  />
-                  <select
-                    aria-label="Importancia"
-                    value={draftDna.competencies[0]?.importance ?? "medium"}
-                    onChange={(event) => updateFirstCompetency("importance", event.target.value)}
-                  >
-                    <option value="low">low</option>
-                    <option value="medium">medium</option>
-                    <option value="high">high</option>
-                    <option value="critical">critical</option>
-                  </select>
-                  <input
-                    aria-label="Cultura"
-                    placeholder="Cultura"
-                    value={draftDna.culture}
-                    onChange={(event) => updateDraftField("culture", event.target.value)}
-                  />
-                  <input
-                    aria-label="Lideranca"
-                    placeholder="Lideranca"
-                    value={draftDna.leadershipStyle}
-                    onChange={(event) => updateDraftField("leadershipStyle", event.target.value)}
-                  />
-                  <input
-                    aria-label="Ambiente"
-                    placeholder="Ambiente"
-                    value={draftDna.workEnvironment}
-                    onChange={(event) => updateDraftField("workEnvironment", event.target.value)}
-                  />
-                  <div className="member-actions">
-                    <button type="button" onClick={saveDnaDraft}>
-                      Salvar
-                    </button>
-                    {canPublishDna && (
-                      <button type="button" onClick={publishDnaDraft}>
-                        Publicar
-                      </button>
-                    )}
-                    <button type="button" onClick={discardDnaDraft}>
-                      Descartar
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {canManageDna && dnaHistory.length > 0 && (
-                <ul>
-                  {dnaHistory.map((version) => (
-                    <li key={version.id}>
-                      <strong>{version.status}</strong>
-                      <small>
-                        v{version.versionNumber ?? "-"} {version.discardedAt ? "- descartado" : ""}
-                      </small>
-                    </li>
-                  ))}
-                </ul>
-              )}
+            <div id="panel-dna">
+              <DnaPanel
+                canManage={canManageDna}
+                canPublish={canPublishDna}
+                publishedDna={publishedDna}
+                draftDna={draftDna}
+                history={dnaHistory}
+                onCreateDraft={createDnaDraft}
+                onUpdateField={updateDraftField}
+                onUpdateFirstValue={updateFirstValue}
+                onUpdateFirstCompetency={updateFirstCompetency}
+                onSave={saveDnaDraft}
+                onPublish={publishDnaDraft}
+                onDiscard={discardDnaDraft}
+              />
             </div>
           )}
 
           {selectedOrganization && (
-            <div className="panel org-units-panel" id="panel-org-units">
-              <span>Estrutura Organizacional</span>
-              <div className="unit-toolbar">
-                {canManageUnits && (
-                  <>
-                    <button type="button" onClick={() => resetUnitDraft("")}>
-                      Nova raiz
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => resetUnitDraft(selectedUnitId)}
-                      disabled={!selectedUnitId}
-                    >
-                      Nova filha
-                    </button>
-                  </>
-                )}
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={showInactiveUnits}
-                    onChange={(event) => setShowInactiveUnits(event.target.checked)}
-                  />
-                  Inativas
-                </label>
-              </div>
-
-              <div className="org-units-layout">
-                <div>{renderUnitNodes(unitTree)}</div>
-
-                {canManageUnits ? (
-                  <div className="unit-editor">
-                    <strong>{selectedUnitId ? "Editar unidade" : "Criar unidade"}</strong>
-                    <input
-                      aria-label="Codigo da unidade"
-                      placeholder="Codigo"
-                      value={unitDraft.code}
-                      disabled={Boolean(selectedUnitId) && !canChangeUnitCode}
-                      onChange={(event) => setUnitDraft({ ...unitDraft, code: event.target.value })}
-                    />
-                    <input
-                      aria-label="Nome da unidade"
-                      placeholder="Nome"
-                      value={unitDraft.name}
-                      onChange={(event) => setUnitDraft({ ...unitDraft, name: event.target.value })}
-                    />
-                    <select
-                      aria-label="Tipo da unidade"
-                      value={unitDraft.type}
-                      onChange={(event) =>
-                        setUnitDraft({
-                          ...unitDraft,
-                          type: event.target.value as OrganizationalUnit["type"]
-                        })
-                      }
-                    >
-                      <option value="board">board</option>
-                      <option value="directorate">directorate</option>
-                      <option value="department">department</option>
-                      <option value="division">division</option>
-                      <option value="branch">branch</option>
-                      <option value="office">office</option>
-                      <option value="team">team</option>
-                      <option value="squad">squad</option>
-                      <option value="unit">unit</option>
-                      <option value="other">other</option>
-                    </select>
-                    <select
-                      aria-label="Unidade pai"
-                      value={unitDraft.parentId}
-                      onChange={(event) =>
-                        setUnitDraft({ ...unitDraft, parentId: event.target.value })
-                      }
-                    >
-                      <option value="">Raiz</option>
-                      {activeUnits
-                        .filter((unit) => unit.id !== selectedUnitId)
-                        .map((unit) => (
-                          <option key={unit.id} value={unit.id}>
-                            {unit.code} - {unit.name}
-                          </option>
-                        ))}
-                    </select>
-                    <input
-                      aria-label="Gestor"
-                      placeholder="Gestor"
-                      value={unitDraft.managerName}
-                      onChange={(event) =>
-                        setUnitDraft({ ...unitDraft, managerName: event.target.value })
-                      }
-                    />
-                    <input
-                      aria-label="Email do gestor"
-                      placeholder="Email do gestor"
-                      value={unitDraft.managerEmail}
-                      onChange={(event) =>
-                        setUnitDraft({ ...unitDraft, managerEmail: event.target.value })
-                      }
-                    />
-                    <input
-                      aria-label="Descricao da unidade"
-                      placeholder="Descricao"
-                      value={unitDraft.description}
-                      onChange={(event) =>
-                        setUnitDraft({ ...unitDraft, description: event.target.value })
-                      }
-                    />
-                    <input
-                      aria-label="Ordem"
-                      type="number"
-                      min="0"
-                      value={unitDraft.displayOrder}
-                      onChange={(event) =>
-                        setUnitDraft({ ...unitDraft, displayOrder: Number(event.target.value) })
-                      }
-                    />
-                    <div className="member-actions">
-                      <button type="button" onClick={saveUnit}>
-                        Salvar
-                      </button>
-                      <button type="button" onClick={moveUnit} disabled={!selectedUnitId}>
-                        Mover
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => changeUnitStatus("inactivate")}
-                        disabled={!selectedUnitId}
-                      >
-                        Inativar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => changeUnitStatus("reactivate")}
-                        disabled={!selectedUnitId}
-                      >
-                        Reativar
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <p>Visualizacao limitada a unidades ativas.</p>
-                )}
-              </div>
+            <div id="panel-org-units">
+              <OrganizationStructurePanel
+                canManage={canManageUnits}
+                canChangeCode={canChangeUnitCode}
+                unitTree={unitTree}
+                activeUnits={activeUnits}
+                selectedUnitId={selectedUnitId}
+                unitDraft={unitDraft}
+                showInactive={showInactiveUnits}
+                onToggleShowInactive={setShowInactiveUnits}
+                onSelectUnit={selectUnit}
+                onNewUnit={resetUnitDraft}
+                onDraftChange={(patch) => setUnitDraft({ ...unitDraft, ...patch })}
+                onSave={saveUnit}
+                onMove={moveUnit}
+                onChangeStatus={changeUnitStatus}
+              />
             </div>
           )}
 
           {selectedOrganization && (
-            <div className="panel job-profiles-panel" id="panel-job-profiles">
-              <span>Cargos</span>
-              <div className="job-profile-layout">
-                <div>
-                  {canManageJobs && (
-                    <div className="job-profile-form">
-                      <input
-                        aria-label="Codigo do cargo"
-                        placeholder="Codigo"
-                        value={jobProfileDraft.code}
-                        onChange={(event) =>
-                          setJobProfileDraft({ ...jobProfileDraft, code: event.target.value })
-                        }
-                      />
-                      <input
-                        aria-label="Nome do cargo"
-                        placeholder="Nome"
-                        value={jobProfileDraft.name}
-                        onChange={(event) =>
-                          setJobProfileDraft({ ...jobProfileDraft, name: event.target.value })
-                        }
-                      />
-                      <button type="button" onClick={createJobProfile}>
-                        Criar cargo
-                      </button>
-                    </div>
-                  )}
-
-                  <ul className="competency-list">
-                    {[...jobProfiles, ...inactiveJobProfiles].map((profile) => (
-                      <li key={profile.id}>
-                        <button
-                          type="button"
-                          className="unit-row"
-                          onClick={() => {
-                            setSelectedJobProfileId(profile.id);
-                            loadSelectedJobProfile(profile.id);
-                          }}
-                        >
-                          <strong>{profile.name}</strong>
-                          <small>
-                            {profile.code} - {profile.status}
-                          </small>
-                        </button>
-                      </li>
-                    ))}
-                    {jobProfiles.length + inactiveJobProfiles.length === 0 && (
-                      <li>Nenhum cargo cadastrado.</li>
-                    )}
-                  </ul>
-                </div>
-
-                <div className="job-profile-editor">
-                  {publishedJobVersion ? (
-                    <div className="dna-summary">
-                      <strong>
-                        Publicado v{publishedJobVersion.versionNumber ?? "-"} -{" "}
-                        {publishedJobVersion.status}
-                      </strong>
-                      <p>{publishedJobVersion.summary || "Sem resumo informado."}</p>
-                      {publishedJobVersion.salaryRange && (
-                        <small>
-                          {publishedJobVersion.salaryRange.currency}{" "}
-                          {publishedJobVersion.salaryRange.min} -{" "}
-                          {publishedJobVersion.salaryRange.max}
-                        </small>
-                      )}
-                    </div>
-                  ) : (
-                    <p>Nenhuma versao publicada.</p>
-                  )}
-
-                  {canManageJobs && selectedJobProfileId && !jobDraftVersion && (
-                    <button type="button" onClick={createJobDraft}>
-                      Criar rascunho
-                    </button>
-                  )}
-
-                  {canManageJobs && jobDraftVersion && (
-                    <div className="job-profile-form">
-                      <strong>Rascunho</strong>
-                      <input
-                        aria-label="Titulo do cargo"
-                        placeholder="Titulo"
-                        value={jobDraftVersion.title}
-                        onChange={(event) => updateJobDraftField("title", event.target.value)}
-                      />
-                      <textarea
-                        aria-label="Missao do cargo"
-                        placeholder="Missao"
-                        value={jobDraftVersion.mission}
-                        onChange={(event) => updateJobDraftField("mission", event.target.value)}
-                      />
-                      <textarea
-                        aria-label="Resumo do cargo"
-                        placeholder="Resumo"
-                        value={jobDraftVersion.summary}
-                        onChange={(event) => updateJobDraftField("summary", event.target.value)}
-                      />
-                      <input
-                        aria-label="Responsabilidade principal"
-                        placeholder="Responsabilidade principal"
-                        value={jobDraftVersion.responsibilities[0]?.text ?? ""}
-                        onChange={(event) =>
-                          updateJobDraftField("responsibilities", [
-                            { text: event.target.value, displayOrder: 0 }
-                          ])
-                        }
-                      />
-                      <select
-                        aria-label="Modelo de trabalho"
-                        value={jobDraftVersion.workModel}
-                        onChange={(event) =>
-                          updateJobDraftField(
-                            "workModel",
-                            event.target.value as JobProfileVersion["workModel"]
-                          )
-                        }
-                      >
-                        <option value="onsite">onsite</option>
-                        <option value="hybrid">hybrid</option>
-                        <option value="remote">remote</option>
-                        <option value="flexible">flexible</option>
-                      </select>
-                      <div className="member-form">
-                        <input
-                          aria-label="Salario minimo"
-                          type="number"
-                          min="0"
-                          placeholder="Min"
-                          value={jobDraftVersion.salaryRange?.min ?? 0}
-                          onChange={(event) =>
-                            updateJobDraftField("salaryRange", {
-                              min: Number(event.target.value),
-                              max: jobDraftVersion.salaryRange?.max ?? 0,
-                              currency: jobDraftVersion.salaryRange?.currency ?? "BRL",
-                              periodicity: jobDraftVersion.salaryRange?.periodicity ?? "monthly"
-                            })
-                          }
-                        />
-                        <input
-                          aria-label="Salario maximo"
-                          type="number"
-                          min="0"
-                          placeholder="Max"
-                          value={jobDraftVersion.salaryRange?.max ?? 0}
-                          onChange={(event) =>
-                            updateJobDraftField("salaryRange", {
-                              min: jobDraftVersion.salaryRange?.min ?? 0,
-                              max: Number(event.target.value),
-                              currency: jobDraftVersion.salaryRange?.currency ?? "BRL",
-                              periodicity: jobDraftVersion.salaryRange?.periodicity ?? "monthly"
-                            })
-                          }
-                        />
-                      </div>
-                      <div className="member-actions">
-                        <button type="button" onClick={saveJobDraft}>
-                          Salvar
-                        </button>
-                        {canPublishJobs && (
-                          <button type="button" onClick={publishJobDraft}>
-                            Publicar
-                          </button>
-                        )}
-                        <button type="button" onClick={discardJobDraft}>
-                          Descartar
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {canManageJobs && jobProfileHistory.length > 0 && (
-                    <ul className="competency-list">
-                      {jobProfileHistory.map((version) => (
-                        <li key={version.id}>
-                          <strong>{version.status}</strong>
-                          <small>
-                            v{version.versionNumber ?? "-"}{" "}
-                            {version.discardedAt ? "- descartado" : ""}
-                          </small>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </div>
+            <div id="panel-job-profiles">
+              <JobProfilesPanel
+                canManage={canManageJobs}
+                canPublish={canPublishJobs}
+                jobProfiles={jobProfiles}
+                inactiveJobProfiles={inactiveJobProfiles}
+                selectedJobProfileId={selectedJobProfileId}
+                onSelectJobProfile={(id) => {
+                  setSelectedJobProfileId(id);
+                  loadSelectedJobProfile(id);
+                }}
+                draft={jobProfileDraft}
+                onDraftChange={(patch) => setJobProfileDraft({ ...jobProfileDraft, ...patch })}
+                onCreate={createJobProfile}
+                publishedJobVersion={publishedJobVersion}
+                jobDraftVersion={jobDraftVersion}
+                jobProfileHistory={jobProfileHistory}
+                onCreateDraft={createJobDraft}
+                onUpdateDraftField={updateJobDraftField}
+                onSaveDraft={saveJobDraft}
+                onPublishDraft={publishJobDraft}
+                onDiscardDraft={discardJobDraft}
+              />
             </div>
           )}
 
@@ -2951,414 +2503,50 @@ export function App() {
           )}
 
           {selectedOrganization && (
-            <div className="panel competencies-panel" id="panel-competencies">
-              <span>Catalogo de Competencias</span>
-              <div className="unit-toolbar">
-                <button type="button" onClick={() => setCompetencyTab("catalog")}>
-                  Catalogo Utilizado
-                </button>
-                <button type="button" onClick={() => setCompetencyTab("organization")}>
-                  Competencias da Empresa
-                </button>
-                <button type="button" onClick={() => setCompetencyTab("global")}>
-                  Biblioteca Global
-                </button>
-              </div>
-
-              {competencyTab === "catalog" && (
-                <ul className="competency-list">
-                  {catalogItems.map((item) => (
-                    <li key={item.competencyCatalogItemId}>
-                      <strong>{item.name}</strong>
-                      <small>
-                        {item.code} - {item.category} - {item.origin}
-                        {item.deprecated ? " - deprecated" : ""}
-                      </small>
-                      <code>{item.competencyCatalogItemId}</code>
-                    </li>
-                  ))}
-                  {catalogItems.length === 0 && <li>Nenhuma competencia disponivel.</li>}
-                </ul>
-              )}
-
-              {competencyTab === "organization" && (
-                <div className="competency-layout">
-                  {canManageCompetencies ? (
-                    <div className="competency-form">
-                      <input
-                        aria-label="Codigo da competencia"
-                        placeholder="Codigo"
-                        value={organizationCompetencyDraft.code}
-                        onChange={(event) =>
-                          setOrganizationCompetencyDraft({
-                            ...organizationCompetencyDraft,
-                            code: event.target.value
-                          })
-                        }
-                      />
-                      <input
-                        aria-label="Nome da competencia"
-                        placeholder="Nome"
-                        value={organizationCompetencyDraft.name}
-                        onChange={(event) =>
-                          setOrganizationCompetencyDraft({
-                            ...organizationCompetencyDraft,
-                            name: event.target.value
-                          })
-                        }
-                      />
-                      <select
-                        aria-label="Categoria da competencia"
-                        value={organizationCompetencyDraft.category}
-                        onChange={(event) =>
-                          setOrganizationCompetencyDraft({
-                            ...organizationCompetencyDraft,
-                            category: event.target.value as CompetencyCategory
-                          })
-                        }
-                      >
-                        {competencyCategories.map((category) => (
-                          <option key={category} value={category}>
-                            {category}
-                          </option>
-                        ))}
-                      </select>
-                      <textarea
-                        aria-label="Definicao da competencia"
-                        placeholder="Definicao"
-                        value={organizationCompetencyDraft.definition}
-                        onChange={(event) =>
-                          setOrganizationCompetencyDraft({
-                            ...organizationCompetencyDraft,
-                            definition: event.target.value
-                          })
-                        }
-                      />
-                      <button type="button" onClick={createOrganizationCompetency}>
-                        Criar competencia
-                      </button>
-                    </div>
-                  ) : (
-                    <p>Visualizacao limitada ao catalogo utilizado.</p>
-                  )}
-
-                  <ul className="competency-list">
-                    {organizationCompetencies.map((competency) => (
-                      <li key={competency.id}>
-                        <strong>{competency.name}</strong>
-                        <small>
-                          {competency.code} - {competency.category} - {competency.status}
-                        </small>
-                        {canManageCompetencies && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              changeOrganizationCompetencyStatus(
-                                competency.id,
-                                competency.status === "active" ? "inactivate" : "activate"
-                              )
-                            }
-                          >
-                            {competency.status === "active" ? "Inativar" : "Ativar"}
-                          </button>
-                        )}
-                      </li>
-                    ))}
-                    {organizationCompetencies.length === 0 && <li>Nenhuma competencia propria.</li>}
-                  </ul>
-                </div>
-              )}
-
-              {competencyTab === "global" && (
-                <div className="competency-layout">
-                  <div className="competency-form">
-                    <input
-                      aria-label="Codigo global"
-                      placeholder="Codigo global"
-                      value={globalCompetencyDraft.code}
-                      onChange={(event) =>
-                        setGlobalCompetencyDraft({
-                          ...globalCompetencyDraft,
-                          code: event.target.value
-                        })
-                      }
-                    />
-                    <input
-                      aria-label="Nome global"
-                      placeholder="Nome global"
-                      value={globalCompetencyDraft.name}
-                      onChange={(event) =>
-                        setGlobalCompetencyDraft({
-                          ...globalCompetencyDraft,
-                          name: event.target.value
-                        })
-                      }
-                    />
-                    <select
-                      aria-label="Categoria global"
-                      value={globalCompetencyDraft.category}
-                      onChange={(event) =>
-                        setGlobalCompetencyDraft({
-                          ...globalCompetencyDraft,
-                          category: event.target.value as CompetencyCategory
-                        })
-                      }
-                    >
-                      {competencyCategories.map((category) => (
-                        <option key={category} value={category}>
-                          {category}
-                        </option>
-                      ))}
-                    </select>
-                    <textarea
-                      aria-label="Definicao global"
-                      placeholder="Definicao"
-                      value={globalCompetencyDraft.definition}
-                      onChange={(event) =>
-                        setGlobalCompetencyDraft({
-                          ...globalCompetencyDraft,
-                          definition: event.target.value
-                        })
-                      }
-                    />
-                    <button type="button" onClick={createGlobalCompetency}>
-                      Criar global
-                    </button>
-                  </div>
-
-                  <ul className="competency-list">
-                    {globalCompetencies.map((competency) => (
-                      <li key={competency.id}>
-                        <strong>{competency.name}</strong>
-                        <small>
-                          {competency.code} - {competency.category} - {competency.status}
-                        </small>
-                      </li>
-                    ))}
-                    {globalCompetencies.length === 0 && <li>Nenhuma global carregada.</li>}
-                  </ul>
-
-                  {canManageCompetencies && (
-                    <ul className="competency-list">
-                      {availableGlobalCompetencies.map((competency) => (
-                        <li key={competency.id}>
-                          <strong>{competency.name}</strong>
-                          <small>
-                            {competency.code} - {competency.category}
-                          </small>
-                          <button
-                            type="button"
-                            onClick={() => adoptGlobalCompetency(competency.id)}
-                          >
-                            Adotar
-                          </button>
-                        </li>
-                      ))}
-                      {availableGlobalCompetencies.length === 0 && (
-                        <li>Nenhuma global disponivel para adocao.</li>
-                      )}
-                    </ul>
-                  )}
-                </div>
-              )}
+            <div id="panel-competencies">
+              <CompetenciesPanel
+                canManage={canManageCompetencies}
+                activeTab={competencyTab}
+                onTabChange={setCompetencyTab}
+                catalogItems={catalogItems}
+                organizationCompetencies={organizationCompetencies}
+                organizationDraft={organizationCompetencyDraft}
+                onOrganizationDraftChange={(patch) =>
+                  setOrganizationCompetencyDraft({ ...organizationCompetencyDraft, ...patch })
+                }
+                onCreateOrganization={createOrganizationCompetency}
+                onChangeOrganizationStatus={changeOrganizationCompetencyStatus}
+                globalCompetencies={globalCompetencies}
+                availableGlobalCompetencies={availableGlobalCompetencies}
+                globalDraft={globalCompetencyDraft}
+                onGlobalDraftChange={(patch) =>
+                  setGlobalCompetencyDraft({ ...globalCompetencyDraft, ...patch })
+                }
+                onCreateGlobal={createGlobalCompetency}
+                onAdoptGlobal={adoptGlobalCompetency}
+              />
             </div>
           )}
 
           {selectedOrganization && (
-            <div className="panel competencies-panel" id="panel-questions">
-              <span>Banco de Perguntas</span>
-              <div className="unit-toolbar">
-                <button type="button" onClick={() => setQuestionTab("catalog")}>
-                  Catalogo Utilizado
-                </button>
-                {canManageQuestions && (
-                  <>
-                    <button type="button" onClick={() => setQuestionTab("organization")}>
-                      Perguntas da Empresa
-                    </button>
-                    <button type="button" onClick={() => setQuestionTab("global")}>
-                      Biblioteca Global
-                    </button>
-                  </>
-                )}
-              </div>
-
-              {questionTab === "catalog" && (
-                <ul className="competency-list">
-                  {questionCatalogItems.map((item) => (
-                    <li key={item.questionCatalogItemId}>
-                      <strong>{item.title}</strong>
-                      <small>
-                        {item.code} - {item.type} - {item.category} - {item.origin}
-                        {item.deprecated ? " - deprecated" : ""}
-                      </small>
-                      <code>{item.questionCatalogItemId}</code>
-                    </li>
-                  ))}
-                  {questionCatalogItems.length === 0 && <li>Nenhuma pergunta disponivel.</li>}
-                </ul>
-              )}
-
-              {questionTab === "organization" && (
-                <div className="competency-layout">
-                  {canManageQuestions ? (
-                    <div className="competency-form">
-                      <input
-                        aria-label="Codigo da pergunta"
-                        placeholder="Codigo"
-                        value={organizationQuestionDraft.code}
-                        onChange={(event) =>
-                          setOrganizationQuestionDraft({
-                            ...organizationQuestionDraft,
-                            code: event.target.value
-                          })
-                        }
-                      />
-                      <input
-                        aria-label="Titulo da pergunta"
-                        placeholder="Titulo"
-                        value={organizationQuestionDraft.title}
-                        onChange={(event) =>
-                          setOrganizationQuestionDraft({
-                            ...organizationQuestionDraft,
-                            title: event.target.value
-                          })
-                        }
-                      />
-                      <textarea
-                        aria-label="Texto da pergunta"
-                        placeholder="Texto da pergunta"
-                        value={organizationQuestionDraft.questionText}
-                        onChange={(event) =>
-                          setOrganizationQuestionDraft({
-                            ...organizationQuestionDraft,
-                            questionText: event.target.value
-                          })
-                        }
-                      />
-                      <select
-                        aria-label="Tipo da pergunta"
-                        value={organizationQuestionDraft.type}
-                        onChange={(event) =>
-                          setOrganizationQuestionDraft({
-                            ...organizationQuestionDraft,
-                            type: event.target.value as QuestionType
-                          })
-                        }
-                      >
-                        {questionTypes.map((type) => (
-                          <option key={type} value={type}>
-                            {type}
-                          </option>
-                        ))}
-                      </select>
-                      <select
-                        aria-label="Categoria da pergunta"
-                        value={organizationQuestionDraft.category}
-                        onChange={(event) =>
-                          setOrganizationQuestionDraft({
-                            ...organizationQuestionDraft,
-                            category: event.target.value as QuestionCategory
-                          })
-                        }
-                      >
-                        {questionCategories.map((category) => (
-                          <option key={category} value={category}>
-                            {category}
-                          </option>
-                        ))}
-                      </select>
-                      <select
-                        aria-label="Competencia associada"
-                        value={organizationQuestionDraft.competencyCatalogItemId}
-                        onChange={(event) =>
-                          setOrganizationQuestionDraft({
-                            ...organizationQuestionDraft,
-                            competencyCatalogItemId: event.target.value
-                          })
-                        }
-                      >
-                        <option value="">Sem competencia</option>
-                        {catalogItems.map((item) => (
-                          <option
-                            key={item.competencyCatalogItemId}
-                            value={item.competencyCatalogItemId}
-                          >
-                            {item.name}
-                          </option>
-                        ))}
-                      </select>
-                      <button type="button" onClick={createOrganizationQuestion}>
-                        Criar pergunta
-                      </button>
-                    </div>
-                  ) : (
-                    <p>Visualizacao limitada ao catalogo utilizado.</p>
-                  )}
-
-                  <ul className="competency-list">
-                    {organizationQuestions.map((question) => (
-                      <li key={question.id}>
-                        <strong>{question.title}</strong>
-                        <small>
-                          {question.code} - {question.type} - {question.category} -{" "}
-                          {question.status}
-                        </small>
-                        {canManageQuestions && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              changeOrganizationQuestionStatus(
-                                question.id,
-                                question.status === "active" ? "inactivate" : "activate"
-                              )
-                            }
-                          >
-                            {question.status === "active" ? "Inativar" : "Ativar"}
-                          </button>
-                        )}
-                      </li>
-                    ))}
-                    {organizationQuestions.length === 0 && <li>Nenhuma pergunta propria.</li>}
-                  </ul>
-                </div>
-              )}
-
-              {questionTab === "global" && (
-                <div className="competency-layout">
-                  <ul className="competency-list">
-                    {globalQuestions.map((question) => (
-                      <li key={question.id}>
-                        <strong>{question.title}</strong>
-                        <small>
-                          {question.code} - {question.type} - {question.category} -{" "}
-                          {question.status}
-                        </small>
-                      </li>
-                    ))}
-                    {globalQuestions.length === 0 && <li>Nenhuma pergunta global carregada.</li>}
-                  </ul>
-
-                  {canManageQuestions && (
-                    <ul className="competency-list">
-                      {availableGlobalQuestions.map((question) => (
-                        <li key={question.id}>
-                          <strong>{question.title}</strong>
-                          <small>
-                            {question.code} - {question.type} - {question.category}
-                          </small>
-                          <button type="button" onClick={() => adoptGlobalQuestion(question.id)}>
-                            Adotar
-                          </button>
-                        </li>
-                      ))}
-                      {availableGlobalQuestions.length === 0 && (
-                        <li>Nenhuma pergunta global disponivel para adocao.</li>
-                      )}
-                    </ul>
-                  )}
-                </div>
-              )}
+            <div id="panel-questions">
+              <QuestionBankPanel
+                canManage={canManageQuestions}
+                activeTab={questionTab}
+                onTabChange={setQuestionTab}
+                questionCatalogItems={questionCatalogItems}
+                competencyCatalogItems={catalogItems}
+                organizationQuestions={organizationQuestions}
+                organizationDraft={organizationQuestionDraft}
+                onOrganizationDraftChange={(patch) =>
+                  setOrganizationQuestionDraft({ ...organizationQuestionDraft, ...patch })
+                }
+                onCreateOrganization={createOrganizationQuestion}
+                onChangeOrganizationStatus={changeOrganizationQuestionStatus}
+                globalQuestions={globalQuestions}
+                availableGlobalQuestions={availableGlobalQuestions}
+                onAdoptGlobal={adoptGlobalQuestion}
+              />
             </div>
           )}
         </section>

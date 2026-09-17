@@ -35,4 +35,8 @@ export { FormSection } from "./FormSection";
 export type { FormSectionProps } from "./FormSection";
 export { DataList, DataListItem } from "./DataList";
 export type { DataListProps, DataListItemProps } from "./DataList";
+export { ConfigStatus } from "./ConfigStatus";
+export type { ConfigStatusProps } from "./ConfigStatus";
+export { Tabs } from "./Tabs";
+export type { TabsProps, TabItem } from "./Tabs";
 export * from "./icons";

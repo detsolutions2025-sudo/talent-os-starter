@@ -594,3 +594,19 @@ Componentes novos nascidos do uso real: `SectionHeader`, `FormSection`,
 `DataList`/`DataListItem`. Processo Seletivo ganhou um pipeline visual por
 etapas (sem drag-and-drop). Nenhuma dependencia nova, nenhuma mudanca de
 backend/API/contrato. Demais modulos permanecem com o visual legado.
+
+## Design System — Migracao Visual Wave 2 (2026-09-17)
+
+Migrados: **DNA Organizacional**, **Estrutura Organizacional**,
+**Competencias**, **Cargos**, **Banco de Perguntas** e **Blueprint
+Organizacional**, extraidos para
+`src/client/features/{organizational-dna,organization-structure,
+competencies,job-profiles,question-bank,blueprint}/`. Componentes novos:
+`ConfigStatus` (resumo de versao publicada/rascunho, 3 usos reais) e
+`Tabs` (2 usos reais). Estrutura Organizacional ganhou `UnitTree`
+(hierarquia recursiva, sem drag-and-drop). Blueprint foi relocado e
+restilizado sem tocar sua logica interna; a investigacao desta Wave
+confirmou que seu readiness nunca usa IA (`src/server/blueprints/
+readiness.ts`, RN-024) -- a marcacao `ai: true` herdada da Wave 0 foi
+corrigida (removida do nav e do Home). Nenhuma dependencia nova, nenhuma
+mudanca de backend/API/contrato/migration.

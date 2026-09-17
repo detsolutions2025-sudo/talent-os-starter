@@ -1,7 +1,13 @@
 // Mapa de navegacao do Design System v1. Cada item aponta para um id de ancora que ja existe
 // no espaco de trabalho (App.tsx) -- nenhum destes destinos e inventado; todos correspondem a
-// paineis/funcionalidades reais ja implementados. `ai: true` marca modulos que de fato acionam
-// o AI Gateway no backend (ver src/server/blueprints e src/server/pre-analyses).
+// paineis/funcionalidades reais ja implementados. `ai: true` marca modulos que de fato geram ou
+// sugerem conteudo via AI Gateway para revisao humana (ver src/server/pre-analyses).
+//
+// Blueprint (src/server/blueprints) NAO leva `ai: true` -- correcao feita na Wave 2 apos
+// investigar o codigo-fonte: readiness.ts declara explicitamente "Nunca usa IA (RN-024)"; o
+// unico uso de IA em blueprints/service.ts e leitura de configuracao (feature settings/provider
+// configs) para o manifesto versionado, nao geracao de conteudo. A marcacao anterior (Wave 0)
+// era imprecisa.
 
 export type NavItem = {
   id: string;
@@ -52,7 +58,7 @@ export const NAV_GROUPS: NavGroup[] = [
     id: "organizacao",
     label: "Organização",
     items: [
-      { id: "panel-blueprint", label: "Blueprint Organizacional", ai: true },
+      { id: "panel-blueprint", label: "Blueprint Organizacional" },
       { id: "panel-dna", label: "DNA Organizacional" },
       { id: "panel-org-units", label: "Estrutura Organizacional" },
       { id: "panel-competencies", label: "Catálogo de Competências" }
