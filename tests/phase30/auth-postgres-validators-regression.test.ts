@@ -102,9 +102,29 @@ describe("assertSupabaseAuthConfiguredForProduction (Fase 29, contrato preservad
 
 describe("requirePostgresDatabaseUrl (Fase 1.1, contrato preservado)", () => {
   it("continua exigindo presenca", () => {
-    expect(() => requirePostgresDatabaseUrl(undefined)).toThrow(
-      "SUPABASE_DATABASE_URL is required for PostgreSQL operations."
-    );
+    // CORRECAO (achado fisico do primeiro run real de CI): este teste prova o default real do
+    // parametro (`value = process.env.SUPABASE_DATABASE_URL`), entao precisa controlar
+    // explicitamente a ausencia da variavel -- nunca presumir que ela esta ausente por acidente
+    // de qual arquivo rodou antes na mesma suite serial (`fileParallelism:false`). Varios outros
+    // arquivos de teste desta suite (ex. tests/phase17, tests/phase15) importam
+    // `tests/helpers/postgres-test-db.ts`, que carrega `.env` via `dotenv/config` -- uma vez
+    // carregado nesse worker, `process.env.SUPABASE_DATABASE_URL` fica populado para o resto da
+    // execucao. Mesmo padrao de controle explicito ja usado por
+    // `tests/phase30/bootstrap-smoke.test.ts` (`buildEnv` deleta as variaveis, nunca presume
+    // ausencia).
+    const original = process.env.SUPABASE_DATABASE_URL;
+    delete process.env.SUPABASE_DATABASE_URL;
+    try {
+      expect(() => requirePostgresDatabaseUrl(undefined)).toThrow(
+        "SUPABASE_DATABASE_URL is required for PostgreSQL operations."
+      );
+    } finally {
+      if (original === undefined) {
+        delete process.env.SUPABASE_DATABASE_URL;
+      } else {
+        process.env.SUPABASE_DATABASE_URL = original;
+      }
+    }
   });
 
   it("continua validando formato PostgreSQL (rejeita valor nao-URL)", () => {

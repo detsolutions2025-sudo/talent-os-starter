@@ -48,16 +48,17 @@ jobs:
 
     env:
       APP_ENV: test
-      # Aponta para o Postgres efemero do proprio job (nunca para o Supabase DEV compartilhado).
-      # `TEST_DATABASE_URL` e a variavel PREFERIDA pelo harness de teste
-      # (`tests/helpers/postgres-test-db.ts`: `TEST_DATABASE_URL ?? requirePostgresDatabaseUrl()`)
-      # -- estando presente, `SUPABASE_DATABASE_URL` nunca chega a ser lida pela suite de testes.
-      # CORRECAO (achado fisico do primeiro run real de CI): `SUPABASE_DATABASE_URL` NAO e
-      # definida aqui no nivel do job -- `tests/phase30/auth-postgres-validators-regression.test.ts`
-      # prova exatamente que `requirePostgresDatabaseUrl(undefined)` lanca quando a variavel esta
-      # ausente do ambiente; definir essa variavel globalmente quebraria esse teste pre-existente.
-      # E setada apenas no passo de fresh-install de migrations abaixo, que dela precisa
-      # diretamente (nunca via `TEST_DATABASE_URL`).
+      # Ambas apontam para o Postgres efemero do proprio job (nunca para o Supabase DEV
+      # compartilhado). `TEST_DATABASE_URL` e a variavel PREFERIDA pelo harness de teste
+      # (`tests/helpers/postgres-test-db.ts`: `TEST_DATABASE_URL ?? requirePostgresDatabaseUrl()`),
+      # mas alguns arquivos de teste (ex. tests/phase17, tests/phase15) chamam
+      # `requirePostgresDatabaseUrl()` diretamente, sem passar por esse fallback -- precisam de
+      # `SUPABASE_DATABASE_URL` presente tambem. CORRECAO (achado fisico do primeiro run real de
+      # CI): `tests/phase30/auth-postgres-validators-regression.test.ts` foi corrigido para
+      # controlar explicitamente a ausencia desta variavel no unico teste que precisa dela ausente
+      # (nunca mais presumindo isso de um acidente de ordem de execucao) -- entao definir esta
+      # variavel aqui no nivel do job volta a ser seguro para toda a suite.
+      SUPABASE_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
       TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
 
     steps:
@@ -92,8 +93,6 @@ jobs:
       # sequencia completa de migrations aplica sem erro a partir de um banco genuinamente vazio.
       - name: Fresh-install migrations (0001..N) against ephemeral Postgres
         run: npm run db:migrate:supabase
-        env:
-          SUPABASE_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
 
       # ADR-0027 secao 22: cada arquivo de teste Postgres-dependente cria/aplica migrations no
       # seu proprio schema temporario dentro deste mesmo Postgres efemero (nunca o de cima
