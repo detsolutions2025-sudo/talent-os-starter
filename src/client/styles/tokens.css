@@ -1,0 +1,97 @@
+/*
+ * Design System v1 -- tokens semanticos (DoF / Gente & Selecao).
+ * Fundacao unica de cores, tipografia, espacamento, bordas, sombras e layout.
+ * Novos componentes devem consumir estas variaveis em vez de valores fixos.
+ */
+
+:root {
+  /* Cores -- superficie e texto */
+  --color-background: #f6f7f9;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f1f3f6;
+  --color-text: #101828;
+  --color-text-muted: #5c6474;
+  --color-text-subtle: #8a90a0;
+  --color-border: #e3e6ec;
+  --color-border-strong: #c8ccd6;
+
+  /* Cores -- funcional (azul) */
+  --color-primary: #2951e6;
+  --color-primary-hover: #1f3fc2;
+  --color-primary-active: #17339e;
+  --color-primary-subtle: #ebf0ff;
+  --color-primary-contrast: #ffffff;
+
+  /* Cores -- estado */
+  --color-success: #1a7f4e;
+  --color-success-subtle: #e6f6ee;
+  --color-warning: #92620a;
+  --color-warning-subtle: #fdf3dd;
+  --color-danger: #c22a3e;
+  --color-danger-subtle: #fbe9ec;
+  --color-info: #2951e6;
+  --color-info-subtle: #ebf0ff;
+
+  /* Cores -- IA (linguagem visual assistida) */
+  --color-ai: #6d3fc0;
+  --color-ai-subtle: #f2ecfb;
+
+  /* Tipografia */
+  --font-family-base:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.8125rem;
+  --font-size-md: 0.9375rem;
+  --font-size-lg: 1.0625rem;
+  --font-size-xl: 1.3125rem;
+  --font-size-2xl: 1.625rem;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --line-height-tight: 1.25;
+  --line-height-base: 1.5;
+
+  /* Espacamento */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Bordas */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-full: 999px;
+
+  /* Sombras */
+  --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --shadow-sm: 0 1px 3px rgba(16, 24, 40, 0.08), 0 1px 2px rgba(16, 24, 40, 0.04);
+  --shadow-md: 0 4px 12px rgba(16, 24, 40, 0.08), 0 2px 4px rgba(16, 24, 40, 0.04);
+  --shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.12);
+
+  /* Layout */
+  --layout-sidebar-width: 260px;
+  --layout-sidebar-width-collapsed: 0px;
+  --layout-topbar-height: 60px;
+  --layout-content-max-width: 1280px;
+
+  /* Breakpoints (referencia -- usados em @media, documentados aqui para consistencia) */
+  --breakpoint-mobile: 599px;
+  --breakpoint-tablet: 900px;
+  --breakpoint-desktop: 1200px;
+
+  /* Foco acessivel */
+  --focus-ring-color: #2951e6;
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+
+  /* Transicoes */
+  --transition-fast: 120ms ease;
+  --transition-base: 200ms ease;
+}

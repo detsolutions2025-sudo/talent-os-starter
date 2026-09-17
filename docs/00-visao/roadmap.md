@@ -555,3 +555,30 @@ rodada.
 **Production Hardening geral continua incompleto** -- restam
 Backup/Restore + DR, Rate limiting distribuido e E2E, cada uma ainda
 candidata a SPEC propria futura, sem numero de fase atribuido.
+
+## FAST TRACK — Design System v1 + App Shell (2026-09-17)
+
+Primeiro bloco visual do Design System (sem SPEC/ADR dedicada -- decisao
+de UI/UX reversivel, nao arquitetural). Entregue: fundacao de tokens
+semanticos (`src/client/styles/tokens.css`); 16 primitivas reutilizaveis
+em `src/client/components/ui/*` (Button, IconButton, Input, Textarea,
+Select, Checkbox, Badge, AiBadge, Card, Divider, Spinner, Skeleton,
+EmptyState, ErrorState, Alert, PageHeader) com icones proprios (sem nova
+dependencia); App Shell (`src/client/components/layout/AppShell.tsx`) com
+Sidebar e Topbar (`src/client/components/navigation/*`) refletindo os
+modulos reais existentes (`nav-config.ts`, 23 itens em 5 grupos); Home
+(`src/client/components/dashboard/Home.tsx`) como tela inicial, com
+indicadores reais (nunca fabricados) e badge de "Assistido por IA"
+aplicado apenas aos dois modulos que de fato acionam o AI Gateway
+(Blueprint e Pre-Analise). Navegacao implementada como estado local +
+ancoras (sem `react-router`, mesma decisao ja registrada em `main.tsx`
+para as rotas publicas) -- todas as 16+ telas legadas continuam
+renderizando dentro do novo shell, com o visual anterior intacto.
+
+**Escopo deliberadamente nao coberto nesta rodada:** redesenho visual das
+telas legadas (permanecem com o CSS antigo, apenas envolvidas pelo shell)
+e dos formularios publicos; scroll-spy automatico da Sidebar (o item ativo
+reflete o ultimo clique, nao a posicao de rolagem); decomposicao mais
+profunda de `App.tsx` (permanece como um unico componente grande, apenas
+com a renderizacao do shell/Home extraida). Nenhuma mudanca de backend,
+autenticacao, multi-tenancy, RBAC ou migration.

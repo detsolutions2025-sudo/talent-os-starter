@@ -12,6 +12,17 @@ import { OffboardingPanel } from "./OffboardingPanel";
 import { AccessGrantPanel } from "./AccessGrantPanel";
 import { InvitationPanel } from "./InvitationPanel";
 import { ProposalPanel } from "./ProposalPanel";
+import { AppShell } from "./components/layout/AppShell";
+import { Sidebar } from "./components/navigation/Sidebar";
+import { Topbar } from "./components/navigation/Topbar";
+import { NAV_GROUPS } from "./components/navigation/nav-config";
+import { Home } from "./components/dashboard/Home";
+import { Alert } from "./components/ui/Alert";
+import { PageHeader } from "./components/ui/PageHeader";
+import "./styles/tokens.css";
+import "./styles/primitives.css";
+import "./styles/shell.css";
+import "./styles/dashboard.css";
 import "./styles.css";
 
 type Organization = {
@@ -626,6 +637,22 @@ export function App() {
   const [organizationQuestionDraft, setOrganizationQuestionDraft] =
     useState<QuestionDraft>(emptyQuestionDraft);
   const [message, setMessage] = useState("Nenhuma Organization selecionada.");
+  const [activeSection, setActiveSection] = useState<"overview" | "workspace">("overview");
+  const [activeAnchorId, setActiveAnchorId] = useState<string | null>(null);
+
+  function navigateToAnchor(anchorId: string) {
+    setActiveSection("workspace");
+    setActiveAnchorId(anchorId);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const element = document.getElementById(anchorId);
+        if (element && typeof element.scrollIntoView === "function") {
+          element.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      });
+    });
+  }
+
   const currentMembership = memberships.find(
     (membership) => membership.userId === currentDevUserId && membership.status === "active"
   );
@@ -2150,1431 +2177,1576 @@ export function App() {
   }
 
   return (
-    <main className="app-shell">
-      <section className="intro" aria-labelledby="page-title">
-        <p className="eyebrow">Fase 3</p>
-        <h1 id="page-title">DoF — Gente & Seleção</h1>
-        <p className="lead">
-          Nucleo multiempresa, DNA Organizacional e Estrutura Organizacional com autorizacao no
-          servidor.
-        </p>
-        <p className="eyebrow">por DocFounder</p>
-      </section>
+    <AppShell
+      sidebar={
+        <Sidebar
+          groups={NAV_GROUPS}
+          activeSection={activeSection}
+          activeAnchorId={activeAnchorId}
+          onSelectOverview={() => setActiveSection("overview")}
+          onSelectAnchor={navigateToAnchor}
+        />
+      }
+      topbar={
+        <Topbar
+          title={activeSection === "overview" ? "Visão Geral" : "Espaço de Trabalho"}
+          organizations={organizations}
+          selectedOrganizationId={selectedOrganizationId}
+          onSelectOrganization={selectOrganization}
+          currentUserId={currentDevUserId}
+          currentRole={currentMembership?.role}
+        />
+      }
+    >
+      <Alert tone="info">{message}</Alert>
 
-      <section className="workspace" aria-label="Nucleo multiempresa">
-        <div className="panel">
-          <span>Usuario temporario</span>
-          <strong>{currentDevUserId}</strong>
-          <p>Identificacao exclusiva para desenvolvimento e testes.</p>
-        </div>
+      {activeSection === "overview" ? (
+        <Home
+          organization={selectedOrganization}
+          organizationsCount={organizations.length}
+          stats={{
+            membershipsCount: memberships.length,
+            jobOpeningsCount: jobOpenings.length,
+            candidatesCount: candidates.length,
+            applicationsCount: candidateApplications.length,
+            interviewsCount: interviews.length
+          }}
+          dnaStatus={{
+            published: Boolean(publishedDna),
+            versionNumber: publishedDna?.versionNumber ?? undefined
+          }}
+          currentRole={currentMembership?.role}
+          groups={NAV_GROUPS}
+          onNavigate={navigateToAnchor}
+        />
+      ) : (
+        <section className="workspace" aria-label="Espaço de trabalho">
+          <PageHeader
+            title="Espaço de Trabalho"
+            description="Telas legadas dos módulos existentes -- ainda com visual anterior ao Design System v1."
+          />
 
-        <label className="field">
-          <span>Organization atual</span>
-          <select
-            value={selectedOrganizationId}
-            onChange={(event) => selectOrganization(event.target.value)}
-          >
-            <option value="">Selecione</option>
-            {organizations.map((organization) => (
-              <option key={organization.id} value={organization.id}>
-                {organization.name}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <div className="message" role="status">
-          {message}
-        </div>
-
-        {selectedOrganization && (
           <div className="panel">
-            <span>Organization</span>
-            <strong>{selectedOrganization.name}</strong>
-            <p>
-              {selectedOrganization.slug} - {selectedOrganization.status}
-            </p>
+            <span>Usuario temporario</span>
+            <strong>{currentDevUserId}</strong>
+            <p>Identificacao exclusiva para desenvolvimento e testes.</p>
           </div>
-        )}
 
-        {selectedOrganization && (
-          <BlueprintPanel
-            organizationId={selectedOrganization.id}
-            role={currentMembership?.role}
-            headers={devHeaders}
-          />
-        )}
-
-        {selectedOrganization && (
-          <PreInterviewPanel
-            organizationId={selectedOrganization.id}
-            role={currentMembership?.role}
-            headers={devHeaders}
-          />
-        )}
-
-        {selectedOrganization && (
-          <BehavioralInstrumentPanel
-            organizationId={selectedOrganization.id}
-            role={currentMembership?.role}
-            headers={devHeaders}
-          />
-        )}
-
-        {selectedOrganization && (
-          <BehavioralAssessmentPanel
-            organizationId={selectedOrganization.id}
-            role={currentMembership?.role}
-            headers={devHeaders}
-          />
-        )}
-
-        {selectedOrganization && (
-          <PreAnalysisPanel
-            organizationId={selectedOrganization.id}
-            role={currentMembership?.role}
-            headers={devHeaders}
-          />
-        )}
-
-        {selectedOrganization && (
-          <CandidateDossierPanel
-            organizationId={selectedOrganization.id}
-            role={currentMembership?.role}
-            headers={devHeaders}
-          />
-        )}
-
-        {selectedOrganization && (
-          <ProposalPanel
-            organizationId={selectedOrganization.id}
-            role={currentMembership?.role}
-            headers={devHeaders}
-            applications={candidateApplications}
-          />
-        )}
-
-        {selectedOrganization && (
-          <OnboardingPanel
-            organizationId={selectedOrganization.id}
-            role={currentMembership?.role}
-            headers={devHeaders}
-            applications={candidateApplications}
-            memberships={memberships}
-          />
-        )}
-
-        {selectedOrganization && (
-          <EmploymentPanel
-            organizationId={selectedOrganization.id}
-            role={currentMembership?.role}
-            headers={devHeaders}
-            applications={candidateApplications}
-          />
-        )}
-
-        {selectedOrganization && (
-          <DevelopmentRetentionPanel
-            organizationId={selectedOrganization.id}
-            role={currentMembership?.role}
-            headers={devHeaders}
-          />
-        )}
-
-        {selectedOrganization && (
-          <OffboardingPanel
-            organizationId={selectedOrganization.id}
-            role={currentMembership?.role}
-            headers={devHeaders}
-            memberships={memberships}
-          />
-        )}
-
-        {selectedOrganization && (
-          <AccessGrantPanel
-            organizationId={selectedOrganization.id}
-            role={currentMembership?.role}
-            headers={devHeaders}
-            memberships={memberships}
-          />
-        )}
-
-        {selectedOrganization && (
-          <InvitationPanel
-            organizationId={selectedOrganization.id}
-            role={currentMembership?.role}
-            headers={devHeaders}
-          />
-        )}
-
-        <div className="panel members">
-          <span>Memberships</span>
-          {canManageMemberships && (
-            <div className="member-form">
-              <input
-                aria-label="User ID"
-                placeholder="User ID"
-                value={newMemberUserId}
-                onChange={(event) => setNewMemberUserId(event.target.value)}
-              />
-              <select
-                aria-label="Role"
-                value={newMemberRole}
-                onChange={(event) => setNewMemberRole(event.target.value as Membership["role"])}
-              >
-                <option value="member">member</option>
-                {canManageOwners && <option value="admin">admin</option>}
-                {canManageOwners && <option value="owner">owner</option>}
-              </select>
-              <button type="button" onClick={addMember}>
-                Adicionar
-              </button>
+          {selectedOrganization && (
+            <div className="panel">
+              <span>Organization</span>
+              <strong>{selectedOrganization.name}</strong>
+              <p>
+                {selectedOrganization.slug} - {selectedOrganization.status}
+              </p>
             </div>
           )}
-          {memberships.length === 0 ? (
-            <p>Nenhum membro carregado.</p>
-          ) : (
-            <ul>
-              {memberships.map((membership) => (
-                <li key={membership.id}>
-                  <strong>{membership.user?.name ?? "Usuario"}</strong>
-                  <small>
-                    {membership.role} - {membership.status}
-                  </small>
-                  {(canManageOwners ||
-                    (currentMembership?.role === "admin" && membership.role === "member")) && (
-                    <div className="member-actions">
-                      {canManageOwners && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => updateMembership(membership.id, { role: "member" })}
-                          >
-                            member
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => updateMembership(membership.id, { role: "admin" })}
-                          >
-                            admin
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => updateMembership(membership.id, { role: "owner" })}
-                          >
-                            owner
-                          </button>
-                        </>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() =>
-                          updateMembership(membership.id, {
-                            status: membership.status === "active" ? "inactive" : "active"
-                          })
-                        }
-                      >
-                        {membership.status === "active" ? "desativar" : "ativar"}
-                      </button>
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
+
+          {selectedOrganization && (
+            <div id="panel-blueprint">
+              <BlueprintPanel
+                organizationId={selectedOrganization.id}
+                role={currentMembership?.role}
+                headers={devHeaders}
+              />
+            </div>
           )}
-        </div>
 
-        {selectedOrganization && (
-          <div className="panel dna-panel">
-            <span>DNA Organizacional</span>
-            {publishedDna ? (
-              <div className="dna-summary">
-                <strong>
-                  Publicado v{publishedDna.versionNumber} - {publishedDna.status}
-                </strong>
-                <p>{publishedDna.mission || "Sem missao informada."}</p>
-              </div>
-            ) : (
-              <p>Nenhuma versao publicada.</p>
-            )}
+          {selectedOrganization && (
+            <div id="panel-preinterview">
+              <PreInterviewPanel
+                organizationId={selectedOrganization.id}
+                role={currentMembership?.role}
+                headers={devHeaders}
+              />
+            </div>
+          )}
 
-            {canManageDna && !draftDna && (
-              <button type="button" onClick={createDnaDraft}>
-                Criar rascunho
-              </button>
-            )}
+          {selectedOrganization && (
+            <div id="panel-behavioral-instrument">
+              <BehavioralInstrumentPanel
+                organizationId={selectedOrganization.id}
+                role={currentMembership?.role}
+                headers={devHeaders}
+              />
+            </div>
+          )}
 
-            {canManageDna && draftDna && (
-              <div className="dna-editor">
-                <strong>Rascunho</strong>
+          {selectedOrganization && (
+            <div id="panel-behavioral-assessment">
+              <BehavioralAssessmentPanel
+                organizationId={selectedOrganization.id}
+                role={currentMembership?.role}
+                headers={devHeaders}
+              />
+            </div>
+          )}
+
+          {selectedOrganization && (
+            <div id="panel-pre-analysis">
+              <PreAnalysisPanel
+                organizationId={selectedOrganization.id}
+                role={currentMembership?.role}
+                headers={devHeaders}
+              />
+            </div>
+          )}
+
+          {selectedOrganization && (
+            <div id="panel-candidate-dossier">
+              <CandidateDossierPanel
+                organizationId={selectedOrganization.id}
+                role={currentMembership?.role}
+                headers={devHeaders}
+              />
+            </div>
+          )}
+
+          {selectedOrganization && (
+            <div id="panel-proposal">
+              <ProposalPanel
+                organizationId={selectedOrganization.id}
+                role={currentMembership?.role}
+                headers={devHeaders}
+                applications={candidateApplications}
+              />
+            </div>
+          )}
+
+          {selectedOrganization && (
+            <div id="panel-onboarding">
+              <OnboardingPanel
+                organizationId={selectedOrganization.id}
+                role={currentMembership?.role}
+                headers={devHeaders}
+                applications={candidateApplications}
+                memberships={memberships}
+              />
+            </div>
+          )}
+
+          {selectedOrganization && (
+            <div id="panel-employment">
+              <EmploymentPanel
+                organizationId={selectedOrganization.id}
+                role={currentMembership?.role}
+                headers={devHeaders}
+                applications={candidateApplications}
+              />
+            </div>
+          )}
+
+          {selectedOrganization && (
+            <div id="panel-development-retention">
+              <DevelopmentRetentionPanel
+                organizationId={selectedOrganization.id}
+                role={currentMembership?.role}
+                headers={devHeaders}
+              />
+            </div>
+          )}
+
+          {selectedOrganization && (
+            <div id="panel-offboarding">
+              <OffboardingPanel
+                organizationId={selectedOrganization.id}
+                role={currentMembership?.role}
+                headers={devHeaders}
+                memberships={memberships}
+              />
+            </div>
+          )}
+
+          {selectedOrganization && (
+            <div id="panel-access-grant">
+              <AccessGrantPanel
+                organizationId={selectedOrganization.id}
+                role={currentMembership?.role}
+                headers={devHeaders}
+                memberships={memberships}
+              />
+            </div>
+          )}
+
+          {selectedOrganization && (
+            <div id="panel-invitation">
+              <InvitationPanel
+                organizationId={selectedOrganization.id}
+                role={currentMembership?.role}
+                headers={devHeaders}
+              />
+            </div>
+          )}
+
+          <div className="panel members" id="panel-memberships">
+            <span>Memberships</span>
+            {canManageMemberships && (
+              <div className="member-form">
                 <input
-                  aria-label="Missao"
-                  placeholder="Missao"
-                  value={draftDna.mission}
-                  onChange={(event) => updateDraftField("mission", event.target.value)}
-                />
-                <input
-                  aria-label="Visao"
-                  placeholder="Visao"
-                  value={draftDna.vision}
-                  onChange={(event) => updateDraftField("vision", event.target.value)}
-                />
-                <input
-                  aria-label="Proposito"
-                  placeholder="Proposito"
-                  value={draftDna.purpose}
-                  onChange={(event) => updateDraftField("purpose", event.target.value)}
-                />
-                <input
-                  aria-label="Valor"
-                  placeholder="Valor"
-                  value={draftDna.values[0]?.name ?? ""}
-                  onChange={(event) => updateFirstValue("name", event.target.value)}
-                />
-                <input
-                  aria-label="Descricao do valor"
-                  placeholder="Descricao do valor"
-                  value={draftDna.values[0]?.description ?? ""}
-                  onChange={(event) => updateFirstValue("description", event.target.value)}
-                />
-                <input
-                  aria-label="Competencia"
-                  placeholder="Competencia"
-                  value={draftDna.competencies[0]?.name ?? ""}
-                  onChange={(event) => updateFirstCompetency("name", event.target.value)}
-                />
-                <input
-                  aria-label="Descricao da competencia"
-                  placeholder="Descricao da competencia"
-                  value={draftDna.competencies[0]?.description ?? ""}
-                  onChange={(event) => updateFirstCompetency("description", event.target.value)}
+                  aria-label="User ID"
+                  placeholder="User ID"
+                  value={newMemberUserId}
+                  onChange={(event) => setNewMemberUserId(event.target.value)}
                 />
                 <select
-                  aria-label="Importancia"
-                  value={draftDna.competencies[0]?.importance ?? "medium"}
-                  onChange={(event) => updateFirstCompetency("importance", event.target.value)}
+                  aria-label="Role"
+                  value={newMemberRole}
+                  onChange={(event) => setNewMemberRole(event.target.value as Membership["role"])}
                 >
-                  <option value="low">low</option>
-                  <option value="medium">medium</option>
-                  <option value="high">high</option>
-                  <option value="critical">critical</option>
+                  <option value="member">member</option>
+                  {canManageOwners && <option value="admin">admin</option>}
+                  {canManageOwners && <option value="owner">owner</option>}
                 </select>
-                <input
-                  aria-label="Cultura"
-                  placeholder="Cultura"
-                  value={draftDna.culture}
-                  onChange={(event) => updateDraftField("culture", event.target.value)}
-                />
-                <input
-                  aria-label="Lideranca"
-                  placeholder="Lideranca"
-                  value={draftDna.leadershipStyle}
-                  onChange={(event) => updateDraftField("leadershipStyle", event.target.value)}
-                />
-                <input
-                  aria-label="Ambiente"
-                  placeholder="Ambiente"
-                  value={draftDna.workEnvironment}
-                  onChange={(event) => updateDraftField("workEnvironment", event.target.value)}
-                />
-                <div className="member-actions">
-                  <button type="button" onClick={saveDnaDraft}>
-                    Salvar
-                  </button>
-                  {canPublishDna && (
-                    <button type="button" onClick={publishDnaDraft}>
-                      Publicar
-                    </button>
-                  )}
-                  <button type="button" onClick={discardDnaDraft}>
-                    Descartar
-                  </button>
-                </div>
+                <button type="button" onClick={addMember}>
+                  Adicionar
+                </button>
               </div>
             )}
-
-            {canManageDna && dnaHistory.length > 0 && (
+            {memberships.length === 0 ? (
+              <p>Nenhum membro carregado.</p>
+            ) : (
               <ul>
-                {dnaHistory.map((version) => (
-                  <li key={version.id}>
-                    <strong>{version.status}</strong>
+                {memberships.map((membership) => (
+                  <li key={membership.id}>
+                    <strong>{membership.user?.name ?? "Usuario"}</strong>
                     <small>
-                      v{version.versionNumber ?? "-"} {version.discardedAt ? "- descartado" : ""}
+                      {membership.role} - {membership.status}
                     </small>
+                    {(canManageOwners ||
+                      (currentMembership?.role === "admin" && membership.role === "member")) && (
+                      <div className="member-actions">
+                        {canManageOwners && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => updateMembership(membership.id, { role: "member" })}
+                            >
+                              member
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => updateMembership(membership.id, { role: "admin" })}
+                            >
+                              admin
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => updateMembership(membership.id, { role: "owner" })}
+                            >
+                              owner
+                            </button>
+                          </>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateMembership(membership.id, {
+                              status: membership.status === "active" ? "inactive" : "active"
+                            })
+                          }
+                        >
+                          {membership.status === "active" ? "desativar" : "ativar"}
+                        </button>
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>
             )}
           </div>
-        )}
 
-        {selectedOrganization && (
-          <div className="panel org-units-panel">
-            <span>Estrutura Organizacional</span>
-            <div className="unit-toolbar">
-              {canManageUnits && (
-                <>
-                  <button type="button" onClick={() => resetUnitDraft("")}>
-                    Nova raiz
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => resetUnitDraft(selectedUnitId)}
-                    disabled={!selectedUnitId}
-                  >
-                    Nova filha
-                  </button>
-                </>
+          {selectedOrganization && (
+            <div className="panel dna-panel" id="panel-dna">
+              <span>DNA Organizacional</span>
+              {publishedDna ? (
+                <div className="dna-summary">
+                  <strong>
+                    Publicado v{publishedDna.versionNumber} - {publishedDna.status}
+                  </strong>
+                  <p>{publishedDna.mission || "Sem missao informada."}</p>
+                </div>
+              ) : (
+                <p>Nenhuma versao publicada.</p>
               )}
-              <label>
-                <input
-                  type="checkbox"
-                  checked={showInactiveUnits}
-                  onChange={(event) => setShowInactiveUnits(event.target.checked)}
-                />
-                Inativas
-              </label>
-            </div>
 
-            <div className="org-units-layout">
-              <div>{renderUnitNodes(unitTree)}</div>
+              {canManageDna && !draftDna && (
+                <button type="button" onClick={createDnaDraft}>
+                  Criar rascunho
+                </button>
+              )}
 
-              {canManageUnits ? (
-                <div className="unit-editor">
-                  <strong>{selectedUnitId ? "Editar unidade" : "Criar unidade"}</strong>
+              {canManageDna && draftDna && (
+                <div className="dna-editor">
+                  <strong>Rascunho</strong>
                   <input
-                    aria-label="Codigo da unidade"
-                    placeholder="Codigo"
-                    value={unitDraft.code}
-                    disabled={Boolean(selectedUnitId) && !canChangeUnitCode}
-                    onChange={(event) => setUnitDraft({ ...unitDraft, code: event.target.value })}
+                    aria-label="Missao"
+                    placeholder="Missao"
+                    value={draftDna.mission}
+                    onChange={(event) => updateDraftField("mission", event.target.value)}
                   />
                   <input
-                    aria-label="Nome da unidade"
-                    placeholder="Nome"
-                    value={unitDraft.name}
-                    onChange={(event) => setUnitDraft({ ...unitDraft, name: event.target.value })}
+                    aria-label="Visao"
+                    placeholder="Visao"
+                    value={draftDna.vision}
+                    onChange={(event) => updateDraftField("vision", event.target.value)}
+                  />
+                  <input
+                    aria-label="Proposito"
+                    placeholder="Proposito"
+                    value={draftDna.purpose}
+                    onChange={(event) => updateDraftField("purpose", event.target.value)}
+                  />
+                  <input
+                    aria-label="Valor"
+                    placeholder="Valor"
+                    value={draftDna.values[0]?.name ?? ""}
+                    onChange={(event) => updateFirstValue("name", event.target.value)}
+                  />
+                  <input
+                    aria-label="Descricao do valor"
+                    placeholder="Descricao do valor"
+                    value={draftDna.values[0]?.description ?? ""}
+                    onChange={(event) => updateFirstValue("description", event.target.value)}
+                  />
+                  <input
+                    aria-label="Competencia"
+                    placeholder="Competencia"
+                    value={draftDna.competencies[0]?.name ?? ""}
+                    onChange={(event) => updateFirstCompetency("name", event.target.value)}
+                  />
+                  <input
+                    aria-label="Descricao da competencia"
+                    placeholder="Descricao da competencia"
+                    value={draftDna.competencies[0]?.description ?? ""}
+                    onChange={(event) => updateFirstCompetency("description", event.target.value)}
                   />
                   <select
-                    aria-label="Tipo da unidade"
-                    value={unitDraft.type}
-                    onChange={(event) =>
-                      setUnitDraft({
-                        ...unitDraft,
-                        type: event.target.value as OrganizationalUnit["type"]
-                      })
-                    }
+                    aria-label="Importancia"
+                    value={draftDna.competencies[0]?.importance ?? "medium"}
+                    onChange={(event) => updateFirstCompetency("importance", event.target.value)}
                   >
-                    <option value="board">board</option>
-                    <option value="directorate">directorate</option>
-                    <option value="department">department</option>
-                    <option value="division">division</option>
-                    <option value="branch">branch</option>
-                    <option value="office">office</option>
-                    <option value="team">team</option>
-                    <option value="squad">squad</option>
-                    <option value="unit">unit</option>
-                    <option value="other">other</option>
-                  </select>
-                  <select
-                    aria-label="Unidade pai"
-                    value={unitDraft.parentId}
-                    onChange={(event) =>
-                      setUnitDraft({ ...unitDraft, parentId: event.target.value })
-                    }
-                  >
-                    <option value="">Raiz</option>
-                    {activeUnits
-                      .filter((unit) => unit.id !== selectedUnitId)
-                      .map((unit) => (
-                        <option key={unit.id} value={unit.id}>
-                          {unit.code} - {unit.name}
-                        </option>
-                      ))}
+                    <option value="low">low</option>
+                    <option value="medium">medium</option>
+                    <option value="high">high</option>
+                    <option value="critical">critical</option>
                   </select>
                   <input
-                    aria-label="Gestor"
-                    placeholder="Gestor"
-                    value={unitDraft.managerName}
-                    onChange={(event) =>
-                      setUnitDraft({ ...unitDraft, managerName: event.target.value })
-                    }
+                    aria-label="Cultura"
+                    placeholder="Cultura"
+                    value={draftDna.culture}
+                    onChange={(event) => updateDraftField("culture", event.target.value)}
                   />
                   <input
-                    aria-label="Email do gestor"
-                    placeholder="Email do gestor"
-                    value={unitDraft.managerEmail}
-                    onChange={(event) =>
-                      setUnitDraft({ ...unitDraft, managerEmail: event.target.value })
-                    }
+                    aria-label="Lideranca"
+                    placeholder="Lideranca"
+                    value={draftDna.leadershipStyle}
+                    onChange={(event) => updateDraftField("leadershipStyle", event.target.value)}
                   />
                   <input
-                    aria-label="Descricao da unidade"
-                    placeholder="Descricao"
-                    value={unitDraft.description}
-                    onChange={(event) =>
-                      setUnitDraft({ ...unitDraft, description: event.target.value })
-                    }
-                  />
-                  <input
-                    aria-label="Ordem"
-                    type="number"
-                    min="0"
-                    value={unitDraft.displayOrder}
-                    onChange={(event) =>
-                      setUnitDraft({ ...unitDraft, displayOrder: Number(event.target.value) })
-                    }
+                    aria-label="Ambiente"
+                    placeholder="Ambiente"
+                    value={draftDna.workEnvironment}
+                    onChange={(event) => updateDraftField("workEnvironment", event.target.value)}
                   />
                   <div className="member-actions">
-                    <button type="button" onClick={saveUnit}>
+                    <button type="button" onClick={saveDnaDraft}>
                       Salvar
                     </button>
-                    <button type="button" onClick={moveUnit} disabled={!selectedUnitId}>
-                      Mover
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => changeUnitStatus("inactivate")}
-                      disabled={!selectedUnitId}
-                    >
-                      Inativar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => changeUnitStatus("reactivate")}
-                      disabled={!selectedUnitId}
-                    >
-                      Reativar
+                    {canPublishDna && (
+                      <button type="button" onClick={publishDnaDraft}>
+                        Publicar
+                      </button>
+                    )}
+                    <button type="button" onClick={discardDnaDraft}>
+                      Descartar
                     </button>
                   </div>
                 </div>
-              ) : (
-                <p>Visualizacao limitada a unidades ativas.</p>
+              )}
+
+              {canManageDna && dnaHistory.length > 0 && (
+                <ul>
+                  {dnaHistory.map((version) => (
+                    <li key={version.id}>
+                      <strong>{version.status}</strong>
+                      <small>
+                        v{version.versionNumber ?? "-"} {version.discardedAt ? "- descartado" : ""}
+                      </small>
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
-          </div>
-        )}
+          )}
 
-        {selectedOrganization && (
-          <div className="panel job-profiles-panel">
-            <span>Cargos</span>
-            <div className="job-profile-layout">
-              <div>
-                {canManageJobs && (
-                  <div className="job-profile-form">
-                    <input
-                      aria-label="Codigo do cargo"
-                      placeholder="Codigo"
-                      value={jobProfileDraft.code}
-                      onChange={(event) =>
-                        setJobProfileDraft({ ...jobProfileDraft, code: event.target.value })
-                      }
-                    />
-                    <input
-                      aria-label="Nome do cargo"
-                      placeholder="Nome"
-                      value={jobProfileDraft.name}
-                      onChange={(event) =>
-                        setJobProfileDraft({ ...jobProfileDraft, name: event.target.value })
-                      }
-                    />
-                    <button type="button" onClick={createJobProfile}>
-                      Criar cargo
+          {selectedOrganization && (
+            <div className="panel org-units-panel" id="panel-org-units">
+              <span>Estrutura Organizacional</span>
+              <div className="unit-toolbar">
+                {canManageUnits && (
+                  <>
+                    <button type="button" onClick={() => resetUnitDraft("")}>
+                      Nova raiz
                     </button>
-                  </div>
-                )}
-
-                <ul className="competency-list">
-                  {[...jobProfiles, ...inactiveJobProfiles].map((profile) => (
-                    <li key={profile.id}>
-                      <button
-                        type="button"
-                        className="unit-row"
-                        onClick={() => {
-                          setSelectedJobProfileId(profile.id);
-                          loadSelectedJobProfile(profile.id);
-                        }}
-                      >
-                        <strong>{profile.name}</strong>
-                        <small>
-                          {profile.code} - {profile.status}
-                        </small>
-                      </button>
-                    </li>
-                  ))}
-                  {jobProfiles.length + inactiveJobProfiles.length === 0 && (
-                    <li>Nenhum cargo cadastrado.</li>
-                  )}
-                </ul>
-              </div>
-
-              <div className="job-profile-editor">
-                {publishedJobVersion ? (
-                  <div className="dna-summary">
-                    <strong>
-                      Publicado v{publishedJobVersion.versionNumber ?? "-"} -{" "}
-                      {publishedJobVersion.status}
-                    </strong>
-                    <p>{publishedJobVersion.summary || "Sem resumo informado."}</p>
-                    {publishedJobVersion.salaryRange && (
-                      <small>
-                        {publishedJobVersion.salaryRange.currency}{" "}
-                        {publishedJobVersion.salaryRange.min} -{" "}
-                        {publishedJobVersion.salaryRange.max}
-                      </small>
-                    )}
-                  </div>
-                ) : (
-                  <p>Nenhuma versao publicada.</p>
-                )}
-
-                {canManageJobs && selectedJobProfileId && !jobDraftVersion && (
-                  <button type="button" onClick={createJobDraft}>
-                    Criar rascunho
-                  </button>
-                )}
-
-                {canManageJobs && jobDraftVersion && (
-                  <div className="job-profile-form">
-                    <strong>Rascunho</strong>
-                    <input
-                      aria-label="Titulo do cargo"
-                      placeholder="Titulo"
-                      value={jobDraftVersion.title}
-                      onChange={(event) => updateJobDraftField("title", event.target.value)}
-                    />
-                    <textarea
-                      aria-label="Missao do cargo"
-                      placeholder="Missao"
-                      value={jobDraftVersion.mission}
-                      onChange={(event) => updateJobDraftField("mission", event.target.value)}
-                    />
-                    <textarea
-                      aria-label="Resumo do cargo"
-                      placeholder="Resumo"
-                      value={jobDraftVersion.summary}
-                      onChange={(event) => updateJobDraftField("summary", event.target.value)}
-                    />
-                    <input
-                      aria-label="Responsabilidade principal"
-                      placeholder="Responsabilidade principal"
-                      value={jobDraftVersion.responsibilities[0]?.text ?? ""}
-                      onChange={(event) =>
-                        updateJobDraftField("responsibilities", [
-                          { text: event.target.value, displayOrder: 0 }
-                        ])
-                      }
-                    />
-                    <select
-                      aria-label="Modelo de trabalho"
-                      value={jobDraftVersion.workModel}
-                      onChange={(event) =>
-                        updateJobDraftField(
-                          "workModel",
-                          event.target.value as JobProfileVersion["workModel"]
-                        )
-                      }
-                    >
-                      <option value="onsite">onsite</option>
-                      <option value="hybrid">hybrid</option>
-                      <option value="remote">remote</option>
-                      <option value="flexible">flexible</option>
-                    </select>
-                    <div className="member-form">
-                      <input
-                        aria-label="Salario minimo"
-                        type="number"
-                        min="0"
-                        placeholder="Min"
-                        value={jobDraftVersion.salaryRange?.min ?? 0}
-                        onChange={(event) =>
-                          updateJobDraftField("salaryRange", {
-                            min: Number(event.target.value),
-                            max: jobDraftVersion.salaryRange?.max ?? 0,
-                            currency: jobDraftVersion.salaryRange?.currency ?? "BRL",
-                            periodicity: jobDraftVersion.salaryRange?.periodicity ?? "monthly"
-                          })
-                        }
-                      />
-                      <input
-                        aria-label="Salario maximo"
-                        type="number"
-                        min="0"
-                        placeholder="Max"
-                        value={jobDraftVersion.salaryRange?.max ?? 0}
-                        onChange={(event) =>
-                          updateJobDraftField("salaryRange", {
-                            min: jobDraftVersion.salaryRange?.min ?? 0,
-                            max: Number(event.target.value),
-                            currency: jobDraftVersion.salaryRange?.currency ?? "BRL",
-                            periodicity: jobDraftVersion.salaryRange?.periodicity ?? "monthly"
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="member-actions">
-                      <button type="button" onClick={saveJobDraft}>
-                        Salvar
-                      </button>
-                      {canPublishJobs && (
-                        <button type="button" onClick={publishJobDraft}>
-                          Publicar
-                        </button>
-                      )}
-                      <button type="button" onClick={discardJobDraft}>
-                        Descartar
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {canManageJobs && jobProfileHistory.length > 0 && (
-                  <ul className="competency-list">
-                    {jobProfileHistory.map((version) => (
-                      <li key={version.id}>
-                        <strong>{version.status}</strong>
-                        <small>
-                          v{version.versionNumber ?? "-"}{" "}
-                          {version.discardedAt ? "- descartado" : ""}
-                        </small>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {selectedOrganization && (
-          <div className="panel job-profiles-panel">
-            <span>Vagas</span>
-            <div className="job-profile-layout">
-              <div>
-                {canManageJobOpenings && (
-                  <div className="job-profile-form">
-                    <input
-                      aria-label="Codigo da vaga"
-                      placeholder="Codigo"
-                      value={jobOpeningDraft.code}
-                      onChange={(event) =>
-                        setJobOpeningDraft({ ...jobOpeningDraft, code: event.target.value })
-                      }
-                    />
-                    <input
-                      aria-label="Titulo interno da vaga"
-                      placeholder="Titulo interno"
-                      value={jobOpeningDraft.title}
-                      onChange={(event) =>
-                        setJobOpeningDraft({ ...jobOpeningDraft, title: event.target.value })
-                      }
-                    />
-                    <input
-                      aria-label="Titulo publico da vaga"
-                      placeholder="Titulo publico"
-                      value={jobOpeningDraft.publicTitle}
-                      onChange={(event) =>
-                        setJobOpeningDraft({ ...jobOpeningDraft, publicTitle: event.target.value })
-                      }
-                    />
-                    <input
-                      aria-label="Quantidade de posicoes"
-                      type="number"
-                      min="1"
-                      max="1000"
-                      value={jobOpeningDraft.positionsCount}
-                      onChange={(event) =>
-                        setJobOpeningDraft({
-                          ...jobOpeningDraft,
-                          positionsCount: Number(event.target.value)
-                        })
-                      }
-                    />
                     <button
                       type="button"
-                      onClick={createJobOpening}
-                      disabled={!publishedJobVersion}
+                      onClick={() => resetUnitDraft(selectedUnitId)}
+                      disabled={!selectedUnitId}
                     >
-                      Criar vaga
+                      Nova filha
                     </button>
-                  </div>
+                  </>
                 )}
-
-                <ul className="competency-list">
-                  {jobOpenings.map((opening) => (
-                    <li key={opening.id}>
-                      <strong>{opening.title}</strong>
-                      <small>
-                        {opening.code} - {opening.status} -{" "}
-                        {opening.isPubliclyAvailable ? "publica" : "restrita"}
-                      </small>
-                      {opening.publishedVersion && (
-                        <small>
-                          {opening.publishedVersion.publicTitle} -{" "}
-                          {opening.publishedVersion.positionsCount} posicao(oes)
-                        </small>
-                      )}
-                      <div className="member-actions">
-                        {canPublishJobOpenings && opening.status === "draft" && (
-                          <button type="button" onClick={() => publishAndOpenJobOpening(opening)}>
-                            Publicar e abrir
-                          </button>
-                        )}
-                        {canManageJobOpenings && opening.status === "open" && (
-                          <button type="button" onClick={() => publishJobOpeningPublicly(opening)}>
-                            Divulgar
-                          </button>
-                        )}
-                      </div>
-                    </li>
-                  ))}
-                  {jobOpenings.length === 0 && <li>Nenhuma vaga cadastrada.</li>}
-                </ul>
-              </div>
-
-              <div className="job-profile-form">
-                <strong>Divulgacao publica</strong>
-                <input
-                  aria-label="Slug publico"
-                  placeholder="slug-publico"
-                  value={jobOpeningDraft.publicSlug}
-                  onChange={(event) =>
-                    setJobOpeningDraft({ ...jobOpeningDraft, publicSlug: event.target.value })
-                  }
-                />
-                <input
-                  aria-label="Prazo de candidatura"
-                  type="datetime-local"
-                  value={jobOpeningDraft.applicationDeadline}
-                  onChange={(event) =>
-                    setJobOpeningDraft({
-                      ...jobOpeningDraft,
-                      applicationDeadline: event.target.value
-                    })
-                  }
-                />
                 <label>
                   <input
                     type="checkbox"
-                    checked={jobOpeningDraft.showSalary}
-                    onChange={(event) =>
-                      setJobOpeningDraft({
-                        ...jobOpeningDraft,
-                        showSalary: event.target.checked
-                      })
-                    }
+                    checked={showInactiveUnits}
+                    onChange={(event) => setShowInactiveUnits(event.target.checked)}
                   />
-                  Exibir faixa salarial publicamente
+                  Inativas
                 </label>
               </div>
-            </div>
-          </div>
-        )}
 
-        {selectedOrganization && (
-          <div className="panel job-profiles-panel">
-            <span>Candidatos</span>
-            <div className="job-profile-layout">
-              <div>
-                {canManageCandidates && (
-                  <div className="job-profile-form">
+              <div className="org-units-layout">
+                <div>{renderUnitNodes(unitTree)}</div>
+
+                {canManageUnits ? (
+                  <div className="unit-editor">
+                    <strong>{selectedUnitId ? "Editar unidade" : "Criar unidade"}</strong>
                     <input
-                      aria-label="Nome do candidato"
-                      placeholder="Nome completo"
-                      value={candidateDraft.fullName}
-                      onChange={(event) =>
-                        setCandidateDraft({ ...candidateDraft, fullName: event.target.value })
-                      }
+                      aria-label="Codigo da unidade"
+                      placeholder="Codigo"
+                      value={unitDraft.code}
+                      disabled={Boolean(selectedUnitId) && !canChangeUnitCode}
+                      onChange={(event) => setUnitDraft({ ...unitDraft, code: event.target.value })}
                     />
                     <input
-                      aria-label="Nome preferido do candidato"
-                      placeholder="Nome preferido"
-                      value={candidateDraft.preferredName}
-                      onChange={(event) =>
-                        setCandidateDraft({ ...candidateDraft, preferredName: event.target.value })
-                      }
-                    />
-                    <input
-                      aria-label="Email do candidato"
-                      placeholder="email@exemplo.com"
-                      value={candidateDraft.email}
-                      onChange={(event) =>
-                        setCandidateDraft({ ...candidateDraft, email: event.target.value })
-                      }
+                      aria-label="Nome da unidade"
+                      placeholder="Nome"
+                      value={unitDraft.name}
+                      onChange={(event) => setUnitDraft({ ...unitDraft, name: event.target.value })}
                     />
                     <select
-                      aria-label="Origem do candidato"
-                      value={candidateDraft.source}
+                      aria-label="Tipo da unidade"
+                      value={unitDraft.type}
                       onChange={(event) =>
-                        setCandidateDraft({ ...candidateDraft, source: event.target.value })
-                      }
-                    >
-                      {[
-                        "career_page",
-                        "referral",
-                        "recruiter",
-                        "agency",
-                        "linkedin",
-                        "job_board",
-                        "event",
-                        "import",
-                        "manual",
-                        "other"
-                      ].map((source) => (
-                        <option key={source} value={source}>
-                          {source}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      aria-label="Cidade do candidato"
-                      placeholder="Cidade"
-                      value={candidateDraft.city}
-                      onChange={(event) =>
-                        setCandidateDraft({ ...candidateDraft, city: event.target.value })
-                      }
-                    />
-                    <input
-                      aria-label="Estado do candidato"
-                      placeholder="Estado"
-                      value={candidateDraft.state}
-                      onChange={(event) =>
-                        setCandidateDraft({ ...candidateDraft, state: event.target.value })
-                      }
-                    />
-                    <textarea
-                      aria-label="Resumo profissional do candidato"
-                      placeholder="Resumo profissional"
-                      value={candidateDraft.professionalSummary}
-                      onChange={(event) =>
-                        setCandidateDraft({
-                          ...candidateDraft,
-                          professionalSummary: event.target.value
+                        setUnitDraft({
+                          ...unitDraft,
+                          type: event.target.value as OrganizationalUnit["type"]
                         })
                       }
+                    >
+                      <option value="board">board</option>
+                      <option value="directorate">directorate</option>
+                      <option value="department">department</option>
+                      <option value="division">division</option>
+                      <option value="branch">branch</option>
+                      <option value="office">office</option>
+                      <option value="team">team</option>
+                      <option value="squad">squad</option>
+                      <option value="unit">unit</option>
+                      <option value="other">other</option>
+                    </select>
+                    <select
+                      aria-label="Unidade pai"
+                      value={unitDraft.parentId}
+                      onChange={(event) =>
+                        setUnitDraft({ ...unitDraft, parentId: event.target.value })
+                      }
+                    >
+                      <option value="">Raiz</option>
+                      {activeUnits
+                        .filter((unit) => unit.id !== selectedUnitId)
+                        .map((unit) => (
+                          <option key={unit.id} value={unit.id}>
+                            {unit.code} - {unit.name}
+                          </option>
+                        ))}
+                    </select>
+                    <input
+                      aria-label="Gestor"
+                      placeholder="Gestor"
+                      value={unitDraft.managerName}
+                      onChange={(event) =>
+                        setUnitDraft({ ...unitDraft, managerName: event.target.value })
+                      }
                     />
-                    <button type="button" onClick={createCandidate}>
-                      Criar candidato
-                    </button>
+                    <input
+                      aria-label="Email do gestor"
+                      placeholder="Email do gestor"
+                      value={unitDraft.managerEmail}
+                      onChange={(event) =>
+                        setUnitDraft({ ...unitDraft, managerEmail: event.target.value })
+                      }
+                    />
+                    <input
+                      aria-label="Descricao da unidade"
+                      placeholder="Descricao"
+                      value={unitDraft.description}
+                      onChange={(event) =>
+                        setUnitDraft({ ...unitDraft, description: event.target.value })
+                      }
+                    />
+                    <input
+                      aria-label="Ordem"
+                      type="number"
+                      min="0"
+                      value={unitDraft.displayOrder}
+                      onChange={(event) =>
+                        setUnitDraft({ ...unitDraft, displayOrder: Number(event.target.value) })
+                      }
+                    />
+                    <div className="member-actions">
+                      <button type="button" onClick={saveUnit}>
+                        Salvar
+                      </button>
+                      <button type="button" onClick={moveUnit} disabled={!selectedUnitId}>
+                        Mover
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => changeUnitStatus("inactivate")}
+                        disabled={!selectedUnitId}
+                      >
+                        Inativar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => changeUnitStatus("reactivate")}
+                        disabled={!selectedUnitId}
+                      >
+                        Reativar
+                      </button>
+                    </div>
                   </div>
+                ) : (
+                  <p>Visualizacao limitada a unidades ativas.</p>
                 )}
-
-                <ul className="competency-list">
-                  {candidates.map((candidate) => (
-                    <li key={candidate.id}>
-                      <strong>{candidate.fullName}</strong>
-                      <small>
-                        {candidate.preferredName ? `${candidate.preferredName} - ` : ""}
-                        {candidate.status} - {candidate.source}
-                      </small>
-                      <small>
-                        {candidate.location?.city ?? candidate.city}{" "}
-                        {candidate.location?.state ?? candidate.state}
-                      </small>
-                      {candidate.professionalSummary && <p>{candidate.professionalSummary}</p>}
-                      <small>
-                        {candidate.experiences.length} experiencia(s), {candidate.education.length}{" "}
-                        escolaridade(s), {candidate.languages.length} idioma(s)
-                      </small>
-                      {canManageCandidates && candidate.status === "active" && (
-                        <button
-                          type="button"
-                          onClick={() => changeCandidateStatus(candidate, "inactivate")}
-                        >
-                          Inativar
-                        </button>
-                      )}
-                    </li>
-                  ))}
-                  {candidates.length === 0 && <li>Nenhum candidato ativo.</li>}
-                </ul>
               </div>
+            </div>
+          )}
 
-              {canManageCandidates && (
+          {selectedOrganization && (
+            <div className="panel job-profiles-panel" id="panel-job-profiles">
+              <span>Cargos</span>
+              <div className="job-profile-layout">
                 <div>
-                  <strong>Inativos</strong>
+                  {canManageJobs && (
+                    <div className="job-profile-form">
+                      <input
+                        aria-label="Codigo do cargo"
+                        placeholder="Codigo"
+                        value={jobProfileDraft.code}
+                        onChange={(event) =>
+                          setJobProfileDraft({ ...jobProfileDraft, code: event.target.value })
+                        }
+                      />
+                      <input
+                        aria-label="Nome do cargo"
+                        placeholder="Nome"
+                        value={jobProfileDraft.name}
+                        onChange={(event) =>
+                          setJobProfileDraft({ ...jobProfileDraft, name: event.target.value })
+                        }
+                      />
+                      <button type="button" onClick={createJobProfile}>
+                        Criar cargo
+                      </button>
+                    </div>
+                  )}
+
                   <ul className="competency-list">
-                    {inactiveCandidates.map((candidate) => (
-                      <li key={candidate.id}>
-                        <strong>{candidate.fullName}</strong>
-                        <small>{candidate.source}</small>
+                    {[...jobProfiles, ...inactiveJobProfiles].map((profile) => (
+                      <li key={profile.id}>
                         <button
                           type="button"
-                          onClick={() => changeCandidateStatus(candidate, "reactivate")}
+                          className="unit-row"
+                          onClick={() => {
+                            setSelectedJobProfileId(profile.id);
+                            loadSelectedJobProfile(profile.id);
+                          }}
                         >
-                          Reativar
+                          <strong>{profile.name}</strong>
+                          <small>
+                            {profile.code} - {profile.status}
+                          </small>
                         </button>
                       </li>
                     ))}
-                    {inactiveCandidates.length === 0 && <li>Nenhum candidato inativo.</li>}
+                    {jobProfiles.length + inactiveJobProfiles.length === 0 && (
+                      <li>Nenhum cargo cadastrado.</li>
+                    )}
                   </ul>
                 </div>
-              )}
-            </div>
-          </div>
-        )}
 
-        {selectedOrganization && (
-          <div className="panel job-profiles-panel">
-            <span>Processo Seletivo</span>
-            <div className="job-profile-layout">
-              <div>
-                {canManageApplications && (
-                  <div className="job-profile-form">
-                    <select
-                      aria-label="Candidato da candidatura"
-                      value={candidateApplicationDraft.candidateId}
-                      onChange={(event) =>
-                        setCandidateApplicationDraft({
-                          ...candidateApplicationDraft,
-                          candidateId: event.target.value
-                        })
-                      }
-                    >
-                      <option value="">Candidato ativo</option>
-                      {candidates.map((candidate) => (
-                        <option key={candidate.id} value={candidate.id}>
-                          {candidate.fullName}
-                        </option>
+                <div className="job-profile-editor">
+                  {publishedJobVersion ? (
+                    <div className="dna-summary">
+                      <strong>
+                        Publicado v{publishedJobVersion.versionNumber ?? "-"} -{" "}
+                        {publishedJobVersion.status}
+                      </strong>
+                      <p>{publishedJobVersion.summary || "Sem resumo informado."}</p>
+                      {publishedJobVersion.salaryRange && (
+                        <small>
+                          {publishedJobVersion.salaryRange.currency}{" "}
+                          {publishedJobVersion.salaryRange.min} -{" "}
+                          {publishedJobVersion.salaryRange.max}
+                        </small>
+                      )}
+                    </div>
+                  ) : (
+                    <p>Nenhuma versao publicada.</p>
+                  )}
+
+                  {canManageJobs && selectedJobProfileId && !jobDraftVersion && (
+                    <button type="button" onClick={createJobDraft}>
+                      Criar rascunho
+                    </button>
+                  )}
+
+                  {canManageJobs && jobDraftVersion && (
+                    <div className="job-profile-form">
+                      <strong>Rascunho</strong>
+                      <input
+                        aria-label="Titulo do cargo"
+                        placeholder="Titulo"
+                        value={jobDraftVersion.title}
+                        onChange={(event) => updateJobDraftField("title", event.target.value)}
+                      />
+                      <textarea
+                        aria-label="Missao do cargo"
+                        placeholder="Missao"
+                        value={jobDraftVersion.mission}
+                        onChange={(event) => updateJobDraftField("mission", event.target.value)}
+                      />
+                      <textarea
+                        aria-label="Resumo do cargo"
+                        placeholder="Resumo"
+                        value={jobDraftVersion.summary}
+                        onChange={(event) => updateJobDraftField("summary", event.target.value)}
+                      />
+                      <input
+                        aria-label="Responsabilidade principal"
+                        placeholder="Responsabilidade principal"
+                        value={jobDraftVersion.responsibilities[0]?.text ?? ""}
+                        onChange={(event) =>
+                          updateJobDraftField("responsibilities", [
+                            { text: event.target.value, displayOrder: 0 }
+                          ])
+                        }
+                      />
+                      <select
+                        aria-label="Modelo de trabalho"
+                        value={jobDraftVersion.workModel}
+                        onChange={(event) =>
+                          updateJobDraftField(
+                            "workModel",
+                            event.target.value as JobProfileVersion["workModel"]
+                          )
+                        }
+                      >
+                        <option value="onsite">onsite</option>
+                        <option value="hybrid">hybrid</option>
+                        <option value="remote">remote</option>
+                        <option value="flexible">flexible</option>
+                      </select>
+                      <div className="member-form">
+                        <input
+                          aria-label="Salario minimo"
+                          type="number"
+                          min="0"
+                          placeholder="Min"
+                          value={jobDraftVersion.salaryRange?.min ?? 0}
+                          onChange={(event) =>
+                            updateJobDraftField("salaryRange", {
+                              min: Number(event.target.value),
+                              max: jobDraftVersion.salaryRange?.max ?? 0,
+                              currency: jobDraftVersion.salaryRange?.currency ?? "BRL",
+                              periodicity: jobDraftVersion.salaryRange?.periodicity ?? "monthly"
+                            })
+                          }
+                        />
+                        <input
+                          aria-label="Salario maximo"
+                          type="number"
+                          min="0"
+                          placeholder="Max"
+                          value={jobDraftVersion.salaryRange?.max ?? 0}
+                          onChange={(event) =>
+                            updateJobDraftField("salaryRange", {
+                              min: jobDraftVersion.salaryRange?.min ?? 0,
+                              max: Number(event.target.value),
+                              currency: jobDraftVersion.salaryRange?.currency ?? "BRL",
+                              periodicity: jobDraftVersion.salaryRange?.periodicity ?? "monthly"
+                            })
+                          }
+                        />
+                      </div>
+                      <div className="member-actions">
+                        <button type="button" onClick={saveJobDraft}>
+                          Salvar
+                        </button>
+                        {canPublishJobs && (
+                          <button type="button" onClick={publishJobDraft}>
+                            Publicar
+                          </button>
+                        )}
+                        <button type="button" onClick={discardJobDraft}>
+                          Descartar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {canManageJobs && jobProfileHistory.length > 0 && (
+                    <ul className="competency-list">
+                      {jobProfileHistory.map((version) => (
+                        <li key={version.id}>
+                          <strong>{version.status}</strong>
+                          <small>
+                            v{version.versionNumber ?? "-"}{" "}
+                            {version.discardedAt ? "- descartado" : ""}
+                          </small>
+                        </li>
                       ))}
-                    </select>
-                    <select
-                      aria-label="Vaga da candidatura"
-                      value={candidateApplicationDraft.jobOpeningId}
-                      onChange={(event) => {
-                        const opening = jobOpenings.find(
-                          (candidate) => candidate.id === event.target.value
-                        );
-                        setCandidateApplicationDraft({
-                          ...candidateApplicationDraft,
-                          jobOpeningId: event.target.value,
-                          jobOpeningVersionId: opening?.publishedVersion?.id ?? ""
-                        });
-                      }}
-                    >
-                      <option value="">Vaga aberta</option>
-                      {jobOpenings
-                        .filter((opening) => opening.status === "open" && opening.publishedVersion)
-                        .map((opening) => (
-                          <option key={opening.id} value={opening.id}>
-                            {opening.title}
-                          </option>
-                        ))}
-                    </select>
-                    <select
-                      aria-label="Origem da candidatura"
-                      value={candidateApplicationDraft.source}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {selectedOrganization && (
+            <div className="panel job-profiles-panel" id="panel-job-openings">
+              <span>Vagas</span>
+              <div className="job-profile-layout">
+                <div>
+                  {canManageJobOpenings && (
+                    <div className="job-profile-form">
+                      <input
+                        aria-label="Codigo da vaga"
+                        placeholder="Codigo"
+                        value={jobOpeningDraft.code}
+                        onChange={(event) =>
+                          setJobOpeningDraft({ ...jobOpeningDraft, code: event.target.value })
+                        }
+                      />
+                      <input
+                        aria-label="Titulo interno da vaga"
+                        placeholder="Titulo interno"
+                        value={jobOpeningDraft.title}
+                        onChange={(event) =>
+                          setJobOpeningDraft({ ...jobOpeningDraft, title: event.target.value })
+                        }
+                      />
+                      <input
+                        aria-label="Titulo publico da vaga"
+                        placeholder="Titulo publico"
+                        value={jobOpeningDraft.publicTitle}
+                        onChange={(event) =>
+                          setJobOpeningDraft({
+                            ...jobOpeningDraft,
+                            publicTitle: event.target.value
+                          })
+                        }
+                      />
+                      <input
+                        aria-label="Quantidade de posicoes"
+                        type="number"
+                        min="1"
+                        max="1000"
+                        value={jobOpeningDraft.positionsCount}
+                        onChange={(event) =>
+                          setJobOpeningDraft({
+                            ...jobOpeningDraft,
+                            positionsCount: Number(event.target.value)
+                          })
+                        }
+                      />
+                      <button
+                        type="button"
+                        onClick={createJobOpening}
+                        disabled={!publishedJobVersion}
+                      >
+                        Criar vaga
+                      </button>
+                    </div>
+                  )}
+
+                  <ul className="competency-list">
+                    {jobOpenings.map((opening) => (
+                      <li key={opening.id}>
+                        <strong>{opening.title}</strong>
+                        <small>
+                          {opening.code} - {opening.status} -{" "}
+                          {opening.isPubliclyAvailable ? "publica" : "restrita"}
+                        </small>
+                        {opening.publishedVersion && (
+                          <small>
+                            {opening.publishedVersion.publicTitle} -{" "}
+                            {opening.publishedVersion.positionsCount} posicao(oes)
+                          </small>
+                        )}
+                        <div className="member-actions">
+                          {canPublishJobOpenings && opening.status === "draft" && (
+                            <button type="button" onClick={() => publishAndOpenJobOpening(opening)}>
+                              Publicar e abrir
+                            </button>
+                          )}
+                          {canManageJobOpenings && opening.status === "open" && (
+                            <button
+                              type="button"
+                              onClick={() => publishJobOpeningPublicly(opening)}
+                            >
+                              Divulgar
+                            </button>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                    {jobOpenings.length === 0 && <li>Nenhuma vaga cadastrada.</li>}
+                  </ul>
+                </div>
+
+                <div className="job-profile-form">
+                  <strong>Divulgacao publica</strong>
+                  <input
+                    aria-label="Slug publico"
+                    placeholder="slug-publico"
+                    value={jobOpeningDraft.publicSlug}
+                    onChange={(event) =>
+                      setJobOpeningDraft({ ...jobOpeningDraft, publicSlug: event.target.value })
+                    }
+                  />
+                  <input
+                    aria-label="Prazo de candidatura"
+                    type="datetime-local"
+                    value={jobOpeningDraft.applicationDeadline}
+                    onChange={(event) =>
+                      setJobOpeningDraft({
+                        ...jobOpeningDraft,
+                        applicationDeadline: event.target.value
+                      })
+                    }
+                  />
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={jobOpeningDraft.showSalary}
                       onChange={(event) =>
-                        setCandidateApplicationDraft({
-                          ...candidateApplicationDraft,
-                          source: event.target.value
+                        setJobOpeningDraft({
+                          ...jobOpeningDraft,
+                          showSalary: event.target.checked
                         })
                       }
-                    >
-                      {["career_page", "referral", "recruiter", "import", "manual", "other"].map(
-                        (source) => (
+                    />
+                    Exibir faixa salarial publicamente
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {selectedOrganization && (
+            <div className="panel job-profiles-panel" id="panel-candidates">
+              <span>Candidatos</span>
+              <div className="job-profile-layout">
+                <div>
+                  {canManageCandidates && (
+                    <div className="job-profile-form">
+                      <input
+                        aria-label="Nome do candidato"
+                        placeholder="Nome completo"
+                        value={candidateDraft.fullName}
+                        onChange={(event) =>
+                          setCandidateDraft({ ...candidateDraft, fullName: event.target.value })
+                        }
+                      />
+                      <input
+                        aria-label="Nome preferido do candidato"
+                        placeholder="Nome preferido"
+                        value={candidateDraft.preferredName}
+                        onChange={(event) =>
+                          setCandidateDraft({
+                            ...candidateDraft,
+                            preferredName: event.target.value
+                          })
+                        }
+                      />
+                      <input
+                        aria-label="Email do candidato"
+                        placeholder="email@exemplo.com"
+                        value={candidateDraft.email}
+                        onChange={(event) =>
+                          setCandidateDraft({ ...candidateDraft, email: event.target.value })
+                        }
+                      />
+                      <select
+                        aria-label="Origem do candidato"
+                        value={candidateDraft.source}
+                        onChange={(event) =>
+                          setCandidateDraft({ ...candidateDraft, source: event.target.value })
+                        }
+                      >
+                        {[
+                          "career_page",
+                          "referral",
+                          "recruiter",
+                          "agency",
+                          "linkedin",
+                          "job_board",
+                          "event",
+                          "import",
+                          "manual",
+                          "other"
+                        ].map((source) => (
                           <option key={source} value={source}>
                             {source}
                           </option>
-                        )
-                      )}
-                    </select>
-                    <button type="button" onClick={createCandidateApplication}>
-                      Criar candidatura
-                    </button>
-                  </div>
-                )}
+                        ))}
+                      </select>
+                      <input
+                        aria-label="Cidade do candidato"
+                        placeholder="Cidade"
+                        value={candidateDraft.city}
+                        onChange={(event) =>
+                          setCandidateDraft({ ...candidateDraft, city: event.target.value })
+                        }
+                      />
+                      <input
+                        aria-label="Estado do candidato"
+                        placeholder="Estado"
+                        value={candidateDraft.state}
+                        onChange={(event) =>
+                          setCandidateDraft({ ...candidateDraft, state: event.target.value })
+                        }
+                      />
+                      <textarea
+                        aria-label="Resumo profissional do candidato"
+                        placeholder="Resumo profissional"
+                        value={candidateDraft.professionalSummary}
+                        onChange={(event) =>
+                          setCandidateDraft({
+                            ...candidateDraft,
+                            professionalSummary: event.target.value
+                          })
+                        }
+                      />
+                      <button type="button" onClick={createCandidate}>
+                        Criar candidato
+                      </button>
+                    </div>
+                  )}
 
-                <ul className="competency-list">
-                  {candidateApplications.map((application) => {
-                    const status = applicationStatusOf(application);
-                    const currentStage = applicationStageOf(application);
-                    const opening = jobOpenings.find(
-                      (entry) => entry.id === application.jobOpeningId
-                    );
-                    const stageIndex = applicationStages.indexOf(currentStage);
-                    return (
-                      <li key={application.id}>
-                        <strong>{applicationCandidateName(application)}</strong>
+                  <ul className="competency-list">
+                    {candidates.map((candidate) => (
+                      <li key={candidate.id}>
+                        <strong>{candidate.fullName}</strong>
                         <small>
-                          {opening?.title ??
-                            application.job_opening?.title ??
-                            application.jobOpeningId ??
-                            "vaga"}{" "}
-                          - {status} - {currentStage}
+                          {candidate.preferredName ? `${candidate.preferredName} - ` : ""}
+                          {candidate.status} - {candidate.source}
                         </small>
                         <small>
-                          {application.source ?? "origem restrita"} -{" "}
-                          {applicationAppliedAtOf(application)
-                            ? new Date(applicationAppliedAtOf(application)).toLocaleString()
-                            : "data restrita"}
+                          {candidate.location?.city ?? candidate.city}{" "}
+                          {candidate.location?.state ?? candidate.state}
                         </small>
-                        {canManageApplications && status === "active" && (
-                          <div className="member-actions">
-                            {stageIndex > 0 && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  moveCandidateApplication(
-                                    application,
-                                    applicationStages[stageIndex - 1]
-                                  )
-                                }
-                              >
-                                Voltar etapa
-                              </button>
-                            )}
-                            {stageIndex < applicationStages.length - 1 && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  moveCandidateApplication(
-                                    application,
-                                    applicationStages[stageIndex + 1]
-                                  )
-                                }
-                              >
-                                Avancar etapa
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => addCandidateApplicationNote(application)}
-                            >
-                              Adicionar nota
-                            </button>
-                          </div>
-                        )}
-                        {canManageApplications && status === "active" && (
-                          <div className="member-actions">
-                            <button
-                              type="button"
-                              onClick={() => finalizeCandidateApplication(application, "withdraw")}
-                            >
-                              Retirar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => finalizeCandidateApplication(application, "reject")}
-                            >
-                              Rejeitar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => finalizeCandidateApplication(application, "cancel")}
-                            >
-                              Cancelar
-                            </button>
-                            {canHireApplications && (
-                              <button
-                                type="button"
-                                onClick={() => finalizeCandidateApplication(application, "hire")}
-                              >
-                                Contratar
-                              </button>
-                            )}
-                          </div>
+                        {candidate.professionalSummary && <p>{candidate.professionalSummary}</p>}
+                        <small>
+                          {candidate.experiences.length} experiencia(s),{" "}
+                          {candidate.education.length} escolaridade(s), {candidate.languages.length}{" "}
+                          idioma(s)
+                        </small>
+                        {canManageCandidates && candidate.status === "active" && (
+                          <button
+                            type="button"
+                            onClick={() => changeCandidateStatus(candidate, "inactivate")}
+                          >
+                            Inativar
+                          </button>
                         )}
                       </li>
-                    );
-                  })}
-                  {candidateApplications.length === 0 && <li>Nenhuma candidatura cadastrada.</li>}
-                </ul>
-              </div>
-
-              {canManageApplications && (
-                <div className="job-profile-form">
-                  <strong>Operacoes</strong>
-                  <textarea
-                    aria-label="Nota da candidatura"
-                    placeholder="Nota interna da candidatura"
-                    value={candidateApplicationDraft.note}
-                    onChange={(event) =>
-                      setCandidateApplicationDraft({
-                        ...candidateApplicationDraft,
-                        note: event.target.value
-                      })
-                    }
-                  />
-                  <textarea
-                    aria-label="Motivo de finalizacao"
-                    placeholder="Motivo de finalizacao"
-                    value={candidateApplicationDraft.finalizationReason}
-                    onChange={(event) =>
-                      setCandidateApplicationDraft({
-                        ...candidateApplicationDraft,
-                        finalizationReason: event.target.value
-                      })
-                    }
-                  />
+                    ))}
+                    {candidates.length === 0 && <li>Nenhum candidato ativo.</li>}
+                  </ul>
                 </div>
-              )}
-            </div>
-          </div>
-        )}
 
-        {selectedOrganization && (
-          <div className="panel job-profiles-panel">
-            <span>Entrevistas</span>
-            <div className="job-profile-layout">
-              <div>
+                {canManageCandidates && (
+                  <div>
+                    <strong>Inativos</strong>
+                    <ul className="competency-list">
+                      {inactiveCandidates.map((candidate) => (
+                        <li key={candidate.id}>
+                          <strong>{candidate.fullName}</strong>
+                          <small>{candidate.source}</small>
+                          <button
+                            type="button"
+                            onClick={() => changeCandidateStatus(candidate, "reactivate")}
+                          >
+                            Reativar
+                          </button>
+                        </li>
+                      ))}
+                      {inactiveCandidates.length === 0 && <li>Nenhum candidato inativo.</li>}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {selectedOrganization && (
+            <div className="panel job-profiles-panel" id="panel-applications">
+              <span>Processo Seletivo</span>
+              <div className="job-profile-layout">
+                <div>
+                  {canManageApplications && (
+                    <div className="job-profile-form">
+                      <select
+                        aria-label="Candidato da candidatura"
+                        value={candidateApplicationDraft.candidateId}
+                        onChange={(event) =>
+                          setCandidateApplicationDraft({
+                            ...candidateApplicationDraft,
+                            candidateId: event.target.value
+                          })
+                        }
+                      >
+                        <option value="">Candidato ativo</option>
+                        {candidates.map((candidate) => (
+                          <option key={candidate.id} value={candidate.id}>
+                            {candidate.fullName}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        aria-label="Vaga da candidatura"
+                        value={candidateApplicationDraft.jobOpeningId}
+                        onChange={(event) => {
+                          const opening = jobOpenings.find(
+                            (candidate) => candidate.id === event.target.value
+                          );
+                          setCandidateApplicationDraft({
+                            ...candidateApplicationDraft,
+                            jobOpeningId: event.target.value,
+                            jobOpeningVersionId: opening?.publishedVersion?.id ?? ""
+                          });
+                        }}
+                      >
+                        <option value="">Vaga aberta</option>
+                        {jobOpenings
+                          .filter(
+                            (opening) => opening.status === "open" && opening.publishedVersion
+                          )
+                          .map((opening) => (
+                            <option key={opening.id} value={opening.id}>
+                              {opening.title}
+                            </option>
+                          ))}
+                      </select>
+                      <select
+                        aria-label="Origem da candidatura"
+                        value={candidateApplicationDraft.source}
+                        onChange={(event) =>
+                          setCandidateApplicationDraft({
+                            ...candidateApplicationDraft,
+                            source: event.target.value
+                          })
+                        }
+                      >
+                        {["career_page", "referral", "recruiter", "import", "manual", "other"].map(
+                          (source) => (
+                            <option key={source} value={source}>
+                              {source}
+                            </option>
+                          )
+                        )}
+                      </select>
+                      <button type="button" onClick={createCandidateApplication}>
+                        Criar candidatura
+                      </button>
+                    </div>
+                  )}
+
+                  <ul className="competency-list">
+                    {candidateApplications.map((application) => {
+                      const status = applicationStatusOf(application);
+                      const currentStage = applicationStageOf(application);
+                      const opening = jobOpenings.find(
+                        (entry) => entry.id === application.jobOpeningId
+                      );
+                      const stageIndex = applicationStages.indexOf(currentStage);
+                      return (
+                        <li key={application.id}>
+                          <strong>{applicationCandidateName(application)}</strong>
+                          <small>
+                            {opening?.title ??
+                              application.job_opening?.title ??
+                              application.jobOpeningId ??
+                              "vaga"}{" "}
+                            - {status} - {currentStage}
+                          </small>
+                          <small>
+                            {application.source ?? "origem restrita"} -{" "}
+                            {applicationAppliedAtOf(application)
+                              ? new Date(applicationAppliedAtOf(application)).toLocaleString()
+                              : "data restrita"}
+                          </small>
+                          {canManageApplications && status === "active" && (
+                            <div className="member-actions">
+                              {stageIndex > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    moveCandidateApplication(
+                                      application,
+                                      applicationStages[stageIndex - 1]
+                                    )
+                                  }
+                                >
+                                  Voltar etapa
+                                </button>
+                              )}
+                              {stageIndex < applicationStages.length - 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    moveCandidateApplication(
+                                      application,
+                                      applicationStages[stageIndex + 1]
+                                    )
+                                  }
+                                >
+                                  Avancar etapa
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => addCandidateApplicationNote(application)}
+                              >
+                                Adicionar nota
+                              </button>
+                            </div>
+                          )}
+                          {canManageApplications && status === "active" && (
+                            <div className="member-actions">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  finalizeCandidateApplication(application, "withdraw")
+                                }
+                              >
+                                Retirar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => finalizeCandidateApplication(application, "reject")}
+                              >
+                                Rejeitar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => finalizeCandidateApplication(application, "cancel")}
+                              >
+                                Cancelar
+                              </button>
+                              {canHireApplications && (
+                                <button
+                                  type="button"
+                                  onClick={() => finalizeCandidateApplication(application, "hire")}
+                                >
+                                  Contratar
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
+                    {candidateApplications.length === 0 && <li>Nenhuma candidatura cadastrada.</li>}
+                  </ul>
+                </div>
+
+                {canManageApplications && (
+                  <div className="job-profile-form">
+                    <strong>Operacoes</strong>
+                    <textarea
+                      aria-label="Nota da candidatura"
+                      placeholder="Nota interna da candidatura"
+                      value={candidateApplicationDraft.note}
+                      onChange={(event) =>
+                        setCandidateApplicationDraft({
+                          ...candidateApplicationDraft,
+                          note: event.target.value
+                        })
+                      }
+                    />
+                    <textarea
+                      aria-label="Motivo de finalizacao"
+                      placeholder="Motivo de finalizacao"
+                      value={candidateApplicationDraft.finalizationReason}
+                      onChange={(event) =>
+                        setCandidateApplicationDraft({
+                          ...candidateApplicationDraft,
+                          finalizationReason: event.target.value
+                        })
+                      }
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {selectedOrganization && (
+            <div className="panel job-profiles-panel" id="panel-interviews">
+              <span>Entrevistas</span>
+              <div className="job-profile-layout">
+                <div>
+                  {canManageInterviews && (
+                    <div className="job-profile-form">
+                      <select
+                        aria-label="Candidatura da entrevista"
+                        value={interviewDraft.candidateApplicationId}
+                        onChange={(event) =>
+                          setInterviewDraft({
+                            ...interviewDraft,
+                            candidateApplicationId: event.target.value
+                          })
+                        }
+                      >
+                        <option value="">Candidatura ativa</option>
+                        {candidateApplications
+                          .filter((application) => applicationStatusOf(application) === "active")
+                          .map((application) => (
+                            <option key={application.id} value={application.id}>
+                              {applicationCandidateName(application)}
+                            </option>
+                          ))}
+                      </select>
+                      <input
+                        aria-label="Titulo da entrevista"
+                        placeholder="Titulo"
+                        value={interviewDraft.title}
+                        onChange={(event) =>
+                          setInterviewDraft({ ...interviewDraft, title: event.target.value })
+                        }
+                      />
+                      <select
+                        aria-label="Tipo da entrevista"
+                        value={interviewDraft.type}
+                        onChange={(event) =>
+                          setInterviewDraft({
+                            ...interviewDraft,
+                            type: event.target.value as InterviewType
+                          })
+                        }
+                      >
+                        {[
+                          "screening",
+                          "behavioral",
+                          "technical",
+                          "cultural",
+                          "leadership",
+                          "management",
+                          "panel",
+                          "final",
+                          "other"
+                        ].map((type) => (
+                          <option key={type} value={type}>
+                            {type}
+                          </option>
+                        ))}
+                      </select>
+                      <button type="button" onClick={createInterview}>
+                        Criar entrevista
+                      </button>
+                    </div>
+                  )}
+
+                  <ul className="competency-list">
+                    {interviews.map((interview) => {
+                      const application = candidateApplications.find(
+                        (candidate) => candidate.id === interviewApplicationId(interview)
+                      );
+                      return (
+                        <li key={interview.id}>
+                          <strong>{interview.title}</strong>
+                          <small>
+                            {application ? applicationCandidateName(application) : interview.id} -{" "}
+                            {interview.type} - {interview.status}
+                          </small>
+                          <small>
+                            {interviewScheduledStart(interview)
+                              ? `${new Date(interviewScheduledStart(interview)).toLocaleString()} ate ${new Date(
+                                  interviewScheduledEnd(interview)
+                                ).toLocaleString()}`
+                              : "sem agenda"}
+                          </small>
+                          {canManageInterviews && (
+                            <div className="member-actions">
+                              {interview.status === "draft" && (
+                                <button type="button" onClick={() => scheduleInterview(interview)}>
+                                  Agendar
+                                </button>
+                              )}
+                              {interview.status === "scheduled" && (
+                                <button
+                                  type="button"
+                                  onClick={() => changeInterviewStatus(interview, "start")}
+                                >
+                                  Iniciar
+                                </button>
+                              )}
+                              {["draft", "scheduled", "in_progress"].includes(interview.status) && (
+                                <button
+                                  type="button"
+                                  onClick={() => changeInterviewStatus(interview, "cancel")}
+                                >
+                                  Cancelar
+                                </button>
+                              )}
+                              {interview.status === "scheduled" && (
+                                <button
+                                  type="button"
+                                  onClick={() => changeInterviewStatus(interview, "no-show")}
+                                >
+                                  No-show
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
+                    {interviews.length === 0 && <li>Nenhuma entrevista cadastrada.</li>}
+                  </ul>
+                </div>
+
                 {canManageInterviews && (
                   <div className="job-profile-form">
-                    <select
-                      aria-label="Candidatura da entrevista"
-                      value={interviewDraft.candidateApplicationId}
+                    <strong>Agenda</strong>
+                    <input
+                      aria-label="Inicio da entrevista"
+                      type="datetime-local"
+                      value={interviewDraft.scheduledStartAt}
                       onChange={(event) =>
                         setInterviewDraft({
                           ...interviewDraft,
-                          candidateApplicationId: event.target.value
+                          scheduledStartAt: event.target.value
                         })
                       }
-                    >
-                      <option value="">Candidatura ativa</option>
-                      {candidateApplications
-                        .filter((application) => applicationStatusOf(application) === "active")
-                        .map((application) => (
-                          <option key={application.id} value={application.id}>
-                            {applicationCandidateName(application)}
-                          </option>
-                        ))}
-                    </select>
+                    />
                     <input
-                      aria-label="Titulo da entrevista"
-                      placeholder="Titulo"
-                      value={interviewDraft.title}
+                      aria-label="Fim da entrevista"
+                      type="datetime-local"
+                      value={interviewDraft.scheduledEndAt}
                       onChange={(event) =>
-                        setInterviewDraft({ ...interviewDraft, title: event.target.value })
+                        setInterviewDraft({
+                          ...interviewDraft,
+                          scheduledEndAt: event.target.value
+                        })
+                      }
+                    />
+                    <input
+                      aria-label="Fuso da entrevista"
+                      placeholder="Timezone"
+                      value={interviewDraft.timezone}
+                      onChange={(event) =>
+                        setInterviewDraft({ ...interviewDraft, timezone: event.target.value })
                       }
                     />
                     <select
-                      aria-label="Tipo da entrevista"
-                      value={interviewDraft.type}
+                      aria-label="Local da entrevista"
+                      value={interviewDraft.locationType}
                       onChange={(event) =>
                         setInterviewDraft({
                           ...interviewDraft,
-                          type: event.target.value as InterviewType
+                          locationType: event.target.value as InterviewLocationType
                         })
                       }
                     >
-                      {[
-                        "screening",
-                        "behavioral",
-                        "technical",
-                        "cultural",
-                        "leadership",
-                        "management",
-                        "panel",
-                        "final",
-                        "other"
-                      ].map((type) => (
+                      {["onsite", "video", "phone", "other"].map((type) => (
                         <option key={type} value={type}>
                           {type}
                         </option>
                       ))}
                     </select>
-                    <button type="button" onClick={createInterview}>
-                      Criar entrevista
-                    </button>
+                    <input
+                      aria-label="Detalhes do local"
+                      placeholder="Detalhes do local"
+                      value={interviewDraft.locationDetails}
+                      onChange={(event) =>
+                        setInterviewDraft({
+                          ...interviewDraft,
+                          locationDetails: event.target.value
+                        })
+                      }
+                    />
+                    <textarea
+                      aria-label="Motivo da entrevista"
+                      placeholder="Motivo para cancelamento ou no-show"
+                      value={interviewDraft.reason}
+                      onChange={(event) =>
+                        setInterviewDraft({ ...interviewDraft, reason: event.target.value })
+                      }
+                    />
                   </div>
                 )}
+              </div>
+            </div>
+          )}
 
-                <ul className="competency-list">
-                  {interviews.map((interview) => {
-                    const application = candidateApplications.find(
-                      (candidate) => candidate.id === interviewApplicationId(interview)
-                    );
-                    return (
-                      <li key={interview.id}>
-                        <strong>{interview.title}</strong>
-                        <small>
-                          {application ? applicationCandidateName(application) : interview.id} -{" "}
-                          {interview.type} - {interview.status}
-                        </small>
-                        <small>
-                          {interviewScheduledStart(interview)
-                            ? `${new Date(interviewScheduledStart(interview)).toLocaleString()} ate ${new Date(
-                                interviewScheduledEnd(interview)
-                              ).toLocaleString()}`
-                            : "sem agenda"}
-                        </small>
-                        {canManageInterviews && (
-                          <div className="member-actions">
-                            {interview.status === "draft" && (
-                              <button type="button" onClick={() => scheduleInterview(interview)}>
-                                Agendar
-                              </button>
-                            )}
-                            {interview.status === "scheduled" && (
-                              <button
-                                type="button"
-                                onClick={() => changeInterviewStatus(interview, "start")}
-                              >
-                                Iniciar
-                              </button>
-                            )}
-                            {["draft", "scheduled", "in_progress"].includes(interview.status) && (
-                              <button
-                                type="button"
-                                onClick={() => changeInterviewStatus(interview, "cancel")}
-                              >
-                                Cancelar
-                              </button>
-                            )}
-                            {interview.status === "scheduled" && (
-                              <button
-                                type="button"
-                                onClick={() => changeInterviewStatus(interview, "no-show")}
-                              >
-                                No-show
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </li>
-                    );
-                  })}
-                  {interviews.length === 0 && <li>Nenhuma entrevista cadastrada.</li>}
-                </ul>
+          {selectedOrganization && (
+            <div className="panel competencies-panel" id="panel-competencies">
+              <span>Catalogo de Competencias</span>
+              <div className="unit-toolbar">
+                <button type="button" onClick={() => setCompetencyTab("catalog")}>
+                  Catalogo Utilizado
+                </button>
+                <button type="button" onClick={() => setCompetencyTab("organization")}>
+                  Competencias da Empresa
+                </button>
+                <button type="button" onClick={() => setCompetencyTab("global")}>
+                  Biblioteca Global
+                </button>
               </div>
 
-              {canManageInterviews && (
-                <div className="job-profile-form">
-                  <strong>Agenda</strong>
-                  <input
-                    aria-label="Inicio da entrevista"
-                    type="datetime-local"
-                    value={interviewDraft.scheduledStartAt}
-                    onChange={(event) =>
-                      setInterviewDraft({
-                        ...interviewDraft,
-                        scheduledStartAt: event.target.value
-                      })
-                    }
-                  />
-                  <input
-                    aria-label="Fim da entrevista"
-                    type="datetime-local"
-                    value={interviewDraft.scheduledEndAt}
-                    onChange={(event) =>
-                      setInterviewDraft({
-                        ...interviewDraft,
-                        scheduledEndAt: event.target.value
-                      })
-                    }
-                  />
-                  <input
-                    aria-label="Fuso da entrevista"
-                    placeholder="Timezone"
-                    value={interviewDraft.timezone}
-                    onChange={(event) =>
-                      setInterviewDraft({ ...interviewDraft, timezone: event.target.value })
-                    }
-                  />
-                  <select
-                    aria-label="Local da entrevista"
-                    value={interviewDraft.locationType}
-                    onChange={(event) =>
-                      setInterviewDraft({
-                        ...interviewDraft,
-                        locationType: event.target.value as InterviewLocationType
-                      })
-                    }
-                  >
-                    {["onsite", "video", "phone", "other"].map((type) => (
-                      <option key={type} value={type}>
-                        {type}
-                      </option>
+              {competencyTab === "catalog" && (
+                <ul className="competency-list">
+                  {catalogItems.map((item) => (
+                    <li key={item.competencyCatalogItemId}>
+                      <strong>{item.name}</strong>
+                      <small>
+                        {item.code} - {item.category} - {item.origin}
+                        {item.deprecated ? " - deprecated" : ""}
+                      </small>
+                      <code>{item.competencyCatalogItemId}</code>
+                    </li>
+                  ))}
+                  {catalogItems.length === 0 && <li>Nenhuma competencia disponivel.</li>}
+                </ul>
+              )}
+
+              {competencyTab === "organization" && (
+                <div className="competency-layout">
+                  {canManageCompetencies ? (
+                    <div className="competency-form">
+                      <input
+                        aria-label="Codigo da competencia"
+                        placeholder="Codigo"
+                        value={organizationCompetencyDraft.code}
+                        onChange={(event) =>
+                          setOrganizationCompetencyDraft({
+                            ...organizationCompetencyDraft,
+                            code: event.target.value
+                          })
+                        }
+                      />
+                      <input
+                        aria-label="Nome da competencia"
+                        placeholder="Nome"
+                        value={organizationCompetencyDraft.name}
+                        onChange={(event) =>
+                          setOrganizationCompetencyDraft({
+                            ...organizationCompetencyDraft,
+                            name: event.target.value
+                          })
+                        }
+                      />
+                      <select
+                        aria-label="Categoria da competencia"
+                        value={organizationCompetencyDraft.category}
+                        onChange={(event) =>
+                          setOrganizationCompetencyDraft({
+                            ...organizationCompetencyDraft,
+                            category: event.target.value as CompetencyCategory
+                          })
+                        }
+                      >
+                        {competencyCategories.map((category) => (
+                          <option key={category} value={category}>
+                            {category}
+                          </option>
+                        ))}
+                      </select>
+                      <textarea
+                        aria-label="Definicao da competencia"
+                        placeholder="Definicao"
+                        value={organizationCompetencyDraft.definition}
+                        onChange={(event) =>
+                          setOrganizationCompetencyDraft({
+                            ...organizationCompetencyDraft,
+                            definition: event.target.value
+                          })
+                        }
+                      />
+                      <button type="button" onClick={createOrganizationCompetency}>
+                        Criar competencia
+                      </button>
+                    </div>
+                  ) : (
+                    <p>Visualizacao limitada ao catalogo utilizado.</p>
+                  )}
+
+                  <ul className="competency-list">
+                    {organizationCompetencies.map((competency) => (
+                      <li key={competency.id}>
+                        <strong>{competency.name}</strong>
+                        <small>
+                          {competency.code} - {competency.category} - {competency.status}
+                        </small>
+                        {canManageCompetencies && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              changeOrganizationCompetencyStatus(
+                                competency.id,
+                                competency.status === "active" ? "inactivate" : "activate"
+                              )
+                            }
+                          >
+                            {competency.status === "active" ? "Inativar" : "Ativar"}
+                          </button>
+                        )}
+                      </li>
                     ))}
-                  </select>
-                  <input
-                    aria-label="Detalhes do local"
-                    placeholder="Detalhes do local"
-                    value={interviewDraft.locationDetails}
-                    onChange={(event) =>
-                      setInterviewDraft({
-                        ...interviewDraft,
-                        locationDetails: event.target.value
-                      })
-                    }
-                  />
-                  <textarea
-                    aria-label="Motivo da entrevista"
-                    placeholder="Motivo para cancelamento ou no-show"
-                    value={interviewDraft.reason}
-                    onChange={(event) =>
-                      setInterviewDraft({ ...interviewDraft, reason: event.target.value })
-                    }
-                  />
+                    {organizationCompetencies.length === 0 && <li>Nenhuma competencia propria.</li>}
+                  </ul>
                 </div>
               )}
-            </div>
-          </div>
-        )}
 
-        {selectedOrganization && (
-          <div className="panel competencies-panel">
-            <span>Catalogo de Competencias</span>
-            <div className="unit-toolbar">
-              <button type="button" onClick={() => setCompetencyTab("catalog")}>
-                Catalogo Utilizado
-              </button>
-              <button type="button" onClick={() => setCompetencyTab("organization")}>
-                Competencias da Empresa
-              </button>
-              <button type="button" onClick={() => setCompetencyTab("global")}>
-                Biblioteca Global
-              </button>
-            </div>
-
-            {competencyTab === "catalog" && (
-              <ul className="competency-list">
-                {catalogItems.map((item) => (
-                  <li key={item.competencyCatalogItemId}>
-                    <strong>{item.name}</strong>
-                    <small>
-                      {item.code} - {item.category} - {item.origin}
-                      {item.deprecated ? " - deprecated" : ""}
-                    </small>
-                    <code>{item.competencyCatalogItemId}</code>
-                  </li>
-                ))}
-                {catalogItems.length === 0 && <li>Nenhuma competencia disponivel.</li>}
-              </ul>
-            )}
-
-            {competencyTab === "organization" && (
-              <div className="competency-layout">
-                {canManageCompetencies ? (
+              {competencyTab === "global" && (
+                <div className="competency-layout">
                   <div className="competency-form">
                     <input
-                      aria-label="Codigo da competencia"
-                      placeholder="Codigo"
-                      value={organizationCompetencyDraft.code}
+                      aria-label="Codigo global"
+                      placeholder="Codigo global"
+                      value={globalCompetencyDraft.code}
                       onChange={(event) =>
-                        setOrganizationCompetencyDraft({
-                          ...organizationCompetencyDraft,
+                        setGlobalCompetencyDraft({
+                          ...globalCompetencyDraft,
                           code: event.target.value
                         })
                       }
                     />
                     <input
-                      aria-label="Nome da competencia"
-                      placeholder="Nome"
-                      value={organizationCompetencyDraft.name}
+                      aria-label="Nome global"
+                      placeholder="Nome global"
+                      value={globalCompetencyDraft.name}
                       onChange={(event) =>
-                        setOrganizationCompetencyDraft({
-                          ...organizationCompetencyDraft,
+                        setGlobalCompetencyDraft({
+                          ...globalCompetencyDraft,
                           name: event.target.value
                         })
                       }
                     />
                     <select
-                      aria-label="Categoria da competencia"
-                      value={organizationCompetencyDraft.category}
+                      aria-label="Categoria global"
+                      value={globalCompetencyDraft.category}
                       onChange={(event) =>
-                        setOrganizationCompetencyDraft({
-                          ...organizationCompetencyDraft,
+                        setGlobalCompetencyDraft({
+                          ...globalCompetencyDraft,
                           category: event.target.value as CompetencyCategory
                         })
                       }
@@ -3586,339 +3758,258 @@ export function App() {
                       ))}
                     </select>
                     <textarea
-                      aria-label="Definicao da competencia"
+                      aria-label="Definicao global"
                       placeholder="Definicao"
-                      value={organizationCompetencyDraft.definition}
+                      value={globalCompetencyDraft.definition}
                       onChange={(event) =>
-                        setOrganizationCompetencyDraft({
-                          ...organizationCompetencyDraft,
+                        setGlobalCompetencyDraft({
+                          ...globalCompetencyDraft,
                           definition: event.target.value
                         })
                       }
                     />
-                    <button type="button" onClick={createOrganizationCompetency}>
-                      Criar competencia
+                    <button type="button" onClick={createGlobalCompetency}>
+                      Criar global
                     </button>
                   </div>
-                ) : (
-                  <p>Visualizacao limitada ao catalogo utilizado.</p>
-                )}
 
-                <ul className="competency-list">
-                  {organizationCompetencies.map((competency) => (
-                    <li key={competency.id}>
-                      <strong>{competency.name}</strong>
-                      <small>
-                        {competency.code} - {competency.category} - {competency.status}
-                      </small>
-                      {canManageCompetencies && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            changeOrganizationCompetencyStatus(
-                              competency.id,
-                              competency.status === "active" ? "inactivate" : "activate"
-                            )
-                          }
-                        >
-                          {competency.status === "active" ? "Inativar" : "Ativar"}
-                        </button>
-                      )}
-                    </li>
-                  ))}
-                  {organizationCompetencies.length === 0 && <li>Nenhuma competencia propria.</li>}
-                </ul>
-              </div>
-            )}
-
-            {competencyTab === "global" && (
-              <div className="competency-layout">
-                <div className="competency-form">
-                  <input
-                    aria-label="Codigo global"
-                    placeholder="Codigo global"
-                    value={globalCompetencyDraft.code}
-                    onChange={(event) =>
-                      setGlobalCompetencyDraft({
-                        ...globalCompetencyDraft,
-                        code: event.target.value
-                      })
-                    }
-                  />
-                  <input
-                    aria-label="Nome global"
-                    placeholder="Nome global"
-                    value={globalCompetencyDraft.name}
-                    onChange={(event) =>
-                      setGlobalCompetencyDraft({
-                        ...globalCompetencyDraft,
-                        name: event.target.value
-                      })
-                    }
-                  />
-                  <select
-                    aria-label="Categoria global"
-                    value={globalCompetencyDraft.category}
-                    onChange={(event) =>
-                      setGlobalCompetencyDraft({
-                        ...globalCompetencyDraft,
-                        category: event.target.value as CompetencyCategory
-                      })
-                    }
-                  >
-                    {competencyCategories.map((category) => (
-                      <option key={category} value={category}>
-                        {category}
-                      </option>
-                    ))}
-                  </select>
-                  <textarea
-                    aria-label="Definicao global"
-                    placeholder="Definicao"
-                    value={globalCompetencyDraft.definition}
-                    onChange={(event) =>
-                      setGlobalCompetencyDraft({
-                        ...globalCompetencyDraft,
-                        definition: event.target.value
-                      })
-                    }
-                  />
-                  <button type="button" onClick={createGlobalCompetency}>
-                    Criar global
-                  </button>
-                </div>
-
-                <ul className="competency-list">
-                  {globalCompetencies.map((competency) => (
-                    <li key={competency.id}>
-                      <strong>{competency.name}</strong>
-                      <small>
-                        {competency.code} - {competency.category} - {competency.status}
-                      </small>
-                    </li>
-                  ))}
-                  {globalCompetencies.length === 0 && <li>Nenhuma global carregada.</li>}
-                </ul>
-
-                {canManageCompetencies && (
                   <ul className="competency-list">
-                    {availableGlobalCompetencies.map((competency) => (
+                    {globalCompetencies.map((competency) => (
                       <li key={competency.id}>
                         <strong>{competency.name}</strong>
                         <small>
-                          {competency.code} - {competency.category}
+                          {competency.code} - {competency.category} - {competency.status}
                         </small>
-                        <button type="button" onClick={() => adoptGlobalCompetency(competency.id)}>
-                          Adotar
-                        </button>
                       </li>
                     ))}
-                    {availableGlobalCompetencies.length === 0 && (
-                      <li>Nenhuma global disponivel para adocao.</li>
-                    )}
+                    {globalCompetencies.length === 0 && <li>Nenhuma global carregada.</li>}
                   </ul>
-                )}
-              </div>
-            )}
-          </div>
-        )}
 
-        {selectedOrganization && (
-          <div className="panel competencies-panel">
-            <span>Banco de Perguntas</span>
-            <div className="unit-toolbar">
-              <button type="button" onClick={() => setQuestionTab("catalog")}>
-                Catalogo Utilizado
-              </button>
-              {canManageQuestions && (
-                <>
-                  <button type="button" onClick={() => setQuestionTab("organization")}>
-                    Perguntas da Empresa
-                  </button>
-                  <button type="button" onClick={() => setQuestionTab("global")}>
-                    Biblioteca Global
-                  </button>
-                </>
+                  {canManageCompetencies && (
+                    <ul className="competency-list">
+                      {availableGlobalCompetencies.map((competency) => (
+                        <li key={competency.id}>
+                          <strong>{competency.name}</strong>
+                          <small>
+                            {competency.code} - {competency.category}
+                          </small>
+                          <button
+                            type="button"
+                            onClick={() => adoptGlobalCompetency(competency.id)}
+                          >
+                            Adotar
+                          </button>
+                        </li>
+                      ))}
+                      {availableGlobalCompetencies.length === 0 && (
+                        <li>Nenhuma global disponivel para adocao.</li>
+                      )}
+                    </ul>
+                  )}
+                </div>
               )}
             </div>
+          )}
 
-            {questionTab === "catalog" && (
-              <ul className="competency-list">
-                {questionCatalogItems.map((item) => (
-                  <li key={item.questionCatalogItemId}>
-                    <strong>{item.title}</strong>
-                    <small>
-                      {item.code} - {item.type} - {item.category} - {item.origin}
-                      {item.deprecated ? " - deprecated" : ""}
-                    </small>
-                    <code>{item.questionCatalogItemId}</code>
-                  </li>
-                ))}
-                {questionCatalogItems.length === 0 && <li>Nenhuma pergunta disponivel.</li>}
-              </ul>
-            )}
-
-            {questionTab === "organization" && (
-              <div className="competency-layout">
-                {canManageQuestions ? (
-                  <div className="competency-form">
-                    <input
-                      aria-label="Codigo da pergunta"
-                      placeholder="Codigo"
-                      value={organizationQuestionDraft.code}
-                      onChange={(event) =>
-                        setOrganizationQuestionDraft({
-                          ...organizationQuestionDraft,
-                          code: event.target.value
-                        })
-                      }
-                    />
-                    <input
-                      aria-label="Titulo da pergunta"
-                      placeholder="Titulo"
-                      value={organizationQuestionDraft.title}
-                      onChange={(event) =>
-                        setOrganizationQuestionDraft({
-                          ...organizationQuestionDraft,
-                          title: event.target.value
-                        })
-                      }
-                    />
-                    <textarea
-                      aria-label="Texto da pergunta"
-                      placeholder="Texto da pergunta"
-                      value={organizationQuestionDraft.questionText}
-                      onChange={(event) =>
-                        setOrganizationQuestionDraft({
-                          ...organizationQuestionDraft,
-                          questionText: event.target.value
-                        })
-                      }
-                    />
-                    <select
-                      aria-label="Tipo da pergunta"
-                      value={organizationQuestionDraft.type}
-                      onChange={(event) =>
-                        setOrganizationQuestionDraft({
-                          ...organizationQuestionDraft,
-                          type: event.target.value as QuestionType
-                        })
-                      }
-                    >
-                      {questionTypes.map((type) => (
-                        <option key={type} value={type}>
-                          {type}
-                        </option>
-                      ))}
-                    </select>
-                    <select
-                      aria-label="Categoria da pergunta"
-                      value={organizationQuestionDraft.category}
-                      onChange={(event) =>
-                        setOrganizationQuestionDraft({
-                          ...organizationQuestionDraft,
-                          category: event.target.value as QuestionCategory
-                        })
-                      }
-                    >
-                      {questionCategories.map((category) => (
-                        <option key={category} value={category}>
-                          {category}
-                        </option>
-                      ))}
-                    </select>
-                    <select
-                      aria-label="Competencia associada"
-                      value={organizationQuestionDraft.competencyCatalogItemId}
-                      onChange={(event) =>
-                        setOrganizationQuestionDraft({
-                          ...organizationQuestionDraft,
-                          competencyCatalogItemId: event.target.value
-                        })
-                      }
-                    >
-                      <option value="">Sem competencia</option>
-                      {catalogItems.map((item) => (
-                        <option
-                          key={item.competencyCatalogItemId}
-                          value={item.competencyCatalogItemId}
-                        >
-                          {item.name}
-                        </option>
-                      ))}
-                    </select>
-                    <button type="button" onClick={createOrganizationQuestion}>
-                      Criar pergunta
-                    </button>
-                  </div>
-                ) : (
-                  <p>Visualizacao limitada ao catalogo utilizado.</p>
-                )}
-
-                <ul className="competency-list">
-                  {organizationQuestions.map((question) => (
-                    <li key={question.id}>
-                      <strong>{question.title}</strong>
-                      <small>
-                        {question.code} - {question.type} - {question.category} - {question.status}
-                      </small>
-                      {canManageQuestions && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            changeOrganizationQuestionStatus(
-                              question.id,
-                              question.status === "active" ? "inactivate" : "activate"
-                            )
-                          }
-                        >
-                          {question.status === "active" ? "Inativar" : "Ativar"}
-                        </button>
-                      )}
-                    </li>
-                  ))}
-                  {organizationQuestions.length === 0 && <li>Nenhuma pergunta propria.</li>}
-                </ul>
-              </div>
-            )}
-
-            {questionTab === "global" && (
-              <div className="competency-layout">
-                <ul className="competency-list">
-                  {globalQuestions.map((question) => (
-                    <li key={question.id}>
-                      <strong>{question.title}</strong>
-                      <small>
-                        {question.code} - {question.type} - {question.category} - {question.status}
-                      </small>
-                    </li>
-                  ))}
-                  {globalQuestions.length === 0 && <li>Nenhuma pergunta global carregada.</li>}
-                </ul>
-
+          {selectedOrganization && (
+            <div className="panel competencies-panel" id="panel-questions">
+              <span>Banco de Perguntas</span>
+              <div className="unit-toolbar">
+                <button type="button" onClick={() => setQuestionTab("catalog")}>
+                  Catalogo Utilizado
+                </button>
                 {canManageQuestions && (
+                  <>
+                    <button type="button" onClick={() => setQuestionTab("organization")}>
+                      Perguntas da Empresa
+                    </button>
+                    <button type="button" onClick={() => setQuestionTab("global")}>
+                      Biblioteca Global
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {questionTab === "catalog" && (
+                <ul className="competency-list">
+                  {questionCatalogItems.map((item) => (
+                    <li key={item.questionCatalogItemId}>
+                      <strong>{item.title}</strong>
+                      <small>
+                        {item.code} - {item.type} - {item.category} - {item.origin}
+                        {item.deprecated ? " - deprecated" : ""}
+                      </small>
+                      <code>{item.questionCatalogItemId}</code>
+                    </li>
+                  ))}
+                  {questionCatalogItems.length === 0 && <li>Nenhuma pergunta disponivel.</li>}
+                </ul>
+              )}
+
+              {questionTab === "organization" && (
+                <div className="competency-layout">
+                  {canManageQuestions ? (
+                    <div className="competency-form">
+                      <input
+                        aria-label="Codigo da pergunta"
+                        placeholder="Codigo"
+                        value={organizationQuestionDraft.code}
+                        onChange={(event) =>
+                          setOrganizationQuestionDraft({
+                            ...organizationQuestionDraft,
+                            code: event.target.value
+                          })
+                        }
+                      />
+                      <input
+                        aria-label="Titulo da pergunta"
+                        placeholder="Titulo"
+                        value={organizationQuestionDraft.title}
+                        onChange={(event) =>
+                          setOrganizationQuestionDraft({
+                            ...organizationQuestionDraft,
+                            title: event.target.value
+                          })
+                        }
+                      />
+                      <textarea
+                        aria-label="Texto da pergunta"
+                        placeholder="Texto da pergunta"
+                        value={organizationQuestionDraft.questionText}
+                        onChange={(event) =>
+                          setOrganizationQuestionDraft({
+                            ...organizationQuestionDraft,
+                            questionText: event.target.value
+                          })
+                        }
+                      />
+                      <select
+                        aria-label="Tipo da pergunta"
+                        value={organizationQuestionDraft.type}
+                        onChange={(event) =>
+                          setOrganizationQuestionDraft({
+                            ...organizationQuestionDraft,
+                            type: event.target.value as QuestionType
+                          })
+                        }
+                      >
+                        {questionTypes.map((type) => (
+                          <option key={type} value={type}>
+                            {type}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        aria-label="Categoria da pergunta"
+                        value={organizationQuestionDraft.category}
+                        onChange={(event) =>
+                          setOrganizationQuestionDraft({
+                            ...organizationQuestionDraft,
+                            category: event.target.value as QuestionCategory
+                          })
+                        }
+                      >
+                        {questionCategories.map((category) => (
+                          <option key={category} value={category}>
+                            {category}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        aria-label="Competencia associada"
+                        value={organizationQuestionDraft.competencyCatalogItemId}
+                        onChange={(event) =>
+                          setOrganizationQuestionDraft({
+                            ...organizationQuestionDraft,
+                            competencyCatalogItemId: event.target.value
+                          })
+                        }
+                      >
+                        <option value="">Sem competencia</option>
+                        {catalogItems.map((item) => (
+                          <option
+                            key={item.competencyCatalogItemId}
+                            value={item.competencyCatalogItemId}
+                          >
+                            {item.name}
+                          </option>
+                        ))}
+                      </select>
+                      <button type="button" onClick={createOrganizationQuestion}>
+                        Criar pergunta
+                      </button>
+                    </div>
+                  ) : (
+                    <p>Visualizacao limitada ao catalogo utilizado.</p>
+                  )}
+
                   <ul className="competency-list">
-                    {availableGlobalQuestions.map((question) => (
+                    {organizationQuestions.map((question) => (
                       <li key={question.id}>
                         <strong>{question.title}</strong>
                         <small>
-                          {question.code} - {question.type} - {question.category}
+                          {question.code} - {question.type} - {question.category} -{" "}
+                          {question.status}
                         </small>
-                        <button type="button" onClick={() => adoptGlobalQuestion(question.id)}>
-                          Adotar
-                        </button>
+                        {canManageQuestions && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              changeOrganizationQuestionStatus(
+                                question.id,
+                                question.status === "active" ? "inactivate" : "activate"
+                              )
+                            }
+                          >
+                            {question.status === "active" ? "Inativar" : "Ativar"}
+                          </button>
+                        )}
                       </li>
                     ))}
-                    {availableGlobalQuestions.length === 0 && (
-                      <li>Nenhuma pergunta global disponivel para adocao.</li>
-                    )}
+                    {organizationQuestions.length === 0 && <li>Nenhuma pergunta propria.</li>}
                   </ul>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-      </section>
-    </main>
+                </div>
+              )}
+
+              {questionTab === "global" && (
+                <div className="competency-layout">
+                  <ul className="competency-list">
+                    {globalQuestions.map((question) => (
+                      <li key={question.id}>
+                        <strong>{question.title}</strong>
+                        <small>
+                          {question.code} - {question.type} - {question.category} -{" "}
+                          {question.status}
+                        </small>
+                      </li>
+                    ))}
+                    {globalQuestions.length === 0 && <li>Nenhuma pergunta global carregada.</li>}
+                  </ul>
+
+                  {canManageQuestions && (
+                    <ul className="competency-list">
+                      {availableGlobalQuestions.map((question) => (
+                        <li key={question.id}>
+                          <strong>{question.title}</strong>
+                          <small>
+                            {question.code} - {question.type} - {question.category}
+                          </small>
+                          <button type="button" onClick={() => adoptGlobalQuestion(question.id)}>
+                            Adotar
+                          </button>
+                        </li>
+                      ))}
+                      {availableGlobalQuestions.length === 0 && (
+                        <li>Nenhuma pergunta global disponivel para adocao.</li>
+                      )}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+      )}
+    </AppShell>
   );
 }

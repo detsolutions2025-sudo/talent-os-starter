@@ -1,0 +1,107 @@
+/*
+ * Design System v1 -- Home / Visao Geral (primeira demonstracao real do Design System).
+ */
+
+.ds-home {
+  display: grid;
+  gap: var(--space-8);
+}
+
+.ds-home__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: var(--space-4);
+}
+
+.ds-home__stat-label {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.ds-home__stat-value {
+  display: block;
+  margin-top: var(--space-2);
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+}
+
+.ds-home__stat-value--text {
+  font-size: var(--font-size-lg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ds-home__stat-hint {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-xs);
+}
+
+.ds-home__section-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-1);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+
+.ds-home__section-hint {
+  margin: 0 0 var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  max-width: 72ch;
+}
+
+.ds-home__shortcuts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-4);
+}
+
+.ds-home__shortcut-card {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+}
+
+.ds-home__shortcut-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-primary);
+}
+
+.ds-home__shortcut-description {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.ds-home__ai-modules {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.ds-home__ai-module {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+@media (max-width: 599px) {
+  .ds-home__stats,
+  .ds-home__shortcuts {
+    grid-template-columns: 1fr;
+  }
+}
