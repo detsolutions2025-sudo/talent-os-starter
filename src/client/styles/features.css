@@ -1,0 +1,233 @@
+/*
+ * Design System v1 -- Migracao Visual Wave 1 (Vagas, Candidatos, Processo Seletivo,
+ * Entrevistas). Estilos dos componentes novos (SectionHeader, FormSection, DataList) e do
+ * layout especifico das quatro features.
+ */
+
+/* SectionHeader */
+.ds-section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+}
+
+.ds-section-header__title {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+}
+
+.ds-section-header__description {
+  margin: var(--space-1) 0 0;
+  max-width: 62ch;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.ds-section-header__actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+/* FormSection */
+.ds-form-section__header {
+  margin-bottom: var(--space-3);
+}
+
+.ds-form-section__title {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+
+.ds-form-section__description {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.ds-form-section__fields {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.ds-form-section__actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  flex-wrap: wrap;
+}
+
+/* DataList */
+.ds-data-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ds-data-list__item {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  padding: var(--space-4);
+}
+
+.ds-data-list__row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.ds-data-list__main {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+  flex: 1;
+}
+
+.ds-data-list__title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.ds-data-list__title {
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+}
+
+.ds-data-list__meta {
+  display: grid;
+  gap: 2px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.ds-data-list__actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  flex: none;
+}
+
+/* Layout comum das features (grid principal + coluna lateral de formulario auxiliar) */
+.ds-feature {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.ds-feature__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.ds-feature__layout--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.ds-feature__main {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.ds-feature__aside {
+  display: grid;
+  gap: var(--space-4);
+}
+
+@media (max-width: 899px) {
+  .ds-feature__layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Pipeline visual simples (Processo Seletivo) -- sem drag-and-drop */
+.ds-pipeline {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(230px, 1fr);
+  gap: var(--space-3);
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
+}
+
+.ds-pipeline__column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+  padding: var(--space-3);
+}
+
+.ds-pipeline__column-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+.ds-pipeline__column-title {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-subtle);
+}
+
+.ds-pipeline__card {
+  display: grid;
+  gap: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  padding: var(--space-3);
+  box-shadow: var(--shadow-xs);
+}
+
+.ds-pipeline__card-title {
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+
+.ds-pipeline__card-meta {
+  display: grid;
+  gap: 2px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.ds-pipeline__card-actions {
+  display: flex;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+}
+
+.ds-pipeline__empty {
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-xs);
+  padding: var(--space-2) 0;
+}
+
+@media (max-width: 599px) {
+  .ds-pipeline {
+    grid-auto-columns: minmax(78vw, 1fr);
+  }
+}

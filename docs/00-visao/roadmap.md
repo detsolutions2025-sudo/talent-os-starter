@@ -582,3 +582,15 @@ reflete o ultimo clique, nao a posicao de rolagem); decomposicao mais
 profunda de `App.tsx` (permanece como um unico componente grande, apenas
 com a renderizacao do shell/Home extraida). Nenhuma mudanca de backend,
 autenticacao, multi-tenancy, RBAC ou migration.
+
+## Design System — Migracao Visual Wave 1 (2026-09-17)
+
+Migrados para o Design System v1: **Vagas**, **Candidatos**, **Processo
+Seletivo** e **Entrevistas**, extraidos de `App.tsx` para
+`src/client/features/{jobs,candidates,selection,interviews}/`. App.tsx
+segue como dono do state/composicao (decisao explicita desta Wave, para
+reduzir risco); apenas apresentacao/interacao visual foi extraida.
+Componentes novos nascidos do uso real: `SectionHeader`, `FormSection`,
+`DataList`/`DataListItem`. Processo Seletivo ganhou um pipeline visual por
+etapas (sem drag-and-drop). Nenhuma dependencia nova, nenhuma mudanca de
+backend/API/contrato. Demais modulos permanecem com o visual legado.

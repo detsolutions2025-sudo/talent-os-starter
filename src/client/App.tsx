@@ -19,20 +19,25 @@ import { NAV_GROUPS } from "./components/navigation/nav-config";
 import { Home } from "./components/dashboard/Home";
 import { Alert } from "./components/ui/Alert";
 import { PageHeader } from "./components/ui/PageHeader";
+import { JobsPanel } from "./features/jobs/JobsPanel";
+import { CandidatesPanel } from "./features/candidates/CandidatesPanel";
+import { SelectionPanel } from "./features/selection/SelectionPanel";
+import { InterviewsPanel } from "./features/interviews/InterviewsPanel";
 import "./styles/tokens.css";
 import "./styles/primitives.css";
 import "./styles/shell.css";
 import "./styles/dashboard.css";
+import "./styles/features.css";
 import "./styles.css";
 
-type Organization = {
+export type Organization = {
   id: string;
   name: string;
   slug: string;
   status: "active" | "archived";
 };
 
-type Membership = {
+export type Membership = {
   id: string;
   userId: string;
   role: "owner" | "admin" | "member";
@@ -240,7 +245,7 @@ type JobProfileDraft = {
   name: string;
 };
 
-type JobProfileVersion = {
+export type JobProfileVersion = {
   id: string;
   versionNumber: number | null;
   status: "draft" | "published" | "archived";
@@ -262,7 +267,7 @@ type JobProfileVersion = {
   discardedAt: string | null;
 };
 
-type JobOpening = {
+export type JobOpening = {
   id: string;
   code: string;
   title: string;
@@ -280,7 +285,7 @@ type JobOpening = {
   } | null;
 };
 
-type JobOpeningDraft = {
+export type JobOpeningDraft = {
   code: string;
   title: string;
   publicTitle: string;
@@ -290,7 +295,7 @@ type JobOpeningDraft = {
   showSalary: boolean;
 };
 
-type Candidate = {
+export type Candidate = {
   id: string;
   fullName: string;
   preferredName: string | null;
@@ -311,7 +316,7 @@ type Candidate = {
   professionalLinks: { type: string; url: string }[];
 };
 
-type CandidateDraft = {
+export type CandidateDraft = {
   fullName: string;
   preferredName: string;
   email: string;
@@ -321,11 +326,12 @@ type CandidateDraft = {
   professionalSummary: string;
 };
 
-type CandidateApplicationStatus = "active" | "withdrawn" | "rejected" | "hired" | "cancelled";
-type CandidateApplicationStage =
+export type CandidateApplicationStatus =
+  "active" | "withdrawn" | "rejected" | "hired" | "cancelled";
+export type CandidateApplicationStage =
   "applied" | "screening" | "interview" | "assessment" | "offer" | "completed";
 
-type CandidateApplication = {
+export type CandidateApplication = {
   id: string;
   candidateId?: string;
   jobOpeningId?: string;
@@ -351,14 +357,14 @@ type CandidateApplication = {
   notes?: CandidateApplicationNote[];
 };
 
-type CandidateApplicationNote = {
+export type CandidateApplicationNote = {
   id: string;
   content: string;
   createdByUserId: string;
   createdAt: string;
 };
 
-type CandidateApplicationDraft = {
+export type CandidateApplicationDraft = {
   candidateId: string;
   jobOpeningId: string;
   jobOpeningVersionId: string;
@@ -367,9 +373,9 @@ type CandidateApplicationDraft = {
   finalizationReason: string;
 };
 
-type InterviewStatus =
+export type InterviewStatus =
   "draft" | "scheduled" | "in_progress" | "completed" | "cancelled" | "no_show";
-type InterviewType =
+export type InterviewType =
   | "screening"
   | "behavioral"
   | "technical"
@@ -379,9 +385,9 @@ type InterviewType =
   | "panel"
   | "final"
   | "other";
-type InterviewLocationType = "onsite" | "video" | "phone" | "other";
+export type InterviewLocationType = "onsite" | "video" | "phone" | "other";
 
-type Interview = {
+export type Interview = {
   id: string;
   candidateApplicationId?: string;
   candidate_application_id?: string;
@@ -397,7 +403,7 @@ type Interview = {
   location_type?: InterviewLocationType;
 };
 
-type InterviewDraft = {
+export type InterviewDraft = {
   candidateApplicationId: string;
   title: string;
   type: InterviewType;
@@ -482,47 +488,9 @@ const emptyInterviewDraft: InterviewDraft = {
   reason: ""
 };
 
-const applicationStages: CandidateApplicationStage[] = [
-  "applied",
-  "screening",
-  "interview",
-  "assessment",
-  "offer",
-  "completed"
-];
-
-function applicationStatusOf(application: CandidateApplication) {
-  return application.applicationStatus ?? application.application_status ?? "active";
-}
-
-function applicationStageOf(application: CandidateApplication) {
-  return application.currentStage ?? application.current_stage ?? "applied";
-}
-
-function applicationAppliedAtOf(application: CandidateApplication) {
-  return application.appliedAt ?? application.applied_at ?? "";
-}
-
-function applicationCandidateName(application: CandidateApplication) {
-  return (
-    application.candidate?.fullName ??
-    application.candidate?.full_name ??
-    application.candidateId ??
-    application.id
-  );
-}
-
-function interviewApplicationId(interview: Interview) {
-  return interview.candidateApplicationId ?? interview.candidate_application_id ?? "";
-}
-
-function interviewScheduledStart(interview: Interview) {
-  return interview.scheduledStartAt ?? interview.scheduled_start_at ?? "";
-}
-
-function interviewScheduledEnd(interview: Interview) {
-  return interview.scheduledEndAt ?? interview.scheduled_end_at ?? "";
-}
+// applicationStatusOf/applicationStageOf/applicationCandidateName/interviewScheduledStart etc.
+// foram extraidos para src/client/features/{selection,interviews}/*-helpers.ts (Wave 1 da
+// migracao visual) -- usados apenas pelos paineis de Processo Seletivo e Entrevistas.
 
 const competencyCategories: CompetencyCategory[] = [
   "technical",
@@ -2918,682 +2886,67 @@ export function App() {
           )}
 
           {selectedOrganization && (
-            <div className="panel job-profiles-panel" id="panel-job-openings">
-              <span>Vagas</span>
-              <div className="job-profile-layout">
-                <div>
-                  {canManageJobOpenings && (
-                    <div className="job-profile-form">
-                      <input
-                        aria-label="Codigo da vaga"
-                        placeholder="Codigo"
-                        value={jobOpeningDraft.code}
-                        onChange={(event) =>
-                          setJobOpeningDraft({ ...jobOpeningDraft, code: event.target.value })
-                        }
-                      />
-                      <input
-                        aria-label="Titulo interno da vaga"
-                        placeholder="Titulo interno"
-                        value={jobOpeningDraft.title}
-                        onChange={(event) =>
-                          setJobOpeningDraft({ ...jobOpeningDraft, title: event.target.value })
-                        }
-                      />
-                      <input
-                        aria-label="Titulo publico da vaga"
-                        placeholder="Titulo publico"
-                        value={jobOpeningDraft.publicTitle}
-                        onChange={(event) =>
-                          setJobOpeningDraft({
-                            ...jobOpeningDraft,
-                            publicTitle: event.target.value
-                          })
-                        }
-                      />
-                      <input
-                        aria-label="Quantidade de posicoes"
-                        type="number"
-                        min="1"
-                        max="1000"
-                        value={jobOpeningDraft.positionsCount}
-                        onChange={(event) =>
-                          setJobOpeningDraft({
-                            ...jobOpeningDraft,
-                            positionsCount: Number(event.target.value)
-                          })
-                        }
-                      />
-                      <button
-                        type="button"
-                        onClick={createJobOpening}
-                        disabled={!publishedJobVersion}
-                      >
-                        Criar vaga
-                      </button>
-                    </div>
-                  )}
-
-                  <ul className="competency-list">
-                    {jobOpenings.map((opening) => (
-                      <li key={opening.id}>
-                        <strong>{opening.title}</strong>
-                        <small>
-                          {opening.code} - {opening.status} -{" "}
-                          {opening.isPubliclyAvailable ? "publica" : "restrita"}
-                        </small>
-                        {opening.publishedVersion && (
-                          <small>
-                            {opening.publishedVersion.publicTitle} -{" "}
-                            {opening.publishedVersion.positionsCount} posicao(oes)
-                          </small>
-                        )}
-                        <div className="member-actions">
-                          {canPublishJobOpenings && opening.status === "draft" && (
-                            <button type="button" onClick={() => publishAndOpenJobOpening(opening)}>
-                              Publicar e abrir
-                            </button>
-                          )}
-                          {canManageJobOpenings && opening.status === "open" && (
-                            <button
-                              type="button"
-                              onClick={() => publishJobOpeningPublicly(opening)}
-                            >
-                              Divulgar
-                            </button>
-                          )}
-                        </div>
-                      </li>
-                    ))}
-                    {jobOpenings.length === 0 && <li>Nenhuma vaga cadastrada.</li>}
-                  </ul>
-                </div>
-
-                <div className="job-profile-form">
-                  <strong>Divulgacao publica</strong>
-                  <input
-                    aria-label="Slug publico"
-                    placeholder="slug-publico"
-                    value={jobOpeningDraft.publicSlug}
-                    onChange={(event) =>
-                      setJobOpeningDraft({ ...jobOpeningDraft, publicSlug: event.target.value })
-                    }
-                  />
-                  <input
-                    aria-label="Prazo de candidatura"
-                    type="datetime-local"
-                    value={jobOpeningDraft.applicationDeadline}
-                    onChange={(event) =>
-                      setJobOpeningDraft({
-                        ...jobOpeningDraft,
-                        applicationDeadline: event.target.value
-                      })
-                    }
-                  />
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={jobOpeningDraft.showSalary}
-                      onChange={(event) =>
-                        setJobOpeningDraft({
-                          ...jobOpeningDraft,
-                          showSalary: event.target.checked
-                        })
-                      }
-                    />
-                    Exibir faixa salarial publicamente
-                  </label>
-                </div>
-              </div>
+            <div id="panel-job-openings">
+              <JobsPanel
+                canManage={canManageJobOpenings}
+                canPublishOpenings={canPublishJobOpenings}
+                jobOpenings={jobOpenings}
+                draft={jobOpeningDraft}
+                onDraftChange={(patch) => setJobOpeningDraft({ ...jobOpeningDraft, ...patch })}
+                publishedJobVersionAvailable={Boolean(publishedJobVersion)}
+                onCreate={createJobOpening}
+                onPublishAndOpen={publishAndOpenJobOpening}
+                onPublishPublicly={publishJobOpeningPublicly}
+              />
             </div>
           )}
 
           {selectedOrganization && (
-            <div className="panel job-profiles-panel" id="panel-candidates">
-              <span>Candidatos</span>
-              <div className="job-profile-layout">
-                <div>
-                  {canManageCandidates && (
-                    <div className="job-profile-form">
-                      <input
-                        aria-label="Nome do candidato"
-                        placeholder="Nome completo"
-                        value={candidateDraft.fullName}
-                        onChange={(event) =>
-                          setCandidateDraft({ ...candidateDraft, fullName: event.target.value })
-                        }
-                      />
-                      <input
-                        aria-label="Nome preferido do candidato"
-                        placeholder="Nome preferido"
-                        value={candidateDraft.preferredName}
-                        onChange={(event) =>
-                          setCandidateDraft({
-                            ...candidateDraft,
-                            preferredName: event.target.value
-                          })
-                        }
-                      />
-                      <input
-                        aria-label="Email do candidato"
-                        placeholder="email@exemplo.com"
-                        value={candidateDraft.email}
-                        onChange={(event) =>
-                          setCandidateDraft({ ...candidateDraft, email: event.target.value })
-                        }
-                      />
-                      <select
-                        aria-label="Origem do candidato"
-                        value={candidateDraft.source}
-                        onChange={(event) =>
-                          setCandidateDraft({ ...candidateDraft, source: event.target.value })
-                        }
-                      >
-                        {[
-                          "career_page",
-                          "referral",
-                          "recruiter",
-                          "agency",
-                          "linkedin",
-                          "job_board",
-                          "event",
-                          "import",
-                          "manual",
-                          "other"
-                        ].map((source) => (
-                          <option key={source} value={source}>
-                            {source}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        aria-label="Cidade do candidato"
-                        placeholder="Cidade"
-                        value={candidateDraft.city}
-                        onChange={(event) =>
-                          setCandidateDraft({ ...candidateDraft, city: event.target.value })
-                        }
-                      />
-                      <input
-                        aria-label="Estado do candidato"
-                        placeholder="Estado"
-                        value={candidateDraft.state}
-                        onChange={(event) =>
-                          setCandidateDraft({ ...candidateDraft, state: event.target.value })
-                        }
-                      />
-                      <textarea
-                        aria-label="Resumo profissional do candidato"
-                        placeholder="Resumo profissional"
-                        value={candidateDraft.professionalSummary}
-                        onChange={(event) =>
-                          setCandidateDraft({
-                            ...candidateDraft,
-                            professionalSummary: event.target.value
-                          })
-                        }
-                      />
-                      <button type="button" onClick={createCandidate}>
-                        Criar candidato
-                      </button>
-                    </div>
-                  )}
-
-                  <ul className="competency-list">
-                    {candidates.map((candidate) => (
-                      <li key={candidate.id}>
-                        <strong>{candidate.fullName}</strong>
-                        <small>
-                          {candidate.preferredName ? `${candidate.preferredName} - ` : ""}
-                          {candidate.status} - {candidate.source}
-                        </small>
-                        <small>
-                          {candidate.location?.city ?? candidate.city}{" "}
-                          {candidate.location?.state ?? candidate.state}
-                        </small>
-                        {candidate.professionalSummary && <p>{candidate.professionalSummary}</p>}
-                        <small>
-                          {candidate.experiences.length} experiencia(s),{" "}
-                          {candidate.education.length} escolaridade(s), {candidate.languages.length}{" "}
-                          idioma(s)
-                        </small>
-                        {canManageCandidates && candidate.status === "active" && (
-                          <button
-                            type="button"
-                            onClick={() => changeCandidateStatus(candidate, "inactivate")}
-                          >
-                            Inativar
-                          </button>
-                        )}
-                      </li>
-                    ))}
-                    {candidates.length === 0 && <li>Nenhum candidato ativo.</li>}
-                  </ul>
-                </div>
-
-                {canManageCandidates && (
-                  <div>
-                    <strong>Inativos</strong>
-                    <ul className="competency-list">
-                      {inactiveCandidates.map((candidate) => (
-                        <li key={candidate.id}>
-                          <strong>{candidate.fullName}</strong>
-                          <small>{candidate.source}</small>
-                          <button
-                            type="button"
-                            onClick={() => changeCandidateStatus(candidate, "reactivate")}
-                          >
-                            Reativar
-                          </button>
-                        </li>
-                      ))}
-                      {inactiveCandidates.length === 0 && <li>Nenhum candidato inativo.</li>}
-                    </ul>
-                  </div>
-                )}
-              </div>
+            <div id="panel-candidates">
+              <CandidatesPanel
+                canManage={canManageCandidates}
+                candidates={candidates}
+                inactiveCandidates={inactiveCandidates}
+                draft={candidateDraft}
+                onDraftChange={(patch) => setCandidateDraft({ ...candidateDraft, ...patch })}
+                onCreate={createCandidate}
+                onChangeStatus={changeCandidateStatus}
+              />
             </div>
           )}
 
           {selectedOrganization && (
-            <div className="panel job-profiles-panel" id="panel-applications">
-              <span>Processo Seletivo</span>
-              <div className="job-profile-layout">
-                <div>
-                  {canManageApplications && (
-                    <div className="job-profile-form">
-                      <select
-                        aria-label="Candidato da candidatura"
-                        value={candidateApplicationDraft.candidateId}
-                        onChange={(event) =>
-                          setCandidateApplicationDraft({
-                            ...candidateApplicationDraft,
-                            candidateId: event.target.value
-                          })
-                        }
-                      >
-                        <option value="">Candidato ativo</option>
-                        {candidates.map((candidate) => (
-                          <option key={candidate.id} value={candidate.id}>
-                            {candidate.fullName}
-                          </option>
-                        ))}
-                      </select>
-                      <select
-                        aria-label="Vaga da candidatura"
-                        value={candidateApplicationDraft.jobOpeningId}
-                        onChange={(event) => {
-                          const opening = jobOpenings.find(
-                            (candidate) => candidate.id === event.target.value
-                          );
-                          setCandidateApplicationDraft({
-                            ...candidateApplicationDraft,
-                            jobOpeningId: event.target.value,
-                            jobOpeningVersionId: opening?.publishedVersion?.id ?? ""
-                          });
-                        }}
-                      >
-                        <option value="">Vaga aberta</option>
-                        {jobOpenings
-                          .filter(
-                            (opening) => opening.status === "open" && opening.publishedVersion
-                          )
-                          .map((opening) => (
-                            <option key={opening.id} value={opening.id}>
-                              {opening.title}
-                            </option>
-                          ))}
-                      </select>
-                      <select
-                        aria-label="Origem da candidatura"
-                        value={candidateApplicationDraft.source}
-                        onChange={(event) =>
-                          setCandidateApplicationDraft({
-                            ...candidateApplicationDraft,
-                            source: event.target.value
-                          })
-                        }
-                      >
-                        {["career_page", "referral", "recruiter", "import", "manual", "other"].map(
-                          (source) => (
-                            <option key={source} value={source}>
-                              {source}
-                            </option>
-                          )
-                        )}
-                      </select>
-                      <button type="button" onClick={createCandidateApplication}>
-                        Criar candidatura
-                      </button>
-                    </div>
-                  )}
-
-                  <ul className="competency-list">
-                    {candidateApplications.map((application) => {
-                      const status = applicationStatusOf(application);
-                      const currentStage = applicationStageOf(application);
-                      const opening = jobOpenings.find(
-                        (entry) => entry.id === application.jobOpeningId
-                      );
-                      const stageIndex = applicationStages.indexOf(currentStage);
-                      return (
-                        <li key={application.id}>
-                          <strong>{applicationCandidateName(application)}</strong>
-                          <small>
-                            {opening?.title ??
-                              application.job_opening?.title ??
-                              application.jobOpeningId ??
-                              "vaga"}{" "}
-                            - {status} - {currentStage}
-                          </small>
-                          <small>
-                            {application.source ?? "origem restrita"} -{" "}
-                            {applicationAppliedAtOf(application)
-                              ? new Date(applicationAppliedAtOf(application)).toLocaleString()
-                              : "data restrita"}
-                          </small>
-                          {canManageApplications && status === "active" && (
-                            <div className="member-actions">
-                              {stageIndex > 0 && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    moveCandidateApplication(
-                                      application,
-                                      applicationStages[stageIndex - 1]
-                                    )
-                                  }
-                                >
-                                  Voltar etapa
-                                </button>
-                              )}
-                              {stageIndex < applicationStages.length - 1 && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    moveCandidateApplication(
-                                      application,
-                                      applicationStages[stageIndex + 1]
-                                    )
-                                  }
-                                >
-                                  Avancar etapa
-                                </button>
-                              )}
-                              <button
-                                type="button"
-                                onClick={() => addCandidateApplicationNote(application)}
-                              >
-                                Adicionar nota
-                              </button>
-                            </div>
-                          )}
-                          {canManageApplications && status === "active" && (
-                            <div className="member-actions">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  finalizeCandidateApplication(application, "withdraw")
-                                }
-                              >
-                                Retirar
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => finalizeCandidateApplication(application, "reject")}
-                              >
-                                Rejeitar
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => finalizeCandidateApplication(application, "cancel")}
-                              >
-                                Cancelar
-                              </button>
-                              {canHireApplications && (
-                                <button
-                                  type="button"
-                                  onClick={() => finalizeCandidateApplication(application, "hire")}
-                                >
-                                  Contratar
-                                </button>
-                              )}
-                            </div>
-                          )}
-                        </li>
-                      );
-                    })}
-                    {candidateApplications.length === 0 && <li>Nenhuma candidatura cadastrada.</li>}
-                  </ul>
-                </div>
-
-                {canManageApplications && (
-                  <div className="job-profile-form">
-                    <strong>Operacoes</strong>
-                    <textarea
-                      aria-label="Nota da candidatura"
-                      placeholder="Nota interna da candidatura"
-                      value={candidateApplicationDraft.note}
-                      onChange={(event) =>
-                        setCandidateApplicationDraft({
-                          ...candidateApplicationDraft,
-                          note: event.target.value
-                        })
-                      }
-                    />
-                    <textarea
-                      aria-label="Motivo de finalizacao"
-                      placeholder="Motivo de finalizacao"
-                      value={candidateApplicationDraft.finalizationReason}
-                      onChange={(event) =>
-                        setCandidateApplicationDraft({
-                          ...candidateApplicationDraft,
-                          finalizationReason: event.target.value
-                        })
-                      }
-                    />
-                  </div>
-                )}
-              </div>
+            <div id="panel-applications">
+              <SelectionPanel
+                canManage={canManageApplications}
+                canHire={canHireApplications}
+                applications={candidateApplications}
+                candidates={candidates}
+                jobOpenings={jobOpenings}
+                draft={candidateApplicationDraft}
+                onDraftChange={(patch) =>
+                  setCandidateApplicationDraft({ ...candidateApplicationDraft, ...patch })
+                }
+                onCreate={createCandidateApplication}
+                onMoveStage={moveCandidateApplication}
+                onFinalize={finalizeCandidateApplication}
+                onAddNote={addCandidateApplicationNote}
+              />
             </div>
           )}
 
           {selectedOrganization && (
-            <div className="panel job-profiles-panel" id="panel-interviews">
-              <span>Entrevistas</span>
-              <div className="job-profile-layout">
-                <div>
-                  {canManageInterviews && (
-                    <div className="job-profile-form">
-                      <select
-                        aria-label="Candidatura da entrevista"
-                        value={interviewDraft.candidateApplicationId}
-                        onChange={(event) =>
-                          setInterviewDraft({
-                            ...interviewDraft,
-                            candidateApplicationId: event.target.value
-                          })
-                        }
-                      >
-                        <option value="">Candidatura ativa</option>
-                        {candidateApplications
-                          .filter((application) => applicationStatusOf(application) === "active")
-                          .map((application) => (
-                            <option key={application.id} value={application.id}>
-                              {applicationCandidateName(application)}
-                            </option>
-                          ))}
-                      </select>
-                      <input
-                        aria-label="Titulo da entrevista"
-                        placeholder="Titulo"
-                        value={interviewDraft.title}
-                        onChange={(event) =>
-                          setInterviewDraft({ ...interviewDraft, title: event.target.value })
-                        }
-                      />
-                      <select
-                        aria-label="Tipo da entrevista"
-                        value={interviewDraft.type}
-                        onChange={(event) =>
-                          setInterviewDraft({
-                            ...interviewDraft,
-                            type: event.target.value as InterviewType
-                          })
-                        }
-                      >
-                        {[
-                          "screening",
-                          "behavioral",
-                          "technical",
-                          "cultural",
-                          "leadership",
-                          "management",
-                          "panel",
-                          "final",
-                          "other"
-                        ].map((type) => (
-                          <option key={type} value={type}>
-                            {type}
-                          </option>
-                        ))}
-                      </select>
-                      <button type="button" onClick={createInterview}>
-                        Criar entrevista
-                      </button>
-                    </div>
-                  )}
-
-                  <ul className="competency-list">
-                    {interviews.map((interview) => {
-                      const application = candidateApplications.find(
-                        (candidate) => candidate.id === interviewApplicationId(interview)
-                      );
-                      return (
-                        <li key={interview.id}>
-                          <strong>{interview.title}</strong>
-                          <small>
-                            {application ? applicationCandidateName(application) : interview.id} -{" "}
-                            {interview.type} - {interview.status}
-                          </small>
-                          <small>
-                            {interviewScheduledStart(interview)
-                              ? `${new Date(interviewScheduledStart(interview)).toLocaleString()} ate ${new Date(
-                                  interviewScheduledEnd(interview)
-                                ).toLocaleString()}`
-                              : "sem agenda"}
-                          </small>
-                          {canManageInterviews && (
-                            <div className="member-actions">
-                              {interview.status === "draft" && (
-                                <button type="button" onClick={() => scheduleInterview(interview)}>
-                                  Agendar
-                                </button>
-                              )}
-                              {interview.status === "scheduled" && (
-                                <button
-                                  type="button"
-                                  onClick={() => changeInterviewStatus(interview, "start")}
-                                >
-                                  Iniciar
-                                </button>
-                              )}
-                              {["draft", "scheduled", "in_progress"].includes(interview.status) && (
-                                <button
-                                  type="button"
-                                  onClick={() => changeInterviewStatus(interview, "cancel")}
-                                >
-                                  Cancelar
-                                </button>
-                              )}
-                              {interview.status === "scheduled" && (
-                                <button
-                                  type="button"
-                                  onClick={() => changeInterviewStatus(interview, "no-show")}
-                                >
-                                  No-show
-                                </button>
-                              )}
-                            </div>
-                          )}
-                        </li>
-                      );
-                    })}
-                    {interviews.length === 0 && <li>Nenhuma entrevista cadastrada.</li>}
-                  </ul>
-                </div>
-
-                {canManageInterviews && (
-                  <div className="job-profile-form">
-                    <strong>Agenda</strong>
-                    <input
-                      aria-label="Inicio da entrevista"
-                      type="datetime-local"
-                      value={interviewDraft.scheduledStartAt}
-                      onChange={(event) =>
-                        setInterviewDraft({
-                          ...interviewDraft,
-                          scheduledStartAt: event.target.value
-                        })
-                      }
-                    />
-                    <input
-                      aria-label="Fim da entrevista"
-                      type="datetime-local"
-                      value={interviewDraft.scheduledEndAt}
-                      onChange={(event) =>
-                        setInterviewDraft({
-                          ...interviewDraft,
-                          scheduledEndAt: event.target.value
-                        })
-                      }
-                    />
-                    <input
-                      aria-label="Fuso da entrevista"
-                      placeholder="Timezone"
-                      value={interviewDraft.timezone}
-                      onChange={(event) =>
-                        setInterviewDraft({ ...interviewDraft, timezone: event.target.value })
-                      }
-                    />
-                    <select
-                      aria-label="Local da entrevista"
-                      value={interviewDraft.locationType}
-                      onChange={(event) =>
-                        setInterviewDraft({
-                          ...interviewDraft,
-                          locationType: event.target.value as InterviewLocationType
-                        })
-                      }
-                    >
-                      {["onsite", "video", "phone", "other"].map((type) => (
-                        <option key={type} value={type}>
-                          {type}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      aria-label="Detalhes do local"
-                      placeholder="Detalhes do local"
-                      value={interviewDraft.locationDetails}
-                      onChange={(event) =>
-                        setInterviewDraft({
-                          ...interviewDraft,
-                          locationDetails: event.target.value
-                        })
-                      }
-                    />
-                    <textarea
-                      aria-label="Motivo da entrevista"
-                      placeholder="Motivo para cancelamento ou no-show"
-                      value={interviewDraft.reason}
-                      onChange={(event) =>
-                        setInterviewDraft({ ...interviewDraft, reason: event.target.value })
-                      }
-                    />
-                  </div>
-                )}
-              </div>
+            <div id="panel-interviews">
+              <InterviewsPanel
+                canManage={canManageInterviews}
+                interviews={interviews}
+                applications={candidateApplications}
+                draft={interviewDraft}
+                onDraftChange={(patch) => setInterviewDraft({ ...interviewDraft, ...patch })}
+                onCreate={createInterview}
+                onSchedule={scheduleInterview}
+                onChangeStatus={changeInterviewStatus}
+              />
             </div>
           )}
 
