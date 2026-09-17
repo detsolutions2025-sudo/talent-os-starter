@@ -5,11 +5,11 @@ import { BehavioralInstrumentPanel } from "./BehavioralInstrumentPanel";
 import { BehavioralAssessmentPanel } from "./BehavioralAssessmentPanel";
 import { PreAnalysisPanel } from "./PreAnalysisPanel";
 import { CandidateDossierPanel } from "./CandidateDossierPanel";
-import { OnboardingPanel } from "./OnboardingPanel";
-import { EmploymentPanel } from "./EmploymentPanel";
-import { DevelopmentRetentionPanel } from "./DevelopmentRetentionPanel";
-import { OffboardingPanel } from "./OffboardingPanel";
-import { AccessGrantPanel } from "./AccessGrantPanel";
+import { OnboardingPanel } from "./features/onboarding/OnboardingPanel";
+import { EmploymentPanel } from "./features/employment/EmploymentPanel";
+import { DevelopmentRetentionPanel } from "./features/development/DevelopmentRetentionPanel";
+import { OffboardingPanel } from "./features/offboarding/OffboardingPanel";
+import { AccessGrantPanel } from "./features/access/AccessGrantPanel";
 import { InvitationPanel } from "./InvitationPanel";
 import { ProposalPanel } from "./ProposalPanel";
 import { AppShell } from "./components/layout/AppShell";
@@ -2229,6 +2229,15 @@ export function App() {
           )}
 
           {selectedOrganization && (
+            <EmploymentPanel
+              organizationId={selectedOrganization.id}
+              role={currentMembership?.role}
+              headers={devHeaders}
+              applications={candidateApplications}
+            />
+          )}
+
+          {selectedOrganization && (
             <div id="panel-onboarding">
               <OnboardingPanel
                 organizationId={selectedOrganization.id}
@@ -2236,17 +2245,6 @@ export function App() {
                 headers={devHeaders}
                 applications={candidateApplications}
                 memberships={memberships}
-              />
-            </div>
-          )}
-
-          {selectedOrganization && (
-            <div id="panel-employment">
-              <EmploymentPanel
-                organizationId={selectedOrganization.id}
-                role={currentMembership?.role}
-                headers={devHeaders}
-                applications={candidateApplications}
               />
             </div>
           )}

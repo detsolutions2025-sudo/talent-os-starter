@@ -44,8 +44,9 @@ export const NAV_GROUPS: NavGroup[] = [
     id: "pessoas",
     label: "Pessoas",
     items: [
+      { id: "panel-people", label: "Pessoas" },
+      { id: "panel-employment", label: "Vínculos (Employment)" },
       { id: "panel-onboarding", label: "Onboarding" },
-      { id: "panel-employment", label: "Pessoas e Vínculos" },
       { id: "panel-offboarding", label: "Offboarding" }
     ]
   },

@@ -610,3 +610,34 @@ confirmou que seu readiness nunca usa IA (`src/server/blueprints/
 readiness.ts`, RN-024) -- a marcacao `ai: true` herdada da Wave 0 foi
 corrigida (removida do nav e do Home). Nenhuma dependencia nova, nenhuma
 mudanca de backend/API/contrato/migration.
+
+## Design System — Migracao Visual Wave 3 (2026-09-17)
+
+Migrados: **Pessoas** (OrganizationPerson), **Employment** (vinculos),
+**Onboarding**, **Offboarding**, **AccessGrant** (Ciclo de Vida de
+Acesso) e **Desenvolvimento e Retencao**, relocados para
+`src/client/features/{employment,onboarding,offboarding,access,
+development}/` -- visual apenas, mesma logica/fetch/payload das Fases
+24-28. Diferente das Waves 1-2, esses cinco modulos ja eram componentes
+autonomos (dono do proprio state/fetch, sem App.tsx no meio) desde as
+fases originais -- por isso a Wave manteve esse padrao (o mesmo ja usado
+pelo Blueprint na Wave 2) em vez de migrar para o modelo "App.tsx dono do
+state"; e por isso o LOC de App.tsx nao muda de forma relevante nesta
+rodada (a decomposicao real ja tinha acontecido antes da Wave 3). Pessoas
+(identidade de OrganizationPerson) ganhou uma secao visual propria
+(`#panel-people`, item de nav dedicado) dentro do mesmo componente que ja
+buscava essa lista para Employment -- sem endpoint novo, sem duplicar
+fetch, com o mesmo dado agora contextualizando os dois blocos. Componente
+novo compartilhado: `TaskList` (Onboarding + Offboarding, que tinham
+tarefas identicas em formato e regra de apresentacao). Nenhuma metrica de
+score/ranking/risco foi introduzida em Desenvolvimento e Retencao; nenhum
+AiBadge foi aplicado (nenhum destes modulos aciona AI Gateway). Nenhuma
+dependencia nova, nenhuma mudanca de backend/API/contrato/migration/RBAC.
+
+**Limitacao registrada (nao contornada):** Onboarding, Offboarding e
+AccessGrant continuam mostrando o identificador bruto (UUID) de
+Employment/OrganizationPerson em vez do nome da pessoa, porque resolver
+esse nome exigiria um fetch adicional que essas telas nao faziam antes --
+fora do escopo "visual apenas" desta Wave. Um modulo futuro de contexto
+de pessoa entre paineis (ou um endpoint agregado) resolveria isso sem
+duplicar chamadas.

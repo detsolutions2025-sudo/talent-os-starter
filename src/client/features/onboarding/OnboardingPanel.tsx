@@ -1,4 +1,22 @@
 import { useMemo, useState } from "react";
+import { Alert } from "../../components/ui/Alert";
+import { Badge } from "../../components/ui/Badge";
+import { Button } from "../../components/ui/Button";
+import { Card, CardHeader } from "../../components/ui/Card";
+import { Checkbox } from "../../components/ui/Checkbox";
+import { ConfigStatus } from "../../components/ui/ConfigStatus";
+import { FormSection } from "../../components/ui/FormSection";
+import { Input } from "../../components/ui/Input";
+import { Select } from "../../components/ui/Select";
+import { SectionHeader } from "../../components/ui/SectionHeader";
+import { Textarea } from "../../components/ui/Textarea";
+import { TaskList } from "../shared/TaskList";
+import type { LifecycleTaskView, MembershipOption } from "../shared/types";
+
+// Migrado para o Design System v1 na Wave 3 (visual apenas -- toda a logica interna,
+// chamadas de API e sequencia de operacoes permanecem identicas ao componente original de
+// Fase 26). Onboarding continua vinculado a uma candidatura hired; o vinculo opcional com
+// Employment usa o endpoint de listagem ja existente (nenhuma rota nova).
 
 type ApplicationOption = {
   id: string;
@@ -8,13 +26,6 @@ type ApplicationOption = {
   application_status?: string;
 };
 
-type MembershipOption = {
-  id: string;
-  role: "owner" | "admin" | "member";
-  status: "active" | "inactive";
-  user?: { name: string; email: string } | null;
-};
-
 type OnboardingView = {
   id: string;
   candidateApplicationId: string;
@@ -22,27 +33,22 @@ type OnboardingView = {
   expectedPersonStartDate: string | null;
   employmentId?: string | null;
   progress: { numerator: number; denominator: number; percent: number };
-  tasks: OnboardingTaskView[];
+  tasks: LifecycleTaskView[];
 };
 
-// Fase 26 (SPEC-016 v1.1 s45.1): somente `pending`/`active` sao elegiveis
-// para vinculo. Somente identificadores minimos -- nunca nome, e-mail ou
-// qualquer dado da OrganizationPerson.
+// Fase 26 (SPEC-016 v1.1 s45.1): somente `pending`/`active` sao elegiveis para vinculo.
+// Somente identificadores minimos -- nunca nome, e-mail ou qualquer dado da OrganizationPerson.
 type EmploymentOption = {
   id: string;
   status: "pending" | "active" | "ended" | "cancelled";
 };
 
-type OnboardingTaskView = {
-  id: string;
-  title: string;
-  description: string | null;
-  isRequired: boolean;
-  status: "open" | "completed" | "cancelled";
-  assigneeMembershipId: string | null;
-  dueAt: string | null;
-  cancellationReason: string | null;
-};
+const statusTone = {
+  draft: "neutral",
+  in_progress: "info",
+  completed: "success",
+  cancelled: "danger"
+} as const;
 
 export function OnboardingPanel({
   organizationId,
@@ -195,11 +201,10 @@ export function OnboardingPanel({
       .catch((error: Error) => setMessage(error.message));
   }
 
-  // Fase 26 (SPEC-016 v1.1 s45.1, s48): reaproveita o endpoint ja existente
-  // de listagem de Employments (owner/admin), sem criar rota nova, e filtra
-  // client-side apenas os estados elegiveis para vinculo (pending/active).
-  // Employment nao sabe se ja esta vinculado a outro Onboarding -- um
-  // conflito de cardinalidade, se ocorrer, e recusado no submit (secao 5).
+  // Fase 26 (SPEC-016 v1.1 s45.1, s48): reaproveita o endpoint ja existente de listagem de
+  // Employments (owner/admin), sem criar rota nova, e filtra client-side apenas os estados
+  // elegiveis para vinculo (pending/active). Employment nao sabe se ja esta vinculado a outro
+  // Onboarding -- um conflito de cardinalidade, se ocorrer, e recusado no submit.
   function loadEligibleEmployments() {
     fetch(`/api/organizations/${organizationId}/employments`, { headers })
       .then(async (response) => {
@@ -234,11 +239,18 @@ export function OnboardingPanel({
   }
 
   return (
-    <section className="panel onboarding-panel">
-      <span>Onboarding</span>
-      <label>
-        Candidatura hired
-        <select
+    <div className="ds-feature">
+      <SectionHeader
+        title="Onboarding"
+        description="Progresso operacional de integração de uma pessoa recém-contratada, com tarefas obrigatórias e opcionais."
+      />
+
+      {message && <Alert tone="info">{message}</Alert>}
+
+      <Card>
+        <CardHeader title="Candidatura" />
+        <Select
+          label="Candidatura hired"
           value={applicationId}
           onChange={(event) => {
             setApplicationId(event.target.value);
@@ -255,172 +267,154 @@ export function OnboardingPanel({
                 application.id}
             </option>
           ))}
-        </select>
-      </label>
+        </Select>
 
-      {canManage && applicationId && !onboarding && (
-        <div className="form-grid">
-          <input
-            aria-label="Data prevista de inicio"
-            type="date"
-            value={expectedStartDate}
-            onChange={(event) => setExpectedStartDate(event.target.value)}
-          />
-          <button type="button" onClick={createOnboarding}>
-            Criar Onboarding
-          </button>
-        </div>
-      )}
+        {canManage && applicationId && !onboarding && (
+          <FormSection
+            title="Criar Onboarding"
+            actions={<Button onClick={createOnboarding}>Criar Onboarding</Button>}
+          >
+            <Input
+              label="Data prevista de início"
+              type="date"
+              value={expectedStartDate}
+              onChange={(event) => setExpectedStartDate(event.target.value)}
+            />
+          </FormSection>
+        )}
+      </Card>
 
       {onboarding && (
         <>
-          <p>
-            {onboarding.status} - {onboarding.progress.percent}% ({onboarding.progress.numerator}/
-            {onboarding.progress.denominator})
-          </p>
+          <Card>
+            <CardHeader
+              title="Status"
+              action={<Badge tone={statusTone[onboarding.status]}>{onboarding.status}</Badge>}
+            />
+            <ConfigStatus
+              label={`${onboarding.progress.numerator} de ${onboarding.progress.denominator} concluídas`}
+              tone={statusTone[onboarding.status]}
+              meta={`${onboarding.progress.percent}%`}
+              description={
+                onboarding.employmentId ? `Employment vinculado: ${onboarding.employmentId}` : null
+              }
+            />
 
-          {canManage && (
-            <div className="actions">
-              <button type="button" onClick={() => postOnboardingAction("start")}>
-                Iniciar
-              </button>
-              <button type="button" onClick={() => postOnboardingAction("complete")}>
-                Concluir
-              </button>
-              <input
-                aria-label="Motivo operacional de Onboarding"
-                placeholder="Motivo"
-                value={reason}
-                onChange={(event) => setReason(event.target.value)}
-              />
-              <button type="button" onClick={() => postOnboardingAction("cancel")}>
-                Cancelar
-              </button>
-            </div>
-          )}
-
-          {onboarding.employmentId && <p>Employment vinculado: {onboarding.employmentId}</p>}
-
-          {canManage &&
-            !onboarding.employmentId &&
-            (onboarding.status === "draft" || onboarding.status === "in_progress") && (
-              <div className="form-grid">
-                <button type="button" onClick={loadEligibleEmployments}>
-                  Carregar Employments elegiveis
-                </button>
-                <select
-                  aria-label="Employment para vincular"
-                  value={selectedEmploymentId}
-                  onChange={(event) => setSelectedEmploymentId(event.target.value)}
-                >
-                  <option value="">Selecione um Employment</option>
-                  {employmentOptions.map((employment) => (
-                    <option key={employment.id} value={employment.id}>
-                      {employment.id} - {employment.status}
-                    </option>
-                  ))}
-                </select>
-                <button type="button" onClick={linkEmployment} disabled={!selectedEmploymentId}>
-                  Vincular Employment
-                </button>
+            {canManage && (
+              <div className="ds-form-section__actions">
+                <Button variant="secondary" onClick={() => postOnboardingAction("start")}>
+                  Iniciar
+                </Button>
+                <Button onClick={() => postOnboardingAction("complete")}>Concluir</Button>
+                <Input
+                  label="Motivo"
+                  placeholder="Motivo operacional de Onboarding"
+                  value={reason}
+                  onChange={(event) => setReason(event.target.value)}
+                />
+                <Button variant="danger" onClick={() => postOnboardingAction("cancel")}>
+                  Cancelar
+                </Button>
               </div>
             )}
 
+            {canManage &&
+              !onboarding.employmentId &&
+              (onboarding.status === "draft" || onboarding.status === "in_progress") && (
+                <FormSection
+                  title="Vincular Employment"
+                  actions={
+                    <>
+                      <Button variant="secondary" onClick={loadEligibleEmployments}>
+                        Carregar Employments elegíveis
+                      </Button>
+                      <Button onClick={linkEmployment} disabled={!selectedEmploymentId}>
+                        Vincular Employment
+                      </Button>
+                    </>
+                  }
+                >
+                  <Select
+                    label="Employment para vincular"
+                    value={selectedEmploymentId}
+                    onChange={(event) => setSelectedEmploymentId(event.target.value)}
+                  >
+                    <option value="">Selecione um Employment</option>
+                    {employmentOptions.map((employment) => (
+                      <option key={employment.id} value={employment.id}>
+                        {employment.id} - {employment.status}
+                      </option>
+                    ))}
+                  </Select>
+                </FormSection>
+              )}
+          </Card>
+
           {canManage && (
-            <div className="form-grid">
-              <input
-                aria-label="Titulo da tarefa"
-                placeholder="Titulo"
-                value={taskTitle}
-                onChange={(event) => setTaskTitle(event.target.value)}
-              />
-              <textarea
-                aria-label="Descricao da tarefa"
-                placeholder="Descricao"
-                value={taskDescription}
-                onChange={(event) => setTaskDescription(event.target.value)}
-              />
-              <label>
-                <input
-                  type="checkbox"
+            <Card>
+              <FormSection
+                title="Nova tarefa"
+                actions={<Button onClick={addTask}>Adicionar tarefa</Button>}
+              >
+                <Input
+                  label="Título"
+                  placeholder="Título"
+                  value={taskTitle}
+                  onChange={(event) => setTaskTitle(event.target.value)}
+                />
+                <Textarea
+                  label="Descrição"
+                  placeholder="Descrição"
+                  value={taskDescription}
+                  onChange={(event) => setTaskDescription(event.target.value)}
+                />
+                <Checkbox
+                  label="Obrigatória"
                   checked={taskRequired}
                   onChange={(event) => setTaskRequired(event.target.checked)}
                 />
-                Obrigatoria
-              </label>
-              <select
-                aria-label="Responsavel da tarefa"
-                value={taskAssignee}
-                onChange={(event) => setTaskAssignee(event.target.value)}
-              >
-                <option value="">Sem responsavel</option>
-                {activeMemberships.map((membership) => (
-                  <option key={membership.id} value={membership.id}>
-                    {membership.user?.name ?? membership.id} - {membership.role}
-                  </option>
-                ))}
-              </select>
-              <input
-                aria-label="Prazo da tarefa"
-                type="datetime-local"
-                value={taskDueAt}
-                onChange={(event) => setTaskDueAt(event.target.value)}
-              />
-              <input
-                aria-label="Motivo da tarefa"
-                placeholder="Motivo para ad hoc em andamento"
-                value={taskReason}
-                onChange={(event) => setTaskReason(event.target.value)}
-              />
-              <button type="button" onClick={addTask}>
-                Adicionar tarefa
-              </button>
-            </div>
+                <Select
+                  label="Responsável"
+                  value={taskAssignee}
+                  onChange={(event) => setTaskAssignee(event.target.value)}
+                >
+                  <option value="">Sem responsável</option>
+                  {activeMemberships.map((membership) => (
+                    <option key={membership.id} value={membership.id}>
+                      {membership.user?.name ?? membership.id} - {membership.role}
+                    </option>
+                  ))}
+                </Select>
+                <Input
+                  label="Prazo"
+                  type="datetime-local"
+                  value={taskDueAt}
+                  onChange={(event) => setTaskDueAt(event.target.value)}
+                />
+                <Input
+                  label="Motivo"
+                  placeholder="Motivo para tarefa ad hoc em andamento"
+                  value={taskReason}
+                  onChange={(event) => setTaskReason(event.target.value)}
+                />
+              </FormSection>
+            </Card>
           )}
 
-          <ul className="competency-list">
-            {onboarding.tasks.map((task) => (
-              <li key={task.id}>
-                <strong>{task.title}</strong>
-                <small>
-                  {task.status} - {task.isRequired ? "required" : "optional"}
-                </small>
-                {task.description && <p>{task.description}</p>}
-                {canManage && task.status === "open" && (
-                  <select
-                    aria-label="Reatribuir tarefa"
-                    value={task.assigneeMembershipId ?? ""}
-                    onChange={(event) => assignTask(task.id, event.target.value)}
-                  >
-                    <option value="">Sem responsavel</option>
-                    {activeMemberships.map((membership) => (
-                      <option key={membership.id} value={membership.id}>
-                        {membership.user?.name ?? membership.id} - {membership.role}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                {task.status === "open" && (
-                  <div className="actions">
-                    <button type="button" onClick={() => taskAction(task.id, "complete")}>
-                      Concluir tarefa
-                    </button>
-                    {canManage && (
-                      <button type="button" onClick={() => taskAction(task.id, "cancel")}>
-                        Cancelar tarefa
-                      </button>
-                    )}
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
+          <Card>
+            <CardHeader title="Tarefas" />
+            <TaskList
+              tasks={onboarding.tasks}
+              canManage={canManage}
+              activeMemberships={activeMemberships}
+              onComplete={(taskId) => taskAction(taskId, "complete")}
+              onCancel={(taskId) => taskAction(taskId, "cancel")}
+              onAssign={assignTask}
+              emptyTitle="Nenhuma tarefa registrada"
+            />
+          </Card>
         </>
       )}
-
-      <p className="message" role="status">
-        {message}
-      </p>
-    </section>
+    </div>
   );
 }

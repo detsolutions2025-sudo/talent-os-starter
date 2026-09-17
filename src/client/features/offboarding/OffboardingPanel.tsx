@@ -1,29 +1,30 @@
 import { useCallback, useMemo, useState } from "react";
+import { Alert } from "../../components/ui/Alert";
+import { Badge } from "../../components/ui/Badge";
+import { Button } from "../../components/ui/Button";
+import { Card, CardHeader } from "../../components/ui/Card";
+import { Checkbox } from "../../components/ui/Checkbox";
+import { ConfigStatus } from "../../components/ui/ConfigStatus";
+import { FormSection } from "../../components/ui/FormSection";
+import { Input } from "../../components/ui/Input";
+import { Select } from "../../components/ui/Select";
+import { SectionHeader } from "../../components/ui/SectionHeader";
+import { Textarea } from "../../components/ui/Textarea";
+import { TaskList } from "../shared/TaskList";
+import type { LifecycleTaskView, MembershipOption } from "../shared/types";
 
-// Fase 27 (SPEC-026 v1.0 s8): somente `active`/`ended` sao elegiveis para criar
-// Offboarding -- nunca `pending` nem `cancelled`. Reaproveita o endpoint ja
-// existente de listagem de Employments (owner/admin), sem criar rota nova.
+// Migrado para o Design System v1 na Wave 3 (visual apenas -- toda a logica interna, chamadas
+// de API e sequencia de operacoes permanecem identicas ao componente original de Fase 27).
+// SPEC-026 s17/s20: nao ha operacao desta tela que chame User/Membership -- as unicas acoes
+// sao create/start/tasks/complete/cancel do processo. Nenhum botao de "revogar acesso": a
+// revogacao de acesso e responsabilidade exclusiva de AccessGrant/Membership.
+
+// Fase 27 (SPEC-026 v1.0 s8): somente `active`/`ended` sao elegiveis para criar Offboarding --
+// nunca `pending` nem `cancelled`. Reaproveita o endpoint ja existente de listagem de
+// Employments (owner/admin), sem criar rota nova.
 type EmploymentOption = {
   id: string;
   status: "pending" | "active" | "ended" | "cancelled";
-};
-
-type MembershipOption = {
-  id: string;
-  role: "owner" | "admin" | "member";
-  status: "active" | "inactive";
-  user?: { name: string; email: string } | null;
-};
-
-type OffboardingTaskView = {
-  id: string;
-  title: string;
-  description: string | null;
-  isRequired: boolean;
-  status: "open" | "completed" | "cancelled";
-  assigneeMembershipId: string | null;
-  dueAt: string | null;
-  cancellationReason: string | null;
 };
 
 type OffboardingView = {
@@ -33,7 +34,7 @@ type OffboardingView = {
   exitCategory: string | null;
   expectedLastDay: string | null;
   progress: { numerator: number; denominator: number; percent: number };
-  tasks: OffboardingTaskView[];
+  tasks: LifecycleTaskView[];
 };
 
 const EXIT_CATEGORIES = [
@@ -43,6 +44,13 @@ const EXIT_CATEGORIES = [
   "mutual_agreement",
   "other_minimized"
 ] as const;
+
+const statusTone = {
+  draft: "neutral",
+  in_progress: "info",
+  completed: "success",
+  cancelled: "danger"
+} as const;
 
 export function OffboardingPanel({
   organizationId,
@@ -75,8 +83,6 @@ export function OffboardingPanel({
   const [reason, setReason] = useState("");
   const [message, setMessage] = useState("");
 
-  // SPEC-026 s17/s20: nao ha operacao desta tela que chame User/Membership -- as unicas acoes
-  // sao create/start/tasks/complete/cancel do processo. Nenhum botao de "revogar acesso".
   const loadEligibleEmployments = useCallback(() => {
     if (!canManage) return;
     fetch(`/api/organizations/${organizationId}/employments`, { headers })
@@ -223,181 +229,168 @@ export function OffboardingPanel({
   }
 
   return (
-    <section className="panel offboarding-panel">
-      <span>Offboarding</span>
+    <div className="ds-feature">
+      <SectionHeader
+        title="Offboarding"
+        description="Processo de desligamento e suas tarefas operacionais. Concluir o Offboarding não revoga acesso automaticamente — a revogação de Membership acontece em Ciclo de Vida de Acesso."
+      />
 
-      {canManage && (
-        <div className="form-grid">
-          <button type="button" onClick={loadEligibleEmployments}>
-            Carregar Employments elegiveis
-          </button>
-          <select
-            aria-label="Employment para offboarding"
-            value={employmentId}
-            onChange={(event) => {
-              setEmploymentId(event.target.value);
-              setOffboarding(null);
-              if (event.target.value) loadOffboarding(event.target.value);
-            }}
-          >
-            <option value="">Selecione um Employment</option>
-            {employmentOptions.map((employment) => (
-              <option key={employment.id} value={employment.id}>
-                {employment.id} - {employment.status}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
+      {message && <Alert tone="info">{message}</Alert>}
 
-      {canManage && employmentId && !offboarding && (
-        <div className="form-grid">
-          <select
-            aria-label="Categoria operacional de saida"
-            value={exitCategory}
-            onChange={(event) => setExitCategory(event.target.value)}
+      <Card>
+        <CardHeader title="Employment" />
+        {canManage && (
+          <FormSection
+            title="Selecionar Employment"
+            actions={
+              <Button variant="secondary" onClick={loadEligibleEmployments}>
+                Carregar Employments elegíveis
+              </Button>
+            }
           >
-            <option value="">Sem categoria</option>
-            {EXIT_CATEGORIES.map((category) => (
-              <option key={category} value={category}>
-                {category}
-              </option>
-            ))}
-          </select>
-          <input
-            aria-label="Ultimo dia esperado"
-            type="date"
-            value={expectedLastDay}
-            onChange={(event) => setExpectedLastDay(event.target.value)}
-          />
-          <button type="button" onClick={createOffboarding}>
-            Criar Offboarding
-          </button>
-        </div>
-      )}
+            <Select
+              label="Employment para offboarding"
+              value={employmentId}
+              onChange={(event) => {
+                setEmploymentId(event.target.value);
+                setOffboarding(null);
+                if (event.target.value) loadOffboarding(event.target.value);
+              }}
+            >
+              <option value="">Selecione um Employment</option>
+              {employmentOptions.map((employment) => (
+                <option key={employment.id} value={employment.id}>
+                  {employment.id} - {employment.status}
+                </option>
+              ))}
+            </Select>
+          </FormSection>
+        )}
+
+        {canManage && employmentId && !offboarding && (
+          <FormSection
+            title="Criar Offboarding"
+            actions={<Button onClick={createOffboarding}>Criar Offboarding</Button>}
+          >
+            <Select
+              label="Categoria operacional de saída"
+              value={exitCategory}
+              onChange={(event) => setExitCategory(event.target.value)}
+            >
+              <option value="">Sem categoria</option>
+              {EXIT_CATEGORIES.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </Select>
+            <Input
+              label="Último dia esperado"
+              type="date"
+              value={expectedLastDay}
+              onChange={(event) => setExpectedLastDay(event.target.value)}
+            />
+          </FormSection>
+        )}
+      </Card>
 
       {offboarding && (
         <>
-          <p>
-            {offboarding.status} - {offboarding.progress.percent}% ({offboarding.progress.numerator}
-            /{offboarding.progress.denominator})
-          </p>
+          <Card>
+            <CardHeader
+              title="Status"
+              action={<Badge tone={statusTone[offboarding.status]}>{offboarding.status}</Badge>}
+            />
+            <ConfigStatus
+              label={`${offboarding.progress.numerator} de ${offboarding.progress.denominator} concluídas`}
+              tone={statusTone[offboarding.status]}
+              meta={`${offboarding.progress.percent}%`}
+            />
+
+            {canManage && (
+              <div className="ds-form-section__actions">
+                <Button variant="secondary" onClick={() => postOffboardingAction("start")}>
+                  Iniciar
+                </Button>
+                <Button onClick={() => postOffboardingAction("complete")}>Concluir</Button>
+                <Input
+                  label="Motivo"
+                  placeholder="Motivo operacional de Offboarding"
+                  value={reason}
+                  onChange={(event) => setReason(event.target.value)}
+                />
+                <Button variant="danger" onClick={() => postOffboardingAction("cancel")}>
+                  Cancelar
+                </Button>
+              </div>
+            )}
+          </Card>
 
           {canManage && (
-            <div className="actions">
-              <button type="button" onClick={() => postOffboardingAction("start")}>
-                Iniciar
-              </button>
-              <button type="button" onClick={() => postOffboardingAction("complete")}>
-                Concluir
-              </button>
-              <input
-                aria-label="Motivo operacional de Offboarding"
-                placeholder="Motivo"
-                value={reason}
-                onChange={(event) => setReason(event.target.value)}
-              />
-              <button type="button" onClick={() => postOffboardingAction("cancel")}>
-                Cancelar
-              </button>
-            </div>
-          )}
-
-          {canManage && (
-            <div className="form-grid">
-              <input
-                aria-label="Titulo da tarefa"
-                placeholder="Titulo"
-                value={taskTitle}
-                onChange={(event) => setTaskTitle(event.target.value)}
-              />
-              <textarea
-                aria-label="Descricao da tarefa"
-                placeholder="Descricao"
-                value={taskDescription}
-                onChange={(event) => setTaskDescription(event.target.value)}
-              />
-              <label>
-                <input
-                  type="checkbox"
+            <Card>
+              <FormSection
+                title="Nova tarefa"
+                actions={<Button onClick={addTask}>Adicionar tarefa</Button>}
+              >
+                <Input
+                  label="Título"
+                  placeholder="Título"
+                  value={taskTitle}
+                  onChange={(event) => setTaskTitle(event.target.value)}
+                />
+                <Textarea
+                  label="Descrição"
+                  placeholder="Descrição"
+                  value={taskDescription}
+                  onChange={(event) => setTaskDescription(event.target.value)}
+                />
+                <Checkbox
+                  label="Obrigatória"
                   checked={taskRequired}
                   onChange={(event) => setTaskRequired(event.target.checked)}
                 />
-                Obrigatoria
-              </label>
-              <select
-                aria-label="Responsavel da tarefa"
-                value={taskAssignee}
-                onChange={(event) => setTaskAssignee(event.target.value)}
-              >
-                <option value="">Sem responsavel</option>
-                {activeMemberships.map((membership) => (
-                  <option key={membership.id} value={membership.id}>
-                    {membership.user?.name ?? membership.id} - {membership.role}
-                  </option>
-                ))}
-              </select>
-              <input
-                aria-label="Prazo da tarefa"
-                type="datetime-local"
-                value={taskDueAt}
-                onChange={(event) => setTaskDueAt(event.target.value)}
-              />
-              <input
-                aria-label="Motivo da tarefa"
-                placeholder="Motivo para ad hoc em andamento"
-                value={taskReason}
-                onChange={(event) => setTaskReason(event.target.value)}
-              />
-              <button type="button" onClick={addTask}>
-                Adicionar tarefa
-              </button>
-            </div>
+                <Select
+                  label="Responsável"
+                  value={taskAssignee}
+                  onChange={(event) => setTaskAssignee(event.target.value)}
+                >
+                  <option value="">Sem responsável</option>
+                  {activeMemberships.map((membership) => (
+                    <option key={membership.id} value={membership.id}>
+                      {membership.user?.name ?? membership.id} - {membership.role}
+                    </option>
+                  ))}
+                </Select>
+                <Input
+                  label="Prazo"
+                  type="datetime-local"
+                  value={taskDueAt}
+                  onChange={(event) => setTaskDueAt(event.target.value)}
+                />
+                <Input
+                  label="Motivo"
+                  placeholder="Motivo para tarefa ad hoc em andamento"
+                  value={taskReason}
+                  onChange={(event) => setTaskReason(event.target.value)}
+                />
+              </FormSection>
+            </Card>
           )}
 
-          <ul className="competency-list">
-            {offboarding.tasks.map((task) => (
-              <li key={task.id}>
-                <strong>{task.title}</strong>
-                <small>
-                  {task.status} - {task.isRequired ? "required" : "optional"}
-                </small>
-                {task.description && <p>{task.description}</p>}
-                {canManage && task.status === "open" && (
-                  <select
-                    aria-label="Reatribuir tarefa"
-                    value={task.assigneeMembershipId ?? ""}
-                    onChange={(event) => assignTask(task.id, event.target.value)}
-                  >
-                    <option value="">Sem responsavel</option>
-                    {activeMemberships.map((membership) => (
-                      <option key={membership.id} value={membership.id}>
-                        {membership.user?.name ?? membership.id} - {membership.role}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                {task.status === "open" && (
-                  <div className="actions">
-                    <button type="button" onClick={() => taskAction(task.id, "complete")}>
-                      Concluir tarefa
-                    </button>
-                    {canManage && (
-                      <button type="button" onClick={() => taskAction(task.id, "cancel")}>
-                        Cancelar tarefa
-                      </button>
-                    )}
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
+          <Card>
+            <CardHeader title="Tarefas" />
+            <TaskList
+              tasks={offboarding.tasks}
+              canManage={canManage}
+              activeMemberships={activeMemberships}
+              onComplete={(taskId) => taskAction(taskId, "complete")}
+              onCancel={(taskId) => taskAction(taskId, "cancel")}
+              onAssign={assignTask}
+              emptyTitle="Nenhuma tarefa registrada"
+            />
+          </Card>
         </>
       )}
-
-      <p className="message" role="status">
-        {message}
-      </p>
-    </section>
+    </div>
   );
 }
