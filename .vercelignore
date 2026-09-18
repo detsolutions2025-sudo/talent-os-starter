@@ -1,0 +1,10 @@
+# Nao usados pelo build (`vite build`) nem pela Serverless Function (`api/index.ts`) -- ver
+# docs/operacao/deploy-vercel.md. Migrations sao aplicadas manualmente contra o banco de
+# producao ANTES do deploy (nunca automaticamente durante o build da Vercel), entao os arquivos
+# .sql nao precisam viajar com o artefato de deploy.
+tests
+docs
+coverage
+db/migrations
+dev.db
+backups

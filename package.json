@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "concurrently \"npm:dev:web\" \"npm:dev:api\"",
     "dev:web": "vite --host 127.0.0.1 --port 5173",

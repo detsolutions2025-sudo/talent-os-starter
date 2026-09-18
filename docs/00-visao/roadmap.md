@@ -798,3 +798,19 @@ Isto fecha as sete sub-frentes da ADR-0027 -- **ainda nao** torna o
 projeto "production ready"/RC formalmente declarado; isso depende de
 decisoes humanas (hosting, plano Supabase real, primeiro release
 candidate) fora do escopo de codigo.
+
+**Wave de Hospedagem (ADR-0028): Vercel.** Decide a lacuna de hosting
+deixada em aberto pela ADR-0027 secao 4. Modo A (mesma origem):
+frontend estatico (`vite build`) e a API inteira (`src/server/app.ts`,
+inalterado) como uma unica Serverless Function (`api/index.ts`), com
+`vercel.json` roteando `/api/*` para a function e todo o resto para
+`index.html` (fallback de SPA, essencial para as rotas publicas
+client-side de `main.tsx`). A sequencia de boot foi extraida de
+`index.ts` para `src/server/bootstrap.ts` (`buildApp()`) e agora serve
+os dois entrypoints (processo tradicional e Vercel) sem duplicacao --
+`tests/phase30/bootstrap-smoke.test.ts` prova que o comportamento
+observavel do processo tradicional nao mudou. Nenhuma dependencia
+nova, nenhuma migration, nenhuma mudanca de RBAC/tenant/lifecycle/rate
+limiting/Auth. Documentacao operacional completa em
+`docs/operacao/deploy-vercel.md`; decisao e alternativas consideradas
+em `docs/03-arquitetura/decisoes/0028-hosting-vercel.md`.
