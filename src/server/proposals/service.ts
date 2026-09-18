@@ -2,6 +2,7 @@ import type pg from "pg";
 import { fingerprint } from "../core/canonical-hash";
 import { badRequest, conflict, forbidden, gone, notFound, tooManyRequests } from "../core/errors";
 import { RateLimiter, type RateLimitConfig } from "../core/rate-limiter";
+import type { RateLimitStore } from "../core/rate-limit-store";
 import type { CoreRepository } from "../core/repository";
 import type { Actor, AuditEvent, MembershipRole } from "../core/types";
 import { PostgresCoreRepository } from "../persistence/postgres-core-repository";
@@ -38,9 +39,15 @@ import {
 
 const DEFAULT_GRANT_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 const PRESENTATION_SCHEMA_VERSION = "proposal_public_v1";
+// Fase 32 (ADR-0027 s9): `failureMode: "open"` -- classe B, mesma justificativa de
+// `pre-interviews/service.ts`/`behavioral-assessments/service.ts`.
 const DEFAULT_RATE_LIMITS = {
-  publicByIp: { limit: 60, windowMs: 60_000 } satisfies RateLimitConfig,
-  publicByTokenHash: { limit: 30, windowMs: 60_000 } satisfies RateLimitConfig
+  publicByIp: { limit: 60, windowMs: 60_000, failureMode: "open" } satisfies RateLimitConfig,
+  publicByTokenHash: {
+    limit: 30,
+    windowMs: 60_000,
+    failureMode: "open"
+  } satisfies RateLimitConfig
 };
 type ProposalRateLimitNamespace = keyof typeof DEFAULT_RATE_LIMITS;
 
@@ -480,7 +487,7 @@ export class ProposalService {
   }
 
   async getPublic(rawToken: string, meta: ProposalPublicMeta) {
-    const tokenHash = this.publicRateLimit(rawToken, meta.ip);
+    const tokenHash = await this.publicRateLimit(rawToken, meta.ip);
     return this.runTransaction(async (tx) => {
       const { proposal, version } = await this.publicWithValidGrant(tx, tokenHash, null);
       return this.serializePublic(proposal, version);
@@ -489,7 +496,7 @@ export class ProposalService {
 
   async accept(rawToken: string, input: ProposalPublicActionInput, meta: ProposalPublicMeta) {
     validatePublicActionInput(input);
-    const tokenHash = this.publicRateLimit(rawToken, meta.ip);
+    const tokenHash = await this.publicRateLimit(rawToken, meta.ip);
     return this.withPublicIdempotency(tokenHash, "accept", meta.idempotencyKey, {}, async () =>
       this.runTransaction(async (tx) => {
         const { proposal, version, grant } = await this.publicWithValidGrant(
@@ -522,7 +529,7 @@ export class ProposalService {
 
   async decline(rawToken: string, input: ProposalPublicActionInput, meta: ProposalPublicMeta) {
     const normalized = validatePublicActionInput(input);
-    const tokenHash = this.publicRateLimit(rawToken, meta.ip);
+    const tokenHash = await this.publicRateLimit(rawToken, meta.ip);
     return this.withPublicIdempotency(
       tokenHash,
       "decline",
@@ -845,13 +852,19 @@ export class ProposalService {
     };
   }
 
-  private publicRateLimit(rawToken: string, ip: string) {
+  private async publicRateLimit(rawToken: string, ip: string) {
     const tokenHash = hashProposalToken(rawToken);
-    if (!this.rateLimiter.checkAndRecord("publicByIp", ip || "unknown")) {
-      throw tooManyRequests("proposal_rate_limited", "Too many requests.");
+    const byIp = await this.rateLimiter.checkAndRecord("publicByIp", ip || "unknown");
+    if (!byIp.allowed) {
+      throw tooManyRequests("proposal_rate_limited", "Too many requests.", byIp.retryAfterSeconds);
     }
-    if (!this.rateLimiter.checkAndRecord("publicByTokenHash", tokenHash)) {
-      throw tooManyRequests("proposal_rate_limited", "Too many requests.");
+    const byTokenHash = await this.rateLimiter.checkAndRecord("publicByTokenHash", tokenHash);
+    if (!byTokenHash.allowed) {
+      throw tooManyRequests(
+        "proposal_rate_limited",
+        "Too many requests.",
+        byTokenHash.retryAfterSeconds
+      );
     }
     return tokenHash;
   }
@@ -1071,14 +1084,19 @@ export class ProposalService {
   }
 }
 
-export function createPostgresProposalService(pool: pg.Pool) {
+export function createPostgresProposalService(
+  pool: pg.Pool,
+  // Fase 32 (ADR-0027 s9). Ausente = in-memory (dev/test); `index.ts` passa
+  // `new PostgresRateLimitStore(pool)` em producao.
+  rateLimitStore?: RateLimitStore
+) {
   const core = new PostgresCoreRepository(pool);
   const proposals = new PostgresProposalRepository(pool);
   return new ProposalService(
     core,
     proposals,
     createProposalTransactionRunner(pool),
-    new RateLimiter(DEFAULT_RATE_LIMITS)
+    new RateLimiter(DEFAULT_RATE_LIMITS, rateLimitStore)
   );
 }
 

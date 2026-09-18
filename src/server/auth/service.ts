@@ -6,6 +6,7 @@ import { fingerprint } from "../core/canonical-hash";
 import { conflict, forbidden, notFound, tooManyRequests } from "../core/errors";
 import { normalizeEmail } from "../core/normalization";
 import { RateLimiter, type RateLimitConfig } from "../core/rate-limiter";
+import type { RateLimitStore } from "../core/rate-limit-store";
 import type { CoreRepository } from "../core/repository";
 import { CoreService } from "../core/service";
 import type { Actor, AuditEvent } from "../core/types";
@@ -61,6 +62,11 @@ export type AuthServiceDeps = {
   // Prazo de validade"); 7 dias e o padrao adotado aqui, consistente com o padrao de convite do
   // proprio Supabase Auth.
   invitationTtlMs?: number;
+  // Fase 32 (ADR-0027 s9). Ausente = `RateLimiter` usa seu default in-memory (preserva, sem
+  // nenhuma mudanca de comportamento, todo teste existente que constroi `AuthService` sem
+  // conhecer este campo); `index.ts` injeta explicitamente `new PostgresRateLimitStore(pool)`
+  // em producao.
+  rateLimitStore?: RateLimitStore;
 };
 
 const DEFAULT_INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -68,15 +74,43 @@ const DEFAULT_INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 // SPEC-028 s29: "Criar convite, aceitar convite, bootstrap, revogar sessao de terceiro:
 // protegidos pelo RateLimiter in-memory ja existente (core/rate-limiter.ts)... nenhuma nova
 // implementacao de rate limiting criada por esta SPEC, apenas reaproveitamento." Mesma classe
-// generica ja usada por propostas/avaliacoes/pre-entrevistas/candidatura publica -- mesma
-// limitacao ja conhecida e herdada (nao serve multiplas instancias do processo).
-const DEFAULT_AUTH_RATE_LIMITS = {
-  invitationCreate: { limit: 20, windowMs: 60_000 } satisfies RateLimitConfig,
-  invitationAccept: { limit: 10, windowMs: 60_000 } satisfies RateLimitConfig,
-  bootstrap: { limit: 5, windowMs: 60_000 } satisfies RateLimitConfig,
-  sessionRevoke: { limit: 10, windowMs: 60_000 } satisfies RateLimitConfig
+// generica ja usada por propostas/avaliacoes/pre-entrevistas/candidatura publica.
+//
+// Fase 32 (ADR-0027 s9): store agora injetavel (`AuthServiceDeps.rateLimitStore`) -- `index.ts`
+// passa `new PostgresRateLimitStore(pool)` em producao, tornando estes seis namespaces
+// autoritativos entre instancias (nao mais limitados a um unico processo).
+// `failureMode: "closed"` em todos: classe A ("autenticacao/login") -- nunca deixar login/
+// gestao de sessao sem protecao alguma quando o store estiver indisponivel (ADR-0027 s9).
+//
+// `sessionBridge`/`refresh` sao novos nesta Fase -- `/auth/session` e `/auth/refresh`
+// (`http/routes.ts`) trocam um token assinado por cookies HttpOnly de sessao e nao tinham
+// nenhum rate limit proprio ate aqui (unicas rotas publicas de `auth` sem protecao, achado
+// fisico do discovery desta Fase). Chave: IP (nenhum Actor/sessao ainda existe neste ponto).
+export const DEFAULT_AUTH_RATE_LIMITS = {
+  invitationCreate: {
+    limit: 20,
+    windowMs: 60_000,
+    failureMode: "closed"
+  } satisfies RateLimitConfig,
+  invitationAccept: {
+    limit: 10,
+    windowMs: 60_000,
+    failureMode: "closed"
+  } satisfies RateLimitConfig,
+  bootstrap: { limit: 5, windowMs: 60_000, failureMode: "closed" } satisfies RateLimitConfig,
+  sessionRevoke: {
+    limit: 10,
+    windowMs: 60_000,
+    failureMode: "closed"
+  } satisfies RateLimitConfig,
+  sessionBridge: {
+    limit: 20,
+    windowMs: 60_000,
+    failureMode: "closed"
+  } satisfies RateLimitConfig,
+  refresh: { limit: 30, windowMs: 60_000, failureMode: "closed" } satisfies RateLimitConfig
 };
-type AuthRateLimitNamespace = keyof typeof DEFAULT_AUTH_RATE_LIMITS;
+export type AuthRateLimitNamespace = keyof typeof DEFAULT_AUTH_RATE_LIMITS;
 
 export class AuthService {
   private readonly core: CoreRepository;
@@ -86,9 +120,7 @@ export class AuthService {
   private readonly getKey: JWTVerifyGetKey;
   private readonly jwtOptions: ProviderJwtVerifierOptions;
   private readonly invitationTtlMs: number;
-  private readonly rateLimiter: RateLimiter<AuthRateLimitNamespace> = new RateLimiter(
-    DEFAULT_AUTH_RATE_LIMITS
-  );
+  private readonly rateLimiter: RateLimiter<AuthRateLimitNamespace>;
 
   constructor(deps: AuthServiceDeps) {
     this.core = deps.core;
@@ -98,12 +130,29 @@ export class AuthService {
     this.getKey = deps.getKey;
     this.jwtOptions = deps.jwtOptions;
     this.invitationTtlMs = deps.invitationTtlMs ?? DEFAULT_INVITATION_TTL_MS;
+    this.rateLimiter = new RateLimiter(DEFAULT_AUTH_RATE_LIMITS, deps.rateLimitStore);
   }
 
-  private checkRateLimit(namespace: AuthRateLimitNamespace, key: string) {
-    if (!this.rateLimiter.checkAndRecord(namespace, key)) {
-      throw tooManyRequests("auth_rate_limited", "Too many requests.");
+  private async checkRateLimit(namespace: AuthRateLimitNamespace, key: string) {
+    const result = await this.rateLimiter.checkAndRecord(namespace, key);
+    if (!result.allowed) {
+      throw tooManyRequests("auth_rate_limited", "Too many requests.", result.retryAfterSeconds);
     }
+  }
+
+  // Fase 32 (ADR-0027 s9). `/auth/session` (`http/routes.ts`) chama isto ANTES de
+  // `verifyToken` -- nunca dentro de `verifyToken` em si, que tambem e chamado por toda
+  // requisicao autenticada via `SupabaseActorProvider.resolve()` (`http/actor-provider.ts`) e
+  // nunca deveria carregar rate limiting de bridge de sessao. Chave: IP (nenhuma sessao/Actor
+  // existe ainda neste ponto -- SPEC-028 s9/s13).
+  async checkSessionBridgeRateLimit(ip: string): Promise<void> {
+    await this.checkRateLimit("sessionBridge", ip || "unknown");
+  }
+
+  // Fase 32 (ADR-0027 s9). `/auth/refresh` chama isto ANTES de `refreshSession`, pela mesma
+  // razao acima.
+  async checkRefreshRateLimit(ip: string): Promise<void> {
+    await this.checkRateLimit("refresh", ip || "unknown");
   }
 
   // ---------------------------------------------------------------------------------------
@@ -148,7 +197,7 @@ export class AuthService {
     idempotencyKeyRaw: unknown
   ) {
     const normalized = validateCreateInvitationInput(input);
-    this.checkRateLimit("invitationCreate", organizationId);
+    await this.checkRateLimit("invitationCreate", organizationId);
     await this.authorizeInviter(actor, organizationId, normalized.role);
 
     const existingUser = await this.core.findUserByEmail(normalized.email);
@@ -276,7 +325,7 @@ export class AuthService {
   // User(novo|existente)+AuthIdentity+Membership numa unica transacao, idempotente por
   // natureza (chave: external_id + invitation.id).
   async acceptInvitation(rawAccessToken: string, invitationId: string) {
-    this.checkRateLimit("invitationAccept", invitationId);
+    await this.checkRateLimit("invitationAccept", invitationId);
     const claims = await this.verifyToken(rawAccessToken);
     if (!claims.emailVerified) {
       throw forbidden(
@@ -505,7 +554,7 @@ export class AuthService {
     if (actor.kind !== "platform") {
       throw forbidden("permission_denied", "Only Platform Admin can bootstrap an Organization.");
     }
-    this.checkRateLimit("bootstrap", actor.userId ?? "unknown");
+    await this.checkRateLimit("bootstrap", actor.userId ?? "unknown");
     const normalized = validateBootstrapInput(input);
     const existingUser = await this.core.findUserByEmail(normalized.ownerEmail);
     const existingIdentity = existingUser
@@ -641,7 +690,7 @@ export class AuthService {
     if (!isSelf && actor.kind !== "platform") {
       throw forbidden("permission_denied", "Permission denied.");
     }
-    this.checkRateLimit("sessionRevoke", targetUserId);
+    await this.checkRateLimit("sessionRevoke", targetUserId);
     const identity = await this.auth.findAuthIdentityByUserId(targetUserId);
     if (!identity) {
       throw notFound("auth_identity_not_found", "No identity for this user.");
@@ -761,6 +810,9 @@ export function createPostgresAuthService(
     provider: SupabaseAdminPort;
     getKey: JWTVerifyGetKey;
     jwtOptions: ProviderJwtVerifierOptions;
+    // Fase 32 (ADR-0027 s9). Ausente = default in-memory (dev/test); `index.ts` passa
+    // `new PostgresRateLimitStore(pool)`.
+    rateLimitStore?: RateLimitStore;
   }
 ) {
   return new AuthService({
@@ -769,7 +821,8 @@ export function createPostgresAuthService(
     runTransaction: createAuthTransactionRunner(pool),
     provider: deps.provider,
     getKey: deps.getKey,
-    jwtOptions: deps.jwtOptions
+    jwtOptions: deps.jwtOptions,
+    rateLimitStore: deps.rateLimitStore
   });
 }
 

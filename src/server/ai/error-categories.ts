@@ -51,14 +51,21 @@ export function isFallbackEligible(category: ErrorCategory): boolean {
 
 // Maps a normalized category to an HTTP status for the API layer. Never derived from a raw
 // provider error/status code.
-export function errorCategoryToAppError(category: ErrorCategory, message: string): AppError {
+export function errorCategoryToAppError(
+  category: ErrorCategory,
+  message: string,
+  // Fase 32 (ADR-0027 s9): so preenchido quando a causa e o RateLimiter interno de
+  // test_connection (nunca inferivel quando "rate_limited" vem do proprio provider externo,
+  // ver `ai/gateway.ts`) -- header `Retry-After` fica ausente nesse segundo caso, como antes.
+  retryAfterSeconds?: number
+): AppError {
   switch (category) {
     case "policy_denied":
       return new AppError(403, `ai_${category}`, message);
     case "authentication_error":
       return new AppError(502, `ai_${category}`, message);
     case "rate_limited":
-      return new AppError(429, `ai_${category}`, message);
+      return new AppError(429, `ai_${category}`, message, retryAfterSeconds);
     case "timeout":
       return new AppError(504, `ai_${category}`, message);
     case "provider_unavailable":

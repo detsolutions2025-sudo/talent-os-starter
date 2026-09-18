@@ -15,6 +15,7 @@ import { AIProviderConfigService } from "./provider-config-service";
 import { AIPromptRegistryService } from "./prompt-registry-service";
 import { FakeProviderAdapter } from "./providers/fake-adapter";
 import { RateLimiter } from "./rate-limiter";
+import type { RateLimitStore } from "../core/rate-limit-store";
 import type { AIRepository } from "./repository";
 import { AIRoutingService } from "./routing-service";
 import { InMemorySecretManager } from "./secrets/secret-manager";
@@ -74,6 +75,9 @@ export type CreateAIServiceOptions = {
   secretManager?: SecretManager;
   resolveAdapter?: ProviderAdapterResolver;
   gatewayOptions?: AIGatewayOptions;
+  // Fase 32 (ADR-0027 s9). Ausente = `RateLimiter` usa seu default in-memory (dev/test);
+  // `index.ts` injeta `PostgresRateLimitStore(pool)` explicitamente em producao.
+  rateLimitStore?: RateLimitStore;
 };
 
 // Phase 11 always defaults to InMemorySecretManager + FakeProviderAdapter -- there is no
@@ -107,7 +111,7 @@ export function createPostgresAIService(
   const secretManager = options.secretManager ?? new InMemorySecretManager();
   const resolveAdapter: ProviderAdapterResolver =
     options.resolveAdapter ?? (() => new FakeProviderAdapter());
-  const rateLimiter = new RateLimiter();
+  const rateLimiter = new RateLimiter(undefined, options.rateLimitStore);
 
   const policy = new AIPolicyService(core, ai, runTransaction);
   const providerCatalog = new AIProviderCatalogService(core, ai, runTransaction);

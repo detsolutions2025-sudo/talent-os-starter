@@ -22,6 +22,7 @@ import { PostgresCoreRepository } from "./persistence/postgres-core-repository";
 import { createPostgresPreInterviewService } from "./pre-interviews/service";
 import { assertProductionConfig } from "./config-validation";
 import { createPostgresPool, requirePostgresDatabaseUrl } from "./postgres";
+import { PostgresRateLimitStore } from "./core/rate-limit-store";
 import { createPostgresPublicApplicationService } from "./public-applications/service";
 import { createPostgresQuestionService } from "./questions/service";
 import { createPostgresBehavioralAssessmentService } from "./behavioral-assessments/service";
@@ -68,6 +69,15 @@ const port = Number(process.env.PORT ?? 3001);
 const connectionString = requirePostgresDatabaseUrl();
 const pool = createPostgresPool(connectionString);
 
+// Fase 32 (ADR-0027 s9 "Rate Limiting Distribuido"). Store autoritativo, compartilhado entre
+// TODAS as instancias do processo Node via o MESMO pool Postgres acima -- nenhum servico/vendor
+// novo (ver `core/rate-limit-store.ts`). Uma unica instancia, injetada explicitamente em cada
+// `createPostgresXService(pool, ...)` abaixo que expõe um namespace de rate limit; nenhuma
+// dessas factories usa o default in-memory quando chamadas a partir daqui -- o default
+// in-memory so e alcancado por testes que constroem o service diretamente sem passar este
+// argumento (preserva o isolamento entre `it()` de um mesmo arquivo de teste).
+const rateLimitStore = new PostgresRateLimitStore(pool);
+
 // Phase 11 ships no real Secret Manager / provider adapter yet (SPEC-014 "Fora do escopo":
 // "implementacao fisica do Secret Manager", "adapters de provider concretos"). InMemorySecretManager
 // refuses to even construct when APP_ENV=production (see ai/secrets/secret-manager.ts), and
@@ -105,7 +115,8 @@ if (
   authService = createPostgresAuthService(pool, {
     provider: createSupabaseAdminAdapter(supabaseConfig, process.env.VITE_SUPABASE_ANON_KEY),
     getKey: createRemoteProviderJwks(supabaseConfig.jwksUrl),
-    jwtOptions: { issuer: supabaseConfig.issuer, audience: supabaseConfig.audience }
+    jwtOptions: { issuer: supabaseConfig.issuer, audience: supabaseConfig.audience },
+    rateLimitStore
   });
 }
 
@@ -157,15 +168,15 @@ const checkDatabaseReady = async () => {
   }
 };
 
-const aiService = createPostgresAIService(
-  pool,
-  appEnv === "production"
+const aiService = createPostgresAIService(pool, {
+  ...(appEnv === "production"
     ? {
         secretManager: new UnavailableSecretManager(),
         resolveAdapter: () => new UnavailableProviderAdapter()
       }
-    : {}
-);
+    : {}),
+  rateLimitStore
+});
 
 // Fase 17 (SPEC-020 v1.1): o orquestrador da candidatura publica reutiliza as mesmas
 // instancias de CandidateService/CandidateApplicationService do resto da plataforma -- seus
@@ -186,23 +197,29 @@ const app = createServer(
   createPostgresCompetencyService(pool),
   createPostgresJobProfileService(pool),
   createPostgresQuestionService(pool),
-  createPostgresJobOpeningService(pool),
+  createPostgresJobOpeningService(pool, rateLimitStore),
   candidateService,
   candidateApplicationService,
   createPostgresInterviewService(pool),
   aiService,
   createPostgresBlueprintService(pool),
-  createPostgresPublicApplicationService(pool, candidateService, candidateApplicationService),
-  createPostgresPreInterviewService(pool),
+  createPostgresPublicApplicationService(
+    pool,
+    candidateService,
+    candidateApplicationService,
+    {},
+    rateLimitStore
+  ),
+  createPostgresPreInterviewService(pool, {}, rateLimitStore),
   // Fase 19 (SPEC-022 v1.0). Sem DISC proprietario, sem IA, sem score global/ranking/matching.
-  createPostgresBehavioralAssessmentService(pool),
+  createPostgresBehavioralAssessmentService(pool, {}, rateLimitStore),
   // Fase 20 (SPEC-023 v1.1). Sem score/ranking/matching/decisao automatica (ADR-0023 "Scores").
   // Reutiliza a mesma instancia de AIService do resto da plataforma -- toda execucao passa
   // exclusivamente por `aiService.gateway.execute()`, nunca um caminho alternativo.
   createPostgresPreAnalysisService(pool, aiService),
   // Fase 21 (SPEC-024 v1.1). Dossie materializado sem criar nova AI Execution.
   createPostgresCandidateDossierService(pool),
-  createPostgresProposalService(pool),
+  createPostgresProposalService(pool, rateLimitStore),
   createPostgresOnboardingService(pool),
   createPostgresEmploymentService(pool),
   createPostgresDevelopmentRetentionService(pool),

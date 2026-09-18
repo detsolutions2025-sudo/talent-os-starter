@@ -138,9 +138,11 @@ export class AIGateway {
     }
 
     // Step 7: rate limit, Organization + Feature, before routing is even resolved.
-    if (
-      !this.rateLimiter.checkAndRecord("executionOrgFeature", `${organizationId}:${featureKey}`)
-    ) {
+    const orgFeatureRateLimit = await this.rateLimiter.checkAndRecord(
+      "executionOrgFeature",
+      `${organizationId}:${featureKey}`
+    );
+    if (!orgFeatureRateLimit.allowed) {
       return this.deny(
         actor,
         organizationId,
@@ -368,7 +370,11 @@ export class AIGateway {
     }
 
     const rateLimitKey = `${organizationId}:${gate.featureCatalog.featureKey}:${route.provider}:${route.modelKey}`;
-    if (!this.rateLimiter.checkAndRecord("executionOrgFeatureProviderModel", rateLimitKey)) {
+    const providerModelRateLimit = await this.rateLimiter.checkAndRecord(
+      "executionOrgFeatureProviderModel",
+      rateLimitKey
+    );
+    if (!providerModelRateLimit.allowed) {
       throw new AIProviderError("rate_limited", "provider_model_rate_limited");
     }
 

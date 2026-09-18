@@ -4,6 +4,7 @@ import { fingerprint } from "../core/canonical-hash";
 import { badRequest, conflict, gone, notFound, tooManyRequests } from "../core/errors";
 import type { CoreRepository } from "../core/repository";
 import { RateLimiter, type RateLimitConfig } from "../core/rate-limiter";
+import type { RateLimitStore } from "../core/rate-limit-store";
 import type { CandidateService } from "../candidates/service";
 import type { Candidate } from "../candidates/types";
 import type { CandidateApplicationService } from "../candidate-applications/service";
@@ -24,9 +25,18 @@ import { validateIdempotencyKey, validatePublicApplicationInput } from "./valida
 // Nunca um valor numerico livre por chamada -- configuracao centralizada, mesmo padrao ja
 // estabelecido pela Fase 11 para IA (ai/rate-limiter.ts). Independente de qualquer modulo de
 // IA: reutiliza apenas a classe generica de `core/rate-limiter.ts` (SPEC-020 v1.1, secao 22).
+//
+// Fase 32 (ADR-0027 s9): `failureMode: "open"` -- classe B ("endpoint publico de escrita").
+// Indisponibilidade do store nunca deve bloquear um candidato legitimo de se candidatar; a
+// falha e sempre auditada (`rate_limit_store_error`, `core/rate-limiter.ts`) para visibilidade
+// operacional, nunca silenciosa.
 const DEFAULT_PUBLIC_APPLICATION_RATE_LIMITS = {
-  submitByIp: { limit: 5, windowMs: 60_000 } satisfies RateLimitConfig,
-  submitByJobOpening: { limit: 60, windowMs: 60_000 } satisfies RateLimitConfig
+  submitByIp: { limit: 5, windowMs: 60_000, failureMode: "open" } satisfies RateLimitConfig,
+  submitByJobOpening: {
+    limit: 60,
+    windowMs: 60_000,
+    failureMode: "open"
+  } satisfies RateLimitConfig
 };
 type PublicApplicationRateLimitNamespace = keyof typeof DEFAULT_PUBLIC_APPLICATION_RATE_LIMITS;
 
@@ -82,7 +92,7 @@ export class PublicApplicationService {
     const organizationId = preOpening.organizationId;
     const jobOpeningId = preOpening.id;
 
-    this.ensureRateLimitAllowed(meta.ip, jobOpeningId);
+    await this.ensureRateLimitAllowed(meta.ip, jobOpeningId);
 
     const parsed = validatePublicApplicationInput(rawInput);
     this.ensureNotBot(parsed);
@@ -283,12 +293,22 @@ export class PublicApplicationService {
     }
   }
 
-  private ensureRateLimitAllowed(ip: string, jobOpeningId: string) {
-    if (!this.rateLimiter.checkAndRecord("submitByIp", ip || "unknown")) {
-      throw tooManyRequests("public_application_rate_limited", "Too many requests.");
+  private async ensureRateLimitAllowed(ip: string, jobOpeningId: string) {
+    const byIp = await this.rateLimiter.checkAndRecord("submitByIp", ip || "unknown");
+    if (!byIp.allowed) {
+      throw tooManyRequests(
+        "public_application_rate_limited",
+        "Too many requests.",
+        byIp.retryAfterSeconds
+      );
     }
-    if (!this.rateLimiter.checkAndRecord("submitByJobOpening", jobOpeningId)) {
-      throw tooManyRequests("public_application_rate_limited", "Too many requests.");
+    const byJobOpening = await this.rateLimiter.checkAndRecord("submitByJobOpening", jobOpeningId);
+    if (!byJobOpening.allowed) {
+      throw tooManyRequests(
+        "public_application_rate_limited",
+        "Too many requests.",
+        byJobOpening.retryAfterSeconds
+      );
     }
   }
 
@@ -333,7 +353,13 @@ export function createPostgresPublicApplicationService(
   pool: pg.Pool,
   candidatesService: CandidateService,
   applicationsService: CandidateApplicationService,
-  testingHooks: PublicApplicationTestingHooks = {}
+  testingHooks: PublicApplicationTestingHooks = {},
+  // Fase 32 (ADR-0027 s9). Ausente = `RateLimiter` usa seu default in-memory -- preserva, sem
+  // nenhuma mudanca de comportamento, todo teste existente que chama esta factory diretamente
+  // (isolamento entre `it()` do mesmo arquivo depende de contadores frescos em memoria, nunca
+  // persistidos no schema Postgres COMPARTILHADO entre os testes de um mesmo arquivo). Somente
+  // `index.ts` (processo real) passa `new PostgresRateLimitStore(pool)` explicitamente.
+  rateLimitStore?: RateLimitStore
 ) {
   const core = new PostgresCoreRepository(pool);
   const jobOpenings = new PostgresJobOpeningRepository(pool);
@@ -346,7 +372,7 @@ export function createPostgresPublicApplicationService(
     applicationsService,
     publicApplications,
     runTransaction,
-    new RateLimiter(DEFAULT_PUBLIC_APPLICATION_RATE_LIMITS),
+    new RateLimiter(DEFAULT_PUBLIC_APPLICATION_RATE_LIMITS, rateLimitStore),
     testingHooks
   );
 }

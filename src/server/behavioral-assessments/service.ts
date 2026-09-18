@@ -1,6 +1,7 @@
 import type pg from "pg";
 import { conflict, forbidden, notFound, tooManyRequests } from "../core/errors";
 import { RateLimiter, type RateLimitConfig } from "../core/rate-limiter";
+import type { RateLimitStore } from "../core/rate-limit-store";
 import type { CoreRepository } from "../core/repository";
 import type { Actor, MembershipRole } from "../core/types";
 import { PostgresCoreRepository } from "../persistence/postgres-core-repository";
@@ -61,9 +62,16 @@ export const BEHAVIORAL_ASSESSMENT_CONSENT_PURPOSE = "behavioral_assessment";
 // Mesmo padrao ja validado e corrigido pela revisao destrutiva da Fase 18: duas dimensoes
 // combinadas (IP + hash do token tentado, nunca o token bruto), checadas antes de qualquer
 // trabalho em banco.
+//
+// Fase 32 (ADR-0027 s9): `failureMode: "open"` -- classe B, mesma justificativa de
+// `pre-interviews/service.ts`.
 const DEFAULT_RATE_LIMITS = {
-  publicByIp: { limit: 60, windowMs: 60_000 } satisfies RateLimitConfig,
-  publicByTokenHash: { limit: 30, windowMs: 60_000 } satisfies RateLimitConfig
+  publicByIp: { limit: 60, windowMs: 60_000, failureMode: "open" } satisfies RateLimitConfig,
+  publicByTokenHash: {
+    limit: 30,
+    windowMs: 60_000,
+    failureMode: "open"
+  } satisfies RateLimitConfig
 };
 type RateLimitNamespace = keyof typeof DEFAULT_RATE_LIMITS;
 export type BehavioralAssessmentPublicMeta = { ip: string };
@@ -1195,7 +1203,7 @@ export class BehavioralAssessmentService {
   // ==========================================================================================
 
   async getPublic(rawToken: string, meta: BehavioralAssessmentPublicMeta) {
-    this.ensurePublicRateLimitAllowed(meta, hashAccessToken(String(rawToken ?? "")));
+    await this.ensurePublicRateLimitAllowed(meta, hashAccessToken(String(rawToken ?? "")));
     await this.materializeExpirationForToken(rawToken);
     return this.runTransaction(async (tx) => {
       let assessment = await this.resolveTokenForUpdate(tx, rawToken);
@@ -1205,7 +1213,7 @@ export class BehavioralAssessmentService {
   }
 
   async start(rawToken: string, meta: BehavioralAssessmentPublicMeta) {
-    this.ensurePublicRateLimitAllowed(meta, hashAccessToken(String(rawToken ?? "")));
+    await this.ensurePublicRateLimitAllowed(meta, hashAccessToken(String(rawToken ?? "")));
     await this.materializeExpirationForToken(rawToken);
     return this.runTransaction(async (tx) => {
       let assessment = await this.resolveTokenForUpdate(tx, rawToken);
@@ -1242,7 +1250,7 @@ export class BehavioralAssessmentService {
     input: BehavioralAssessmentResponseInput,
     meta: BehavioralAssessmentPublicMeta
   ) {
-    this.ensurePublicRateLimitAllowed(meta, hashAccessToken(String(rawToken ?? "")));
+    await this.ensurePublicRateLimitAllowed(meta, hashAccessToken(String(rawToken ?? "")));
     await this.materializeExpirationForToken(rawToken);
     return this.runTransaction(async (tx) => {
       let assessment = await this.resolveTokenForUpdate(tx, rawToken);
@@ -1300,7 +1308,7 @@ export class BehavioralAssessmentService {
   }
 
   async submit(rawToken: string, meta: BehavioralAssessmentPublicMeta) {
-    this.ensurePublicRateLimitAllowed(meta, hashAccessToken(String(rawToken ?? "")));
+    await this.ensurePublicRateLimitAllowed(meta, hashAccessToken(String(rawToken ?? "")));
     await this.materializeExpirationForToken(rawToken);
     return this.runTransaction(async (tx) => {
       let assessment = await this.resolveTokenForUpdate(tx, rawToken);
@@ -1512,12 +1520,25 @@ export class BehavioralAssessmentService {
     );
   }
 
-  private ensurePublicRateLimitAllowed(meta: BehavioralAssessmentPublicMeta, tokenHash: string) {
-    if (!this.rateLimiter.checkAndRecord("publicByIp", meta.ip || "unknown")) {
-      throw tooManyRequests("behavioral_assessment_rate_limited", "Too many requests.");
+  private async ensurePublicRateLimitAllowed(
+    meta: BehavioralAssessmentPublicMeta,
+    tokenHash: string
+  ) {
+    const byIp = await this.rateLimiter.checkAndRecord("publicByIp", meta.ip || "unknown");
+    if (!byIp.allowed) {
+      throw tooManyRequests(
+        "behavioral_assessment_rate_limited",
+        "Too many requests.",
+        byIp.retryAfterSeconds
+      );
     }
-    if (!this.rateLimiter.checkAndRecord("publicByTokenHash", tokenHash)) {
-      throw tooManyRequests("behavioral_assessment_rate_limited", "Too many requests.");
+    const byTokenHash = await this.rateLimiter.checkAndRecord("publicByTokenHash", tokenHash);
+    if (!byTokenHash.allowed) {
+      throw tooManyRequests(
+        "behavioral_assessment_rate_limited",
+        "Too many requests.",
+        byTokenHash.retryAfterSeconds
+      );
     }
   }
 
@@ -2109,7 +2130,10 @@ function requireUserActorId(actor: Actor) {
 // provar rollback real. Em producao (`src/server/index.ts`) nunca e passado.
 export function createPostgresBehavioralAssessmentService(
   pool: pg.Pool,
-  testingHooks: BehavioralAssessmentTestingHooks = {}
+  testingHooks: BehavioralAssessmentTestingHooks = {},
+  // Fase 32 (ADR-0027 s9). Ausente = in-memory (dev/test); `index.ts` passa
+  // `new PostgresRateLimitStore(pool)` em producao.
+  rateLimitStore?: RateLimitStore
 ) {
   const core = new PostgresCoreRepository(pool);
   const behavioralAssessments = new PostgresBehavioralAssessmentRepository(pool);
@@ -2118,7 +2142,7 @@ export function createPostgresBehavioralAssessmentService(
     core,
     behavioralAssessments,
     runTransaction,
-    new RateLimiter(DEFAULT_RATE_LIMITS),
+    new RateLimiter(DEFAULT_RATE_LIMITS, rateLimitStore),
     testingHooks
   );
 }

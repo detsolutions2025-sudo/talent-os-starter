@@ -218,6 +218,12 @@ export function createApiErrorHandler() {
       if (error.statusCode >= 500) {
         logger.error({ err: error, reqId: request.id }, "AppError with 5xx status");
       }
+      // Fase 32 (ADR-0027 s9): todo 429 emitido por um RateLimiter carrega `retryAfterSeconds`
+      // (calculado a partir da janela real do store, nunca um valor fixo arbitrario) -- exposto
+      // aqui, no unico ponto de serializacao de erro, como o header padrao HTTP `Retry-After`.
+      if (error.statusCode === 429 && error.retryAfterSeconds !== undefined) {
+        response.set("Retry-After", String(Math.max(1, Math.ceil(error.retryAfterSeconds))));
+      }
       response.status(error.statusCode).json({
         error: {
           code: error.code,

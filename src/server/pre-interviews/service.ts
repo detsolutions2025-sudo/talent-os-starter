@@ -2,6 +2,7 @@ import type pg from "pg";
 import { fingerprint } from "../core/canonical-hash";
 import { conflict, forbidden, notFound, tooManyRequests } from "../core/errors";
 import { RateLimiter, type RateLimitConfig } from "../core/rate-limiter";
+import type { RateLimitStore } from "../core/rate-limit-store";
 import type { CoreRepository } from "../core/repository";
 import type { Actor, MembershipRole } from "../core/types";
 import { PostgresCoreRepository } from "../persistence/postgres-core-repository";
@@ -53,9 +54,16 @@ const DEFAULT_ACCESS_TOKEN_TTL_MS = 14 * 24 * 60 * 60 * 1000; // 14 dias
 // hash do token tentado (defesa contra abuso de UM token especifico, legitimo ou nao, sendo
 // martelado rapido demais) -- nunca o token bruto, que nunca vira chave armazenavel/logavel
 // (item 2: "nao utilizar o raw token diretamente como key").
+// Fase 32 (ADR-0027 s9): `failureMode: "open"` -- classe B ("endpoint publico de escrita/
+// leitura sob token"). Indisponibilidade do store nunca deve travar o fluxo de um candidato
+// real; toda falha e auditada (`rate_limit_store_error`) para visibilidade operacional.
 const DEFAULT_PRE_INTERVIEW_RATE_LIMITS = {
-  publicByIp: { limit: 60, windowMs: 60_000 } satisfies RateLimitConfig,
-  publicByTokenHash: { limit: 30, windowMs: 60_000 } satisfies RateLimitConfig
+  publicByIp: { limit: 60, windowMs: 60_000, failureMode: "open" } satisfies RateLimitConfig,
+  publicByTokenHash: {
+    limit: 30,
+    windowMs: 60_000,
+    failureMode: "open"
+  } satisfies RateLimitConfig
 };
 type PreInterviewRateLimitNamespace = keyof typeof DEFAULT_PRE_INTERVIEW_RATE_LIMITS;
 
@@ -659,7 +667,7 @@ export class PreInterviewService {
   // ----------------------------------------------------------------------------------------
 
   async getPublic(rawToken: string, meta: PreInterviewPublicMeta) {
-    this.ensurePublicRateLimitAllowed(meta, hashAccessToken(String(rawToken ?? "")));
+    await this.ensurePublicRateLimitAllowed(meta, hashAccessToken(String(rawToken ?? "")));
     await this.materializeExpirationForToken(rawToken);
     return this.runTransaction(async (tx) => {
       let preInterview = await this.resolveTokenForUpdate(tx, rawToken);
@@ -669,7 +677,7 @@ export class PreInterviewService {
   }
 
   async start(rawToken: string, meta: PreInterviewPublicMeta) {
-    this.ensurePublicRateLimitAllowed(meta, hashAccessToken(String(rawToken ?? "")));
+    await this.ensurePublicRateLimitAllowed(meta, hashAccessToken(String(rawToken ?? "")));
     await this.materializeExpirationForToken(rawToken);
     return this.runTransaction(async (tx) => {
       let preInterview = await this.resolveTokenForUpdate(tx, rawToken);
@@ -707,7 +715,7 @@ export class PreInterviewService {
     input: PreInterviewResponseInput,
     meta: PreInterviewPublicMeta
   ) {
-    this.ensurePublicRateLimitAllowed(meta, hashAccessToken(String(rawToken ?? "")));
+    await this.ensurePublicRateLimitAllowed(meta, hashAccessToken(String(rawToken ?? "")));
     await this.materializeExpirationForToken(rawToken);
     return this.runTransaction(async (tx) => {
       let preInterview = await this.resolveTokenForUpdate(tx, rawToken);
@@ -759,7 +767,7 @@ export class PreInterviewService {
   }
 
   async submit(rawToken: string, meta: PreInterviewPublicMeta) {
-    this.ensurePublicRateLimitAllowed(meta, hashAccessToken(String(rawToken ?? "")));
+    await this.ensurePublicRateLimitAllowed(meta, hashAccessToken(String(rawToken ?? "")));
     await this.materializeExpirationForToken(rawToken);
     return this.runTransaction(async (tx) => {
       let preInterview = await this.resolveTokenForUpdate(tx, rawToken);
@@ -899,12 +907,22 @@ export class PreInterviewService {
   // valido/invalido/revogado/expirado -- nunca depois, para que o limite em si nunca vire um
   // oracle que diferencie esses casos (a resposta 429, quando ocorre, e identica
   // independentemente do token ser real ou forjado).
-  private ensurePublicRateLimitAllowed(meta: PreInterviewPublicMeta, tokenHash: string) {
-    if (!this.rateLimiter.checkAndRecord("publicByIp", meta.ip || "unknown")) {
-      throw tooManyRequests("pre_interview_rate_limited", "Too many requests.");
+  private async ensurePublicRateLimitAllowed(meta: PreInterviewPublicMeta, tokenHash: string) {
+    const byIp = await this.rateLimiter.checkAndRecord("publicByIp", meta.ip || "unknown");
+    if (!byIp.allowed) {
+      throw tooManyRequests(
+        "pre_interview_rate_limited",
+        "Too many requests.",
+        byIp.retryAfterSeconds
+      );
     }
-    if (!this.rateLimiter.checkAndRecord("publicByTokenHash", tokenHash)) {
-      throw tooManyRequests("pre_interview_rate_limited", "Too many requests.");
+    const byTokenHash = await this.rateLimiter.checkAndRecord("publicByTokenHash", tokenHash);
+    if (!byTokenHash.allowed) {
+      throw tooManyRequests(
+        "pre_interview_rate_limited",
+        "Too many requests.",
+        byTokenHash.retryAfterSeconds
+      );
     }
   }
 
@@ -1421,7 +1439,10 @@ function requireUserActorId(actor: Actor) {
 // (`src/server/index.ts`) nunca e passado, entao o hook e sempre um no-op real.
 export function createPostgresPreInterviewService(
   pool: pg.Pool,
-  testingHooks: PreInterviewTestingHooks = {}
+  testingHooks: PreInterviewTestingHooks = {},
+  // Fase 32 (ADR-0027 s9). Ausente = in-memory (dev/test, preserva isolamento entre `it()` do
+  // mesmo arquivo); `index.ts` passa `new PostgresRateLimitStore(pool)` em producao.
+  rateLimitStore?: RateLimitStore
 ) {
   const core = new PostgresCoreRepository(pool);
   const preInterviews = new PostgresPreInterviewRepository(pool);
@@ -1430,7 +1451,7 @@ export function createPostgresPreInterviewService(
     core,
     preInterviews,
     runTransaction,
-    new RateLimiter(DEFAULT_PRE_INTERVIEW_RATE_LIMITS),
+    new RateLimiter(DEFAULT_PRE_INTERVIEW_RATE_LIMITS, rateLimitStore),
     testingHooks
   );
 }

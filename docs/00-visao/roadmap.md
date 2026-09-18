@@ -694,3 +694,61 @@ restore.test.ts`) mais testes unitarios puros
 segundo bug real foi encontrado e corrigido: `array_agg` de colunas do
 tipo `name` (catalogo do Postgres) nao e desserializado automaticamente
 pelo driver `pg` sem cast explicito para `text[]`.
+
+## Production Hardening — Rate Limiting Distribuido (2026-09-18)
+
+Sexta sub-frente da ADR-0027 (secao 2) fechada nesta rodada. A propria
+ADR (secao 9) ja havia decidido a arquitetura de transicao: sair de
+memoria local (single-process) para **Postgres** (opcao "E" da tabela
+de alternativas) no momento em que a topologia exigir multiplas
+instancias -- "reaproveita infraestrutura ja paga, sem novo vendor".
+Nenhuma dependencia nova instalada; nenhum Redis/Upstash/Valkey
+inventado ou provisionado.
+
+Entregue: `src/server/core/rate-limit-store.ts` (`RateLimitStore`,
+`InMemoryRateLimitStore` default de dev/test, `PostgresRateLimitStore`
+autoritativo via `INSERT ... ON CONFLICT ... DO UPDATE` atomico contra
+a nova tabela `rate_limit_counters`, migration
+`0034_phase_32_rate_limit_counters.sql`); `core/rate-limiter.ts`
+refeito para store injetavel, assincrono, com `failureMode` explicito
+por namespace (fail-closed em autenticacao/sessao e execucao de IA;
+fail-open, sempre auditado, em superficies publicas de baixo risco) e
+`Retry-After` calculado a partir da janela real (`core/errors.ts`,
+`app.ts`). Os sete pontos de rate limit ja existentes desde as Fases
+11/17/18/19/22/29 (IA, candidatura publica, pre-entrevista, avaliacao
+comportamental, proposta, auth) foram migrados para o store
+distribuido sem alterar nenhuma politica/numero ja testado -- apenas
+`index.ts` passa a injetar `PostgresRateLimitStore(pool)`
+explicitamente em cada um. Dois gaps fisicos de cobertura, achados no
+discovery desta Fase, foram fechados: `/auth/session` e `/auth/refresh`
+(unicas rotas publicas de `auth` sem rate limit ate aqui) e `GET
+/public/job-openings/:slug` (unico endpoint publico de leitura
+totalmente desprotegido).
+
+**Teste real executado** (nao apenas documentado) contra Postgres real
+em schema descartavel (`tests/phase32/rate-limit-store-postgres.test.ts`,
+mesmo mecanismo de `tests/helpers/postgres-test-db.ts` usado por toda a
+suite `tests/phase1..31`): increment atomico, isolamento de chaves,
+expiracao de janela, hashing (chave logica nunca persistida em claro),
+concorrencia real via `Promise.all`, e o cenario central desta Fase --
+dois `RateLimiter`/`PostgresRateLimitStore` completamente independentes
+(sem nenhuma referencia compartilhada em memoria, o mesmo que dois
+processos Node distintos teriam) apontando para o MESMO Postgres
+respeitam um unico contador combinado. Fail-open/fail-closed testado
+isoladamente com um store fake que lanca
+(`tests/phase32/rate-limiter-failure-mode.test.ts`). Toda a suite de
+rate limit ja existente (`tests/phase11`, `tests/phase17`,
+`tests/phase18`) continua verde com a nova API assincrona.
+
+**Gap aceito, nao bloqueante:** a classe "endpoints comuns
+autenticados" (~280 rotas do roteador interno) nao recebeu rate limit
+dedicado nesta rodada -- cobrir cada uma individualmente e
+desproporcional ao escopo desta Fase e arrisca prejudicar navegacao
+normal do produto; registrado para trabalho futuro caso um padrao de
+abuso real seja observado. Documentacao operacional completa em
+`docs/operacao/rate-limiting.md`. Nenhuma mudanca de migration de
+dominio, RBAC, tenant isolation ou frontend.
+
+Isto **nao** torna o projeto "production ready" -- e a sexta das sete
+sub-frentes da ADR-0027; E2E permanece candidata a trabalho futuro, sem
+numero de fase atribuido.

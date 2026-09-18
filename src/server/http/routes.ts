@@ -1582,7 +1582,12 @@ export function createApiRouter(
     router.get(
       "/public/job-openings/:slug",
       asyncHandler(async (request, response) => {
-        response.json(await jobOpenings.getPublicBySlug(routeParam(request.params.slug)));
+        response.json(
+          await jobOpenings.getPublicBySlug(
+            routeParam(request.params.slug),
+            request.ip ?? request.socket.remoteAddress ?? "unknown"
+          )
+        );
       })
     );
   }
@@ -4552,6 +4557,12 @@ export function createApiRouter(
     router.post(
       "/auth/session",
       asyncHandler(async (request, response) => {
+        // Fase 32 (ADR-0027 s9): unica das rotas publicas de `auth` sem rate limit ate aqui
+        // (achado fisico do discovery) -- chave IP, ja que nenhuma sessao/Actor existe neste
+        // ponto. Sempre antes de `verifyToken` (nunca dentro dele -- ver `AuthService`).
+        await auth.checkSessionBridgeRateLimit(
+          request.ip ?? request.socket.remoteAddress ?? "unknown"
+        );
         const accessToken = requireBodyString(request.body, "accessToken");
         const refreshToken = requireBodyString(request.body, "refreshToken");
         // Verificacao local (mesma usada por qualquer requisicao autenticada) -- confirma que o
@@ -4566,6 +4577,8 @@ export function createApiRouter(
     router.post(
       "/auth/refresh",
       asyncHandler(async (request, response) => {
+        // Fase 32 (ADR-0027 s9): mesma justificativa de `/auth/session` acima.
+        await auth.checkRefreshRateLimit(request.ip ?? request.socket.remoteAddress ?? "unknown");
         const { refreshToken } = readSessionCookies(request);
         if (!refreshToken) {
           throw forbidden("session_required", "A valid session is required.");

@@ -1,6 +1,8 @@
 import type pg from "pg";
 import type { CompetencyRepository } from "../competencies/repository";
-import { badRequest, conflict, forbidden, notFound } from "../core/errors";
+import { badRequest, conflict, forbidden, notFound, tooManyRequests } from "../core/errors";
+import { RateLimiter, type RateLimitConfig } from "../core/rate-limiter";
+import type { RateLimitStore } from "../core/rate-limit-store";
 import type { CoreRepository } from "../core/repository";
 import type { Actor, AuditEvent, MembershipRole } from "../core/types";
 import type { JobProfileRepository } from "../job-profiles/repository";
@@ -50,6 +52,27 @@ type JobOpeningTransactionRunner = <T>(
   callback: (transaction: JobOpeningTransaction) => Promise<T>
 ) => Promise<T>;
 
+// Fase 32 (ADR-0027 s9). `GET /public/job-openings/:slug` (classe C, "endpoint publico de
+// leitura") nunca teve rate limit proprio ate aqui -- achado fisico do discovery desta Fase,
+// unico endpoint publico do roteador totalmente desprotegido. Duas dimensoes, mesmo padrao ja
+// usado pelas demais superficies publicas: por IP (defesa contra scraping/enumeracao de slugs a
+// partir de uma unica origem) e por slug (defesa de uma vaga especifica contra volume alto
+// vindo de muitas origens -- ex. um crawler distribuido). `failureMode: "open"`: classe C,
+// nunca bloquear a leitura publica de uma vaga por indisponibilidade do store.
+const DEFAULT_JOB_OPENING_RATE_LIMITS = {
+  publicReadByIp: {
+    limit: 60,
+    windowMs: 60_000,
+    failureMode: "open"
+  } satisfies RateLimitConfig,
+  publicReadBySlug: {
+    limit: 120,
+    windowMs: 60_000,
+    failureMode: "open"
+  } satisfies RateLimitConfig
+};
+type JobOpeningRateLimitNamespace = keyof typeof DEFAULT_JOB_OPENING_RATE_LIMITS;
+
 export class JobOpeningService {
   constructor(
     private readonly core: CoreRepository,
@@ -58,7 +81,10 @@ export class JobOpeningService {
     private readonly units: OrganizationalUnitRepository,
     private readonly competencies: CompetencyRepository,
     private readonly questions: QuestionRepository,
-    private readonly runTransaction: JobOpeningTransactionRunner
+    private readonly runTransaction: JobOpeningTransactionRunner,
+    private readonly rateLimiter: RateLimiter<JobOpeningRateLimitNamespace> = new RateLimiter(
+      DEFAULT_JOB_OPENING_RATE_LIMITS
+    )
   ) {}
 
   async createJobOpening(actor: Actor, organizationId: string, input: JobOpeningInput) {
@@ -584,8 +610,10 @@ export class JobOpeningService {
     });
   }
 
-  async getPublicBySlug(slug: string) {
-    const opening = await this.openings.findJobOpeningByPublicSlug(slug.toLowerCase());
+  async getPublicBySlug(slug: string, ip: string) {
+    const normalizedSlug = slug.toLowerCase();
+    await this.ensurePublicReadRateLimitAllowed(ip, normalizedSlug);
+    const opening = await this.openings.findJobOpeningByPublicSlug(normalizedSlug);
     if (!opening) {
       throw notFound("job_opening_public_not_found", "Job opening not found.");
     }
@@ -634,8 +662,28 @@ export class JobOpeningService {
       transaction.units,
       transaction.competencies,
       transaction.questions,
-      this.runTransaction
+      this.runTransaction,
+      this.rateLimiter
     );
+  }
+
+  private async ensurePublicReadRateLimitAllowed(ip: string, slug: string) {
+    const byIp = await this.rateLimiter.checkAndRecord("publicReadByIp", ip || "unknown");
+    if (!byIp.allowed) {
+      throw tooManyRequests(
+        "job_opening_public_rate_limited",
+        "Too many requests.",
+        byIp.retryAfterSeconds
+      );
+    }
+    const bySlug = await this.rateLimiter.checkAndRecord("publicReadBySlug", slug);
+    if (!bySlug.allowed) {
+      throw tooManyRequests(
+        "job_opening_public_rate_limited",
+        "Too many requests.",
+        bySlug.retryAfterSeconds
+      );
+    }
   }
 
   private async authorizeUser(
@@ -925,7 +973,12 @@ export class JobOpeningService {
   }
 }
 
-export function createPostgresJobOpeningService(pool: pg.Pool) {
+export function createPostgresJobOpeningService(
+  pool: pg.Pool,
+  // Fase 32 (ADR-0027 s9). Ausente = in-memory (dev/test); `index.ts` passa
+  // `new PostgresRateLimitStore(pool)` em producao.
+  rateLimitStore?: RateLimitStore
+) {
   const core = new PostgresCoreRepository(pool);
   const openings = new PostgresJobOpeningRepository(pool);
   const jobProfiles = new PostgresJobProfileRepository(pool);
@@ -960,7 +1013,8 @@ export function createPostgresJobOpeningService(pool: pg.Pool) {
     units,
     competencies,
     questions,
-    runTransaction
+    runTransaction,
+    new RateLimiter(DEFAULT_JOB_OPENING_RATE_LIMITS, rateLimitStore)
   );
 }
 

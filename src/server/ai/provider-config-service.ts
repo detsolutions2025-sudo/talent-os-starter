@@ -248,7 +248,11 @@ export class AIProviderConfigService {
     }
 
     const rateLimitKey = `${organizationId}:${provider}:${actorRateLimitKey(actor)}`;
-    if (!this.rateLimiter.checkAndRecord("testConnection", rateLimitKey)) {
+    const testConnectionRateLimit = await this.rateLimiter.checkAndRecord(
+      "testConnection",
+      rateLimitKey
+    );
+    if (!testConnectionRateLimit.allowed) {
       await auditDenied(
         this.core,
         actor,
@@ -259,7 +263,11 @@ export class AIProviderConfigService {
           provider
         }
       );
-      throw errorCategoryToAppError("rate_limited", "test_connection rate limit exceeded.");
+      throw errorCategoryToAppError(
+        "rate_limited",
+        "test_connection rate limit exceeded.",
+        testConnectionRateLimit.retryAfterSeconds
+      );
     }
 
     // "Chamada minima" only -- never any Candidate/Interview/CandidateApplication data.
