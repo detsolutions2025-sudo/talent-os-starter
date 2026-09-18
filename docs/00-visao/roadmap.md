@@ -641,3 +641,56 @@ esse nome exigiria um fetch adicional que essas telas nao faziam antes --
 fora do escopo "visual apenas" desta Wave. Um modulo futuro de contexto
 de pessoa entre paineis (ou um endpoint agregado) resolveria isso sem
 duplicar chamadas.
+
+## Production Hardening — Backup/Restore + DR minimo (2026-09-17)
+
+Terceira sub-frente da ADR-0027 (secao 2) fechada nesta rodada (apos
+Configuracao/Secrets - Fase 30 - e Seguranca de Borda - Fase 31).
+Entregue: `src/server/backup-restore/*` (dump/restore logico em
+Node/`pg`, sem exigir `pg_dump`/`pg_restore` -- ausentes no ambiente
+desta implementacao, e deliberadamente nao instalados), scripts `npm run
+db:backup`/`npm run db:restore`, e o runbook
+`docs/operacao/backup-restore.md`. Restore falha fechado por construcao:
+exige `--target-schema` + `--confirm-target` identico + schema alvo ja
+existente e **vazio** (`assertTargetIsEmpty`, verificado mecanicamente,
+nao inferido de APP_ENV) -- nunca aceita `public` como alvo. Backup
+exclui `schema_migrations` (bookkeeping do migration runner, nao dado de
+dominio) da introspeccao -- bug real encontrado e corrigido durante a
+execucao do teste desta rodada.
+
+**Teste real executado** (nao apenas documentado), contra dois schemas
+descartaveis via `tests/helpers/postgres-test-db.ts` (mesmo mecanismo ja
+usado por toda a suite `tests/phase1..31` contra este mesmo Postgres,
+nunca `public`, nunca dado real): fixture sintetica multi-tenant (2
+Organizations/Users/Memberships + audit_events com JSONB) -> dump ->
+schema vazio -> restore -> verificacao objetiva (contagem, tenant
+boundaries via join real, JSONB preservado) -- `tests/dr/backup-
+restore.test.ts`. Os dois scripts de CLI tambem foram executados
+manualmente de ponta a ponta (nao so as funcoes internas), confirmando
+os tres bloqueios de seguranca do restore na pratica. RPO/RTO desta v1
+sao objetivo interno (24h/2h), nao SLA do provedor -- cobertura real de
+PITR/backup gerenciado do Supabase fica registrada como verificacao
+operacional pendente (nao verificavel sem acesso ao painel da conta
+real). Sem cobertura de Storage (nao usado hoje) nem de segredos/config.
+Nenhuma mudanca de dominio, RBAC, tenant isolation ou migration.
+
+Isto **nao** torna o projeto "production ready" -- e apenas a terceira
+das sete sub-frentes da ADR-0027; as demais quatro (CI/CD ja parcialmente
+coberto, observabilidade ja parcialmente coberta, rate limiting
+distribuido, E2E) seguem candidatas a trabalho futuro, sem numero de
+fase atribuido.
+
+**Ajuste (2026-09-18):** a ordenacao de linhas dentro de tabela com FK
+auto-referenciada (ex.: `organizational_units.parent_id`) -- registrada
+como gap no fechamento acima -- foi resolvida de forma generica (detectada
+via `pg_constraint`, nao hardcoded) em
+`src/server/backup-restore/row-ordering.ts`: dump ordena pai-antes-do-
+filho por construcao, restore reaplica a mesma ordenacao como defesa em
+profundidade, e um ciclo auto-referenciado (so alcancavel via UPDATE)
+falha fechado (`RowCycleError`) em vez de restaurar parcialmente. Testado
+com hierarquia real de 3 niveis contra Postgres real (`tests/dr/backup-
+restore.test.ts`) mais testes unitarios puros
+(`tests/dr/row-ordering.test.ts`). Durante a execucao do teste, um
+segundo bug real foi encontrado e corrigido: `array_agg` de colunas do
+tipo `name` (catalogo do Postgres) nao e desserializado automaticamente
+pelo driver `pg` sem cast explicito para `text[]`.

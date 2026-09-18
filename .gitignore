@@ -5,3 +5,4 @@ coverage/
 dev.db
 prisma/dev.db
 prisma/dev.db-journal
+backups/
