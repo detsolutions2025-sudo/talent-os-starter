@@ -1,11 +1,19 @@
 import { useEffect, useState } from "react";
-import { supabase } from "./supabaseClient";
+import { supabase } from "../../supabaseClient";
+import { PublicShell } from "./PublicShell";
+import { Card } from "../../components/ui/Card";
+import { ErrorState } from "../../components/ui/ErrorState";
+import { Spinner } from "../../components/ui/Spinner";
+import "./public.css";
 
 // Fase 29 (SPEC-028 s15/s23). Rota publica por definicao (a pessoa ainda nao tem sessao local
 // no momento em que a acessa) -- callback/redirecionamento do fluxo do provider apos o convite
 // ser confirmado. `?invitation=<id>` identifica QUAL convite aceitar (o `id` em si e opaco, nao
 // concede nada sozinho -- SPEC-028 s15). `detectSessionInUrl` (supabaseClient.ts) ja populou a
 // sessao do SDK a partir do fragmento/parametros que o provider anexou ao redirecionar para cá.
+//
+// Migrado para o Design System v1 na Wave 4 (frontend puro) -- nenhuma mudanca de Auth,
+// bootstrap, Membership ou tratamento de erro.
 export function AcceptInvitePage() {
   const [status, setStatus] = useState<"working" | "done" | "error">("working");
   const [message, setMessage] = useState("");
@@ -15,18 +23,18 @@ export function AcceptInvitePage() {
       const invitationId = new URLSearchParams(window.location.search).get("invitation");
       if (!invitationId) {
         setStatus("error");
-        setMessage("Link de convite invalido.");
+        setMessage("Link de convite inválido.");
         return;
       }
       if (!supabase) {
         setStatus("error");
-        setMessage("A autenticacao nao esta configurada neste ambiente.");
+        setMessage("A autenticação não está configurada neste ambiente.");
         return;
       }
       const { data } = await supabase.auth.getSession();
       if (!data.session) {
         setStatus("error");
-        setMessage("Nao foi possivel confirmar o convite. Solicite um novo link.");
+        setMessage("Não foi possível confirmar o convite. Solicite um novo link.");
         return;
       }
       const bridgeResponse = await fetch("/api/auth/session", {
@@ -39,7 +47,7 @@ export function AcceptInvitePage() {
       });
       if (!bridgeResponse.ok) {
         setStatus("error");
-        setMessage("Nao foi possivel iniciar a sessao.");
+        setMessage("Não foi possível iniciar a sessão.");
         return;
       }
       const acceptResponse = await fetch(`/api/auth/invitations/${invitationId}/accept`, {
@@ -49,7 +57,7 @@ export function AcceptInvitePage() {
       if (!acceptResponse.ok) {
         setStatus("error");
         setMessage(
-          "Nao foi possivel aceitar o convite. Ele pode ter expirado ou ja ter sido usado."
+          "Não foi possível aceitar o convite. Ele pode ter expirado ou já ter sido usado."
         );
         return;
       }
@@ -58,15 +66,34 @@ export function AcceptInvitePage() {
   }, []);
 
   if (status === "working") {
-    return <p>Confirmando convite...</p>;
+    return (
+      <PublicShell>
+        <Card>
+          <Spinner label="Confirmando convite" />
+        </Card>
+      </PublicShell>
+    );
   }
+
   if (status === "error") {
-    return <p role="alert">{message}</p>;
+    return (
+      <PublicShell>
+        <ErrorState title={message} />
+      </PublicShell>
+    );
   }
+
   return (
-    <div>
-      <p>Convite aceito. Voce ja pode acessar a plataforma.</p>
-      <a href="/">Ir para a plataforma</a>
-    </div>
+    <PublicShell>
+      <Card>
+        <h1 tabIndex={-1} className="ds-public-page-header__title">
+          Convite aceito
+        </h1>
+        <p>Você já pode acessar a plataforma.</p>
+        <a href="/" className="ds-btn ds-btn--primary ds-btn--md">
+          <span className="ds-btn__label">Ir para a plataforma</span>
+        </a>
+      </Card>
+    </PublicShell>
   );
 }

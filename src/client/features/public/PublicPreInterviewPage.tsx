@@ -1,8 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
+import { PublicShell } from "./PublicShell";
+import { Alert } from "../../components/ui/Alert";
+import { Button } from "../../components/ui/Button";
+import { Card } from "../../components/ui/Card";
+import { ErrorState } from "../../components/ui/ErrorState";
+import { Spinner } from "../../components/ui/Spinner";
+import { Textarea } from "../../components/ui/Textarea";
+import "./public.css";
 
-// Fase 18 (SPEC-021 v1.0) - Pre-Entrevista Estruturada.
+// Fase 18 (SPEC-021 v1.0) - Pre-Entrevista Estruturada. Migrado para o Design System v1 na
+// Wave 4 (frontend puro): mesmo contrato HTTP e semantica de token, apenas apresentacao.
 //
-// Mesmo padrao minimo ja usado por `PublicApplicationForm.tsx` (Fase 17): pagina publica sem
+// Mesmo padrao minimo ja usado por `PublicJobApplicationPage.tsx` (Fase 17): pagina publica sem
 // login, sem `getActor`, sem IA. O token de acesso nunca aparece na URL nem em query string
 // (Plano Tecnico da Fase 18, correcao final, item 3/36/37) -- chega via fragment
 // (`#access=...`), nunca enviado ao servidor pelo navegador, e e transportado nas chamadas
@@ -40,7 +49,7 @@ type PublicPreInterviewView = {
 type Stage = "loading" | "unavailable" | "intro" | "answering" | "submitted";
 
 const unavailableMessage =
-  "Esta Pre-Entrevista nao esta mais disponivel. Se voce acredita que isso e um engano, entre em contato com a empresa responsavel pelo processo seletivo.";
+  "Esta Pré-Entrevista não está mais disponível. Se você acredita que isso é um engano, entre em contato com a empresa responsável pelo processo seletivo.";
 
 function readTokenFromFragment(): string {
   const hash = window.location.hash.replace(/^#/, "");
@@ -48,13 +57,13 @@ function readTokenFromFragment(): string {
   return params.get("access") ?? "";
 }
 
-export function PublicPreInterviewForm() {
+export function PublicPreInterviewPage() {
   const [token] = useState(readTokenFromFragment);
   const [stage, setStage] = useState<Stage>("loading");
   const [view, setView] = useState<PublicPreInterviewView | null>(null);
   const [draftAnswers, setDraftAnswers] = useState<Record<string, string>>({});
   const [message, setMessage] = useState("");
-  // Revisao destrutiva, item 46: mesmo guard ja usado por `PublicApplicationForm.tsx` (Fase
+  // Revisao destrutiva, item 46: mesmo guard ja usado por `PublicJobApplicationPage.tsx` (Fase
   // 17) -- o servidor ja e idempotente para submit duplicado, mas o botao desabilitado evita
   // um duplo-clique disparar duas requisicoes desnecessarias.
   const [submitting, setSubmitting] = useState(false);
@@ -126,7 +135,7 @@ export function PublicPreInterviewForm() {
       method: "PUT",
       headers: authHeaders,
       body: JSON.stringify({ responseValue: value })
-    }).catch(() => setMessage("Nao foi possivel salvar esta resposta agora. Tente novamente."));
+    }).catch(() => setMessage("Não foi possível salvar esta resposta agora. Tente novamente."));
   }
 
   function submit() {
@@ -142,108 +151,123 @@ export function PublicPreInterviewForm() {
           } | null;
           setMessage(
             body?.error?.code === "pre_interview_required_response_missing"
-              ? "Responda todas as perguntas obrigatorias antes de enviar."
-              : "Nao foi possivel enviar sua Pre-Entrevista agora. Tente novamente."
+              ? "Responda todas as perguntas obrigatórias antes de enviar."
+              : "Não foi possível enviar sua Pré-Entrevista agora. Tente novamente."
           );
           return;
         }
         setStage("submitted");
       })
-      .catch(() => setMessage("Nao foi possivel enviar sua Pre-Entrevista agora. Tente novamente."))
+      .catch(() => setMessage("Não foi possível enviar sua Pré-Entrevista agora. Tente novamente."))
       .finally(() => setSubmitting(false));
   }
 
   if (stage === "loading") {
     return (
-      <main className="public-pre-interview-page">
-        <p>Carregando...</p>
-      </main>
+      <PublicShell>
+        <Card>
+          <Spinner label="Carregando Pré-Entrevista" />
+        </Card>
+      </PublicShell>
     );
   }
 
   if (stage === "unavailable") {
     return (
-      <main className="public-pre-interview-page">
-        <p role="alert">{unavailableMessage}</p>
-      </main>
+      <PublicShell>
+        <ErrorState title={unavailableMessage} />
+      </PublicShell>
     );
   }
 
   if (stage === "submitted") {
     return (
-      <main className="public-pre-interview-page">
-        <h1 tabIndex={-1}>Pre-Entrevista enviada</h1>
-        <p>
-          Obrigado por responder. Suas respostas foram recebidas e serao analisadas pela equipe
-          responsavel. Eventuais proximas etapas serao comunicadas oportunamente.
-        </p>
-      </main>
+      <PublicShell>
+        <Card>
+          <h1 tabIndex={-1} className="ds-public-page-header__title">
+            Pré-Entrevista enviada
+          </h1>
+          <p>
+            Obrigado por responder. Suas respostas foram recebidas e serão analisadas pela equipe
+            responsável. Eventuais próximas etapas serão comunicadas oportunamente.
+          </p>
+        </Card>
+      </PublicShell>
     );
   }
 
   if (stage === "intro") {
     return (
-      <main className="public-pre-interview-page">
-        <h1>Pre-Entrevista Estruturada</h1>
-        <p>
-          Antes da etapa seguinte do processo seletivo, pedimos que voce responda a um pequeno
-          formulario estruturado. {view ? `${view.questions.length} pergunta(s) no total.` : ""}
-        </p>
-        <button type="button" onClick={start}>
-          Iniciar
-        </button>
-      </main>
+      <PublicShell>
+        <div className="ds-public-page-header">
+          <h1 className="ds-public-page-header__title">Pré-Entrevista Estruturada</h1>
+          <p className="ds-public-page-header__description">
+            Antes da etapa seguinte do processo seletivo, pedimos que você responda a um pequeno
+            formulário estruturado. {view ? `${view.questions.length} pergunta(s) no total.` : ""}
+          </p>
+        </div>
+        <Card>
+          <Button type="button" variant="primary" onClick={start}>
+            Iniciar
+          </Button>
+        </Card>
+      </PublicShell>
     );
   }
 
   return (
-    <main className="public-pre-interview-page">
-      <h1>Pre-Entrevista Estruturada</h1>
-      {view && (
-        <p>
-          Progresso: {view.progress.answered} de {view.progress.total} perguntas respondidas
-          {view.progress.requiredTotal > 0 &&
-            ` (${view.progress.requiredAnswered} de ${view.progress.requiredTotal} obrigatorias)`}
-        </p>
-      )}
-
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          submit();
-        }}
-        noValidate
-      >
-        {view?.questions
-          .slice()
-          .sort((a, b) => a.displayOrder - b.displayOrder)
-          .map((question) => (
-            <div key={question.id}>
-              <label htmlFor={`pint-q-${question.id}`}>
-                {question.title}
-                {question.required ? " *" : " (opcional)"}
-              </label>
-              <p>{question.text}</p>
-              <textarea
-                id={`pint-q-${question.id}`}
-                value={draftAnswers[question.id] ?? ""}
-                onChange={(event) => saveAnswer(question.id, event.target.value)}
-                required={question.required}
-                aria-required={question.required}
-              />
-            </div>
-          ))}
-
-        {message && (
-          <p role="alert" className="message">
-            {message}
+    <PublicShell>
+      <div className="ds-public-page-header">
+        <h1 className="ds-public-page-header__title">Pré-Entrevista Estruturada</h1>
+        {view && (
+          <p className="ds-public-progress">
+            Pergunta {view.progress.answered} de {view.progress.total} respondida(s)
+            {view.progress.requiredTotal > 0 &&
+              ` (${view.progress.requiredAnswered} de ${view.progress.requiredTotal} obrigatórias)`}
           </p>
         )}
+      </div>
 
-        <button type="submit" disabled={submitting}>
-          {submitting ? "Enviando..." : "Enviar Pre-Entrevista"}
-        </button>
-      </form>
-    </main>
+      <Card>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            submit();
+          }}
+          noValidate
+          className="ds-form-section__fields"
+        >
+          {view?.questions
+            .slice()
+            .sort((a, b) => a.displayOrder - b.displayOrder)
+            .map((question) => (
+              <div className="ds-field" key={question.id}>
+                <label className="ds-field__label" htmlFor={`pint-q-${question.id}`}>
+                  {question.title}
+                  {question.required ? " *" : " (opcional)"}
+                </label>
+                <p className="ds-field__hint">{question.text}</p>
+                <Textarea
+                  id={`pint-q-${question.id}`}
+                  value={draftAnswers[question.id] ?? ""}
+                  onChange={(event) => saveAnswer(question.id, event.target.value)}
+                  required={question.required}
+                  aria-required={question.required}
+                />
+              </div>
+            ))}
+
+          {message && (
+            <Alert tone="danger" role="alert">
+              {message}
+            </Alert>
+          )}
+
+          <Button type="submit" variant="primary" loading={submitting}>
+            {submitting ? "Enviando..." : "Enviar Pré-Entrevista"}
+          </Button>
+        </form>
+      </Card>
+    </PublicShell>
   );
 }

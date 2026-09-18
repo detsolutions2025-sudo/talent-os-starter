@@ -1,13 +1,17 @@
-import React from "react";
+import React, { Suspense, lazy } from "react";
 import ReactDOM from "react-dom/client";
-import { App } from "./App";
-import { PublicApplicationForm } from "./PublicApplicationForm";
-import { PublicPreInterviewForm } from "./PublicPreInterviewForm";
-import { PublicBehavioralAssessmentForm } from "./PublicBehavioralAssessmentForm";
-import { PublicProposalForm } from "./PublicProposalForm";
-import { AcceptInvitePage } from "./AcceptInvitePage";
+import { PublicJobApplicationPage } from "./features/public/PublicJobApplicationPage";
+import { PublicPreInterviewPage } from "./features/public/PublicPreInterviewPage";
+import { PublicBehavioralAssessmentPage } from "./features/public/PublicBehavioralAssessmentPage";
+import { PublicProposalPage } from "./features/public/PublicProposalPage";
+import { AcceptInvitePage } from "./features/public/AcceptInvitePage";
 import { SessionGate } from "./SessionGate";
 import { installCredentialedFetch } from "./apiClient";
+
+// Carregado sob demanda: quem acessa uma rota publica (candidato/visitante anonimo) nunca deve
+// baixar o bundle e o CSS do painel administrativo (`App.tsx` e tudo que ele importa) -- so o
+// caminho autenticado (`else` abaixo) paga esse custo.
+const App = lazy(() => import("./App").then((module) => ({ default: module.App })));
 
 // Fase 29 (ADR-0026; SPEC-028 v1.0). Uma unica instalacao, no boot -- ver `apiClient.ts` para a
 // justificativa de por que isto substitui a reescrita das ~150 chamadas `fetch()` existentes.
@@ -35,18 +39,20 @@ const acceptInviteMatch = window.location.pathname.match(/^\/accept-invite\/?$/)
 const root = (
   <React.StrictMode>
     {publicApplicationMatch ? (
-      <PublicApplicationForm slug={decodeURIComponent(publicApplicationMatch[1])} />
+      <PublicJobApplicationPage slug={decodeURIComponent(publicApplicationMatch[1])} />
     ) : publicPreInterviewMatch ? (
-      <PublicPreInterviewForm />
+      <PublicPreInterviewPage />
     ) : publicBehavioralAssessmentMatch ? (
-      <PublicBehavioralAssessmentForm />
+      <PublicBehavioralAssessmentPage />
     ) : publicProposalMatch ? (
-      <PublicProposalForm />
+      <PublicProposalPage />
     ) : acceptInviteMatch ? (
       <AcceptInvitePage />
     ) : (
       <SessionGate>
-        <App />
+        <Suspense fallback={null}>
+          <App />
+        </Suspense>
       </SessionGate>
     )}
   </React.StrictMode>
