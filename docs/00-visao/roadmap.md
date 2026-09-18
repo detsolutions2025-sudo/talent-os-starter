@@ -752,3 +752,49 @@ dominio, RBAC, tenant isolation ou frontend.
 Isto **nao** torna o projeto "production ready" -- e a sexta das sete
 sub-frentes da ADR-0027; E2E permanece candidata a trabalho futuro, sem
 numero de fase atribuido.
+
+## Production Hardening — E2E + Estabilizacao minima (2026-09-18)
+
+Setima e ultima sub-frente da ADR-0027 (secao 2) fechada nesta rodada.
+Bateria pequena e deterministica (`tests/e2e/`, 7 arquivos, 16 testes,
+~2m30s) provando 7 caminhos criticos de ponta a ponta (entrada HTTP
+real -> middleware -> autenticacao/RBAC quando aplicavel -> service ->
+Postgres real -> resposta -> estado persistido verificado): health/
+readiness; autenticacao real (cookie via `/auth/session`, nunca
+dev-headers) + **isolamento cross-tenant** (gate obrigatorio: credencial
+de uma Organization nunca le/altera/executa acao sobre recurso de
+outra); recrutamento (vaga -> candidatura -> mudanca real de estagio ->
+contratacao); fluxo publico (vaga publica -> candidatura publica, sem
+auth); ciclo de vida de pessoas (contratacao -> Onboarding); invariante
+critica de Offboarding (conclusao NUNCA revoga Membership/AccessGrant
+automaticamente); e rate limiting HTTP real (429 + `Retry-After` +
+contador persistido no Postgres distribuido da Fase 32). Nenhum
+Playwright/Cypress instalado -- nenhum dos riscos exige browser, todos
+resolvidos na camada HTTP/API.
+
+Nenhum backdoor novo de autenticacao foi criado: reaproveita os dois
+test doubles ja existentes desde as Fases 1/29 (`DevActorProvider` via
+headers `x-dev-*`, fail-closed fora de development/test; e
+`SupabaseActorProvider` real + `FakeSupabaseAdminPortE2E` -- fronteira
+EXTERNA do provider substituida, verificacao de assinatura JWT e
+resolucao de AuthIdentity/User/Membership/RBAC continuam reais).
+Nenhuma migration nova, nenhuma mudanca de regra de dominio/RBAC/tenant/
+lifecycle/frontend -- apenas testes e um pequeno ajuste de ambiente
+(`@vitest-environment node` no arquivo que assina/verifica JWT real,
+mesmo padrao ja usado por `tests/phase29`).
+
+**Estabilizacao durante a criacao dos E2E:** todos os problemas
+encontrados foram de teste/fixture (categoria D), nunca de producao --
+corrigidos automaticamente, sem tocar `src/`: vazamento de contador de
+rate limit entre dois `it()` compartilhando IP+store real (consolidado
+em um unico teste); ambiente jsdom incompativel com a Web Crypto de
+`jose` (adicionado `@vitest-environment node`); `externalId` de teste
+inventado divergindo do gerado pelo provider fake (corrigida a ordem:
+gerar o externalId real primeiro, so depois inserir o AuthIdentity);
+payload incompleto ao criar uma Vaga auxiliar (reaproveitado um helper
+ja testado). Documentacao completa em `tests/e2e/README.md`.
+
+Isto fecha as sete sub-frentes da ADR-0027 -- **ainda nao** torna o
+projeto "production ready"/RC formalmente declarado; isso depende de
+decisoes humanas (hosting, plano Supabase real, primeiro release
+candidate) fora do escopo de codigo.
