@@ -18,7 +18,8 @@
     "db:check:supabase": "tsx src/server/check-supabase.ts",
     "db:migrate:supabase": "tsx src/server/migrate-postgres.ts",
     "db:backup": "tsx src/server/backup-restore/cli-backup.ts",
-    "db:restore": "tsx src/server/backup-restore/cli-restore.ts"
+    "db:restore": "tsx src/server/backup-restore/cli-restore.ts",
+    "auth:create-platform-admin": "tsx src/server/create-platform-admin.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.3",

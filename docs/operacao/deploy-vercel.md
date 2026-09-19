@@ -195,3 +195,6 @@ por esta wave; é a estratégia nativa da plataforma escolhida.
 - [ ] Após o primeiro deploy: `GET /api/ready` OK, e ao menos um
       fluxo público (`/vagas/:slug`) carregando com CSS aplicado
       (confirma que o rewrite de SPA fallback está correto).
+- [ ] Primeiro Platform Admin criado — ver
+      `docs/operacao/primeiro-platform-admin.md` (processo manual
+      deliberado, sem rota HTTP equivalente).
