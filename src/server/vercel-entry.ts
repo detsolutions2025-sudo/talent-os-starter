@@ -1,10 +1,26 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { buildApp } from "../src/server/bootstrap";
+import { buildApp } from "./bootstrap";
 
-// Entrypoint da Serverless Function do Vercel para toda a API (`/api/*` -- ver os `rewrites` em
-// `vercel.json`, que encaminham qualquer requisicao sob `/api/` para ESTE arquivo preservando o
+// Fonte da Serverless Function da Vercel para toda a API (`/api/*` -- ver os `rewrites` em
+// `vercel.json`, que encaminham qualquer requisicao sob `/api/` para a function preservando o
 // path original, exatamente o que `createServer()` espera: suas rotas ja sao montadas com
 // `app.use("/api", ...)`, ver `src/server/app.ts`).
+//
+// Corrigido apos falha real em producao (primeiro deploy): a Vercel executa Node ESM nativo
+// para funcoes TypeScript deste projeto (`"type": "module"` no package.json raiz) -- ao
+// contrario de `tsx`/Vite/Vitest (que resolvem imports relativos sem extensao via bundler), o
+// loader ESM nativo do Node EXIGE extensao explicita em todo import relativo, e este projeto
+// inteiro (`src/server/**`) usa imports sem extensao. O resultado real observado foi
+// `ERR_MODULE_NOT_FOUND: Cannot find module '/var/task/src/server/bootstrap'` em toda
+// invocacao, inclusive `/api/health` (rota estatica, sem nenhuma dependencia de configuracao).
+//
+// Em vez de reescrever import relativo de ~200 arquivos de `src/server/**` (risco alto, sem
+// beneficio para o processo tradicional que usa `tsx`), este arquivo e compilado para
+// `api/index.js` por esbuild (`npm run build:api`, parte de `npm run build`) ANTES do deploy --
+// um unico arquivo autocontido, com todo `src/server/**` já resolvido/embutido e apenas os
+// pacotes de `node_modules` (express, pg, jose, ...) deixados de fora (`--packages=external`,
+// resolvidos normalmente pelo Node em runtime). `api/index.ts` nunca existe como arquivo -- só
+// o `.js` gerado, gitignored, ver `.gitignore`/`package.json`.
 //
 // `buildApp()` roda em escopo de MODULO (fora do handler), nao a cada requisicao: a Vercel
 // reutiliza a mesma instancia de container ("warm") entre invocacoes proximas no tempo, entao o

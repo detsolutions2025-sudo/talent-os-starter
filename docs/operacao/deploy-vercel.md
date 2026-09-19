@@ -15,8 +15,10 @@ Vercel serve:
 
 - o **frontend estático** (`vite build` → `dist/`), pela CDN da Vercel;
 - a **API** (`/api/*`), como uma única Serverless Function
-  (`api/index.ts`) que reaproveita o mesmo `express()` já usado pelo
-  processo tradicional — nenhuma rota foi reescrita.
+  (`api/index.js`, gerado por `npm run build:api` a partir de
+  `src/server/vercel-entry.ts` — ver seção 2.1) que reaproveita o mesmo
+  `express()` já usado pelo processo tradicional — nenhuma rota foi
+  reescrita.
 
 `vercel.json` faz o roteamento:
 
@@ -44,15 +46,66 @@ Vercel serve:
   ou qualquer hosting baseado em processo de longa duração):
   `buildApp()` + `app.listen()` + `registerGracefulShutdown()`.
   Comportamento observável idêntico a antes desta wave.
-- `api/index.ts` — entrypoint da Vercel: `buildApp({ poolOptions: { max: 3 } })`
-  uma única vez por instância de função (reaproveitada entre
-  invocações "warm" do mesmo container), exportado como handler
-  `(req, res) => void`. Nunca chama `listen()`/graceful shutdown — a
-  Vercel gerencia o ciclo de vida do processo.
+- `src/server/vercel-entry.ts` — fonte da Serverless Function:
+  `buildApp({ poolOptions: { max: 3 } })` uma única vez por instância
+  de função (reaproveitada entre invocações "warm" do mesmo
+  container), exportado como handler `(req, res) => void`. Nunca chama
+  `listen()`/graceful shutdown — a Vercel gerencia o ciclo de vida do
+  processo. **Nunca vive dentro de `api/`** — ver seção 2.1.
 - `vercel.json`, `.vercelignore` — descritos acima/abaixo.
 - `package.json`: `engines.node = "22.x"` (mesma versão já fixada em
   `.github/workflows/ci.yml`) — a Vercel lê este campo para escolher o
-  runtime Node da função e do build.
+  runtime Node da função e do build. `build:api` (esbuild) — ver 2.1.
+
+### 2.1. Por que a API é compilada antes do deploy (falha real do primeiro deploy)
+
+O primeiro deploy real quebrou com `FUNCTION_INVOCATION_FAILED` em
+**toda** invocação, inclusive `/api/health` (rota estática, sem
+nenhuma configuração). O log de runtime mostrou a causa exata:
+
+```
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/var/task/src/server/bootstrap'
+```
+
+Causa raiz: a Vercel executa funções Node deste projeto como **Node
+ESM nativo** (`"type": "module"` no `package.json` raiz), e o loader
+ESM nativo do Node **exige extensão explícita em todo import
+relativo** (`from "./bootstrap.js"`, nunca `from "./bootstrap"`).
+`src/server/**` inteiro (~200 arquivos, escrito antes desta wave) usa
+imports sem extensão — um estilo válido e já testado sob `tsx`
+(dev/testes) e Vite/Vitest (bundle/testes), porque essas ferramentas
+resolvem extensão automaticamente via bundler. A Vercel, para uma
+function TypeScript, **não** garante o mesmo bundling completo que
+essas ferramentas fazem — o resultado real observado foi um `import`
+relativo chegando intacto (sem extensão) ao loader nativo do Node em
+produção, que não sabe resolvê-lo.
+
+Reescrever ~200 imports relativos em `src/server/**` para adicionar
+`.js` (a correção "canônica" de TypeScript+ESM+Node) foi descartado
+por alto risco/baixo benefício: exigiria retestar toda a suíte sem
+nenhum ganho para o processo tradicional, que já funciona hoje via
+`tsx`. Em vez disso, a fonte permanece intocada e é **compilada uma
+vez, antes do deploy**, num único arquivo autocontido:
+
+```
+esbuild src/server/vercel-entry.ts --bundle --platform=node --format=esm \
+  --target=node22 --packages=external --outfile=api/index.js
+```
+
+`--packages=external` deixa todo pacote de `node_modules` (express,
+pg, jose, ...) de fora do bundle (resolvido normalmente pelo Node em
+runtime) e embute apenas `src/server/**` — que passa a ter zero import
+relativo sem extensão remanescente no arquivo final. `api/index.ts`
+**nunca existe como arquivo versionado**: `api/` é gerado
+inteiramente por `npm run build:api` (parte de `npm run build`,
+portanto do `buildCommand` da Vercel) e está no `.gitignore`, mesmo
+tratamento já dado a `dist/`.
+
+Coberto por `tests/ci/vercel-api-bundle.test.ts`: builda o mesmo
+bundle com as mesmas flags e roda o resultado sob um processo `node`
+limpo (nunca `tsx`, nunca o transform do Vitest) — a única forma de
+reproduzir essa classe de bug antes de um deploy real acontecer de
+novo.
 
 ## 3. Variáveis de ambiente por ambiente Vercel
 

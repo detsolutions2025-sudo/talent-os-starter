@@ -3,6 +3,7 @@ db/**/*.sql
 node_modules
 dist
 coverage
+api
 
 # FAST TRACK CI/CD + Observabilidade (2026-09-16). Divida de formatacao PRE-EXISTENTE a este
 # bloco (documentacao historica de fases ja concluidas/fechadas, nunca tocada por este workflow)

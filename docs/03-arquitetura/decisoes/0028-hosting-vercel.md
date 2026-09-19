@@ -95,11 +95,32 @@ Fase 31, sem nenhuma mudança de código necessária para ele).
   `tests/phase30/bootstrap-smoke.test.ts`, que continua passando sem
   nenhuma alteração de expectativa.
 
+## Revisão destrutiva: primeiro deploy real quebrou
+
+O primeiro deploy real falhou em toda invocação (`FUNCTION_INVOCATION_FAILED`
+/ `ERR_MODULE_NOT_FOUND: Cannot find module '.../src/server/bootstrap'`),
+inclusive `/api/health`. Causa: a Vercel roda a function como Node ESM
+nativo, que exige extensão explícita em todo import relativo — ausente
+em `src/server/**` inteiro (estilo válido sob `tsx`/Vite/Vitest, que
+resolvem isso via bundler, mas não sob o loader nativo do Node). Correção:
+a fonte da function foi movida para `src/server/vercel-entry.ts` e passa a
+ser **compilada** por `esbuild` (`npm run build:api`, parte de `npm run
+build`) num único arquivo autocontido (`api/index.js`, gerado, gitignored,
+nunca versionado) — nenhuma linha de `src/server/**` foi reescrita. Ver
+`docs/operacao/deploy-vercel.md` seção 2.1 para o detalhe completo, e
+`tests/ci/vercel-api-bundle.test.ts` para a prova (builda o mesmo bundle e
+roda sob `node` puro, nunca `tsx`/Vitest — a única forma de reproduzir essa
+classe de bug antes de um deploy real).
+
 ## Impacto no Código
 
 `src/server/bootstrap.ts` (novo), `src/server/index.ts` (refatorado,
-comportamento preservado), `api/index.ts` (novo), `vercel.json`,
-`.vercelignore` (novos), `package.json` (`engines.node`), `tsconfig.json`
-e `eslint.config.js` (incluem `api/` nos gates existentes). Nenhuma
+comportamento preservado), `src/server/vercel-entry.ts` (novo, fonte
+da function), `vercel.json`, `.vercelignore` (novos), `package.json`
+(`engines.node`, `esbuild` como devDependency, script `build:api`),
+`tsconfig.json` e `eslint.config.js` (ajustados para a nova
+localização da fonte; `api/` gerado e ignorado por ambos). Nenhuma
 migration, nenhuma mudança de RBAC/tenant/lifecycle/rate
-limiting/Auth, nenhuma dependência nova.
+limiting/Auth. Única dependência nova: `esbuild`, devDependency,
+necessária para compilar a function antes do deploy (ver revisão
+destrutiva acima).
