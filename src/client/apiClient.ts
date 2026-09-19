@@ -10,7 +10,12 @@ export function installCredentialedFetch() {
   if (typeof window === "undefined") return;
   const original = window.fetch.bind(window);
   window.fetch = (input: RequestInfo | URL, init: RequestInit = {}) => {
-    if (init.credentials === undefined) {
+    const requestUrl =
+      input instanceof Request ? input.url : input instanceof URL ? input.href : String(input);
+    const isSameOrigin =
+      new URL(requestUrl, window.location.href).origin === window.location.origin;
+
+    if (isSameOrigin && init.credentials === undefined) {
       init = { ...init, credentials: "include" };
     }
     return original(input, init);
