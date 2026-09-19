@@ -100,8 +100,17 @@ jobs:
       - name: Run tests (vitest)
         run: npm test
 
-      - name: Build (tsc --noEmit + vite build)
+      - name: Build (tsc --noEmit + vite build + build:api)
         run: npm run build
+
+      # ADR-0028 (Hosting/Vercel): a Vercel detecta a Serverless Function pelo estado de `api/`
+      # JA VERSIONADO no repositorio (nao pelo output do build) -- api/index.js precisa estar
+      # commitado e sempre em dia com src/server/vercel-entry.ts/src/server/**. `npm run build`
+      # acima ja regenerou o arquivo a partir do checkout deste job; se o resultado divergir do
+      # que esta commitado, alguem editou src/server/** sem rodar `npm run build:api` de novo
+      # antes de commitar -- falha aqui, nunca um deploy real servindo codigo desatualizado.
+      - name: Verify api/index.js bundle is committed and up to date
+        run: git diff --exit-code -- api/index.js
 
       # ADR-0027 secao 21: gate obrigatorio de CI -- apenas dependencias de producao (dev nunca
       # bloqueia merge, mesmo padrao ja seguido manualmente em toda Fase anterior).

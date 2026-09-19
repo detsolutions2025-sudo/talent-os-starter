@@ -1,9 +1,6 @@
 node_modules/
 dist/
 coverage/
-# Gerado por `npm run build:api` (esbuild) a partir de src/server/vercel-entry.ts -- nunca
-# commitado, ver docs/operacao/deploy-vercel.md.
-api/
 .env
 dev.db
 prisma/dev.db
